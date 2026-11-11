@@ -1,0 +1,1125 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Meetmaat</title>
+<meta name="description" content="Bouwtekening openen, ijken en maten aflezen voor uitzetten in het werk.">
+<meta name="theme-color" content="#1d2427">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Meetmaat">
+<style>
+/* Lettertypen zitten in de app zelf (SIL OFL, zie fonts/): werkt offline, geen verzoeken naar Google */
+@font-face { font-family: "Barlow Condensed"; font-weight: 500; font-display: swap; src: url(fonts/barlow-condensed-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; font-display: swap; src: url(fonts/barlow-condensed-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap; src: url(fonts/barlow-condensed-latin-700-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 500; font-display: swap; src: url(fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: swap; src: url(fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; font-display: swap; src: url(fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 500; font-display: swap; src: url(fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 600; font-display: swap; src: url(fonts/ibm-plex-mono-latin-600-normal.woff2) format("woff2"); }
+/* Layout: werkplaats — gereedschapsbalk boven, tekening groot links, metingenlijst rechts; stapelt op telefoon */
+:root {
+  --bg: #e9ecec;
+  --panel: #f7f8f8;
+  --ink: #1d2427;
+  --muted: #5d686c;
+  --line: #c9cfd0;
+  --accent: #e0a800;        /* maatlat-geel */
+  --accent-ink: #1d2427;
+  --viewer: #cfd5d6;
+  --ok: #2f7d4a;
+  --warn: #c2410c;
+  /* tekenkleuren op het (altijd witte) papier */
+  --mark: #ef6c00;
+  --cal: #2e7d32;
+  --pile: #00838f;
+  --paper-ink: #111111;
+  --paper: #ffffff;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15191b; --panel: #1e2427; --ink: #e6eaeb; --muted: #97a3a7; --line: #333c40;
+    --accent: #f2c230; --accent-ink: #15191b; --viewer: #0e1113; --ok: #6cc28b; --warn: #ff8a5c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15191b; --panel: #1e2427; --ink: #e6eaeb; --muted: #97a3a7; --line: #333c40;
+  --accent: #f2c230; --accent-ink: #15191b; --viewer: #0e1113; --ok: #6cc28b; --warn: #ff8a5c;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 32px;
+}
+.wrap { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.wrap > *, .toolbar > * { min-width: 0; }
+
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 24px; border-bottom: 3px solid var(--ink); padding-bottom: 10px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 4.5vw, 42px); line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: .01em; text-wrap: balance; }
+.sub { color: var(--muted); margin: 4px 0 0; font-size: 14px; max-width: 62ch; }
+.tape { height: 8px; border-radius: 2px; background: repeating-linear-gradient(90deg, var(--accent-ink) 0 1px, transparent 1px 10px), var(--accent); opacity: .9; }
+h2 { font-family: var(--display); font-weight: 600; font-size: 19px; text-transform: uppercase; letter-spacing: .04em; margin: 0; }
+
+.filebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.fname { font-family: var(--mono); font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+select { font: 500 14px var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px; }
+
+button, .btn {
+  font: 600 14px var(--body); border-radius: 4px; padding: 8px 13px; cursor: pointer; display: inline-block;
+  border: 1px solid var(--ink); background: var(--ink); color: var(--panel); line-height: 1.3;
+}
+button.ghost { background: transparent; color: var(--ink); }
+button[aria-pressed="true"].ghost { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; }
+.seg { display: flex; border: 1px solid var(--ink); border-radius: 4px; overflow-x: auto; max-width: 100%; }
+.seg button { border: 0; border-radius: 0; background: transparent; color: var(--ink); padding: 8px 12px; white-space: nowrap; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+
+.work { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
+@media (max-width: 920px) { .work { grid-template-columns: minmax(0, 1fr); } }
+
+.viewer { display: grid; gap: 8px; min-width: 0; }
+#view {
+  position: relative; overflow: hidden; height: min(74vh, 880px); min-height: 360px;
+  background: var(--viewer); border: 1px solid var(--line); border-radius: 6px;
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+}
+#view.measure { cursor: crosshair; }
+#view.panning { cursor: grabbing; }
+#stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#cv { display: block; background: var(--paper); box-shadow: 0 1px 8px rgba(0,0,0,.25); }
+#ov { position: absolute; left: 0; top: 0; overflow: visible; }
+
+#ov path { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+#ov .halo { stroke: var(--paper); stroke-width: 7; opacity: .9; }
+#ov .halo.on { stroke: var(--accent); stroke-width: 11; opacity: .85; }
+#ov .mk { stroke: var(--mark); stroke-width: 3; }
+#ov .fill { fill: var(--mark); opacity: .14; stroke: none; }
+#ov .cal { stroke: var(--cal); stroke-width: 3; stroke-dasharray: 9 6; }
+#ov .dr { stroke: var(--mark); stroke-width: 2; stroke-dasharray: 7 5; }
+#ov .lead { stroke: var(--mark); stroke-width: 1.5; stroke-dasharray: 5 5; }
+#ov .org { stroke: var(--paper-ink); stroke-width: 2; }
+#ov .orgc { fill: var(--paper); stroke: var(--paper-ink); stroke-width: 2; vector-effect: non-scaling-stroke; }
+#ov .pt { fill: var(--mark); stroke: var(--paper); stroke-width: 2; vector-effect: non-scaling-stroke; }
+#ov .hd { fill: var(--paper); stroke: var(--mark); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+#ov .hd.c { stroke: var(--cal); }
+#ov .hd.o { stroke: var(--paper-ink); }
+#ov .hit { fill: transparent; cursor: grab; }
+#ov .selhit { stroke: transparent; stroke-width: 18; cursor: pointer; }
+#ov .lb { fill: var(--paper-ink); stroke: var(--paper); paint-order: stroke; stroke-linejoin: round; font-family: var(--mono); font-weight: 600; pointer-events: none; }
+#ov .lb.cal { fill: var(--cal); }
+#ov .lb.mkc { fill: #b34700; }
+#ov .pl { fill: none; stroke: var(--pile); stroke-width: 1.8; vector-effect: non-scaling-stroke; opacity: .75; }
+#ov .plink { stroke: var(--pile); stroke-width: 2; stroke-dasharray: 4 4; }
+#ov .lb.pil { fill: var(--pile); }
+
+.zoom { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+.zoom button { width: 40px; height: 40px; padding: 0; font-size: 18px; background: var(--panel); color: var(--ink); border-color: var(--line); box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+.zoom button.fit { font-size: 11px; }
+
+.banner { position: absolute; left: 10px; top: 10px; right: 60px; max-width: 520px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 0 4px 4px 0; padding: 8px 12px; font-size: 13px; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
+.banner.err { border-left-color: var(--warn); color: var(--warn); font-weight: 500; }
+.filebtn { position: relative; overflow: hidden; }
+.filebtn input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 40px; }
+.calibbox { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); width: min(340px, calc(100% - 28px)); background: var(--panel); border: 1px solid var(--ink); border-radius: 6px; padding: 14px; display: grid; gap: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.3); }
+.calibbox label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; }
+.unit { position: relative; }
+.unit span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font: 13px var(--mono); pointer-events: none; }
+input[type="number"], input[type="text"], .nm {
+  width: 100%; font: 500 15px/1.4 var(--mono); color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; font-variant-numeric: tabular-nums;
+}
+.unit input { padding-right: 44px; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--viewer) 70%, transparent); font-weight: 600; }
+
+.hintbar { font-size: 14px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; min-height: 2.6em; }
+.hintbar.flash { border-color: var(--warn); color: var(--warn); }
+
+.side { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.calinfo { font-size: 14px; display: grid; gap: 4px; }
+.calinfo .big { font-family: var(--mono); font-size: 14px; font-weight: 500; }
+.calinfo.no { color: var(--warn); }
+.hint { color: var(--muted); font-size: 12.5px; margin: 0; }
+
+#list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 60vh; overflow-y: auto; }
+#list li.m { border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; display: grid; gap: 4px; background: var(--bg); cursor: pointer; }
+#list li.m.on { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
+#list li.empty { color: var(--muted); font-size: 14px; }
+.mh { display: flex; align-items: center; gap: 8px; }
+.num { font: 600 13px var(--mono); background: var(--ink); color: var(--panel); border-radius: 3px; padding: 0 6px; }
+.tag { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); flex: 1; }
+.mh button { padding: 3px 8px; font-size: 12px; background: transparent; color: var(--ink); border-color: var(--line); }
+.nm { font-family: var(--body); font-size: 14px; padding: 4px 8px; background: var(--panel); }
+.val { font: 600 16px var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.subv { font: 12.5px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.toast { font-size: 13px; color: var(--ok); min-height: 1.2em; }
+</style>
+<script src="vendor/pdf.min.js"></script>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Meetmaat</h1>
+      <p class="sub">Open een tekening, ijk hem op een maat die je kent en lees afstanden, lengtes, oppervlakken en uitzetmaten af voor in het werk.</p>
+    </div>
+    <div class="filebar">
+      <label class="btn filebtn">Tekening openen<input id="file" type="file" accept="application/pdf,.pdf,image/*" aria-label="Tekening openen"></label>
+      <select id="page" aria-label="Pagina" hidden></select>
+      <button type="button" class="ghost" id="install" hidden>App installeren</button>
+      <span class="fname" id="fname"></span>
+    </div>
+  </header>
+  <div class="tape" aria-hidden="true"></div>
+
+  <div class="toolbar">
+    <div class="seg" id="tools" role="group" aria-label="Gereedschap">
+      <button type="button" data-tool="pan">Schuiven</button>
+      <button type="button" data-tool="calib">IJken</button>
+      <button type="button" data-tool="dist">Afstand</button>
+      <button type="button" data-tool="poly">Lengte</button>
+      <button type="button" data-tool="area">Oppervlak</button>
+      <button type="button" data-tool="origin">Nulpunt</button>
+      <button type="button" data-tool="set">Uitzetmaat</button>
+    </div>
+    <div class="btns">
+      <div class="seg" id="units" role="group" aria-label="Eenheid">
+        <button type="button" data-unit="mm">mm</button>
+        <button type="button" data-unit="cm">cm</button>
+        <button type="button" data-unit="m">m</button>
+      </div>
+      <button type="button" class="ghost" id="pilesbtn" aria-pressed="true" hidden title="Palen tonen en punten op palen laten vastklikken">Palen</button>
+      <button type="button" class="ghost" id="ortho" aria-pressed="false" title="Alleen horizontaal of verticaal meten (of houd Shift ingedrukt)">Haaks</button>
+      <button type="button" id="finish" hidden>Klaar</button>
+      <button type="button" class="ghost" id="undo">Ongedaan</button>
+    </div>
+  </div>
+
+  <div class="work">
+    <div class="viewer">
+      <div id="view" aria-label="Tekening">
+        <div id="stage"><canvas id="cv" width="10" height="10"></canvas><svg id="ov" xmlns="http://www.w3.org/2000/svg"></svg></div>
+        <div class="banner" id="banner" hidden></div>
+        <form class="calibbox" id="calibbox" hidden>
+          <strong>Hoe lang is deze lijn in het echt?</strong>
+          <span class="hint" id="calpx"></span>
+          <label for="calmm">Echte maat
+            <div class="unit"><input id="calmm" type="number" step="any" min="0" inputmode="decimal" placeholder="bijv. 47970"><span id="calunit">mm</span></div>
+          </label>
+          <span class="hint" id="calerr" style="color:var(--warn)"></span>
+          <div class="btns"><button type="submit">IJken</button><button type="button" class="ghost" id="calcancel">Annuleren</button></div>
+        </form>
+        <div class="zoom">
+          <button type="button" id="zin" aria-label="Inzoomen">+</button>
+          <button type="button" id="zout" aria-label="Uitzoomen">−</button>
+          <button type="button" id="zfit" class="fit" aria-label="Hele tekening tonen">Passend</button>
+        </div>
+        <div class="loading" id="loading" hidden>Tekening laden…</div>
+      </div>
+      <div class="hintbar" id="hint" aria-live="polite"></div>
+    </div>
+
+    <aside class="side">
+      <h2>IJking</h2>
+      <div class="calinfo" id="calinfo"></div>
+      <h2>Palen</h2>
+      <div class="calinfo" id="pileinfo"></div>
+      <h2>Metingen</h2>
+      <ol id="list"></ol>
+      <div class="btns">
+        <button type="button" id="copy">Kopieer lijst</button>
+        <button type="button" class="ghost" id="clearall">Alles wissen</button>
+      </div>
+      <div class="toast" id="toast"></div>
+      <p class="hint">X is naar rechts, Y is naar boven op de tekening, gemeten vanaf het nulpunt. Controleer je ijking door met Afstand een tweede bekende maatlijn na te meten.</p>
+      <p class="hint"><a href="installeren.html" style="color:inherit">Meetmaat installeren of doorsturen</a></p>
+    </aside>
+  </div>
+</div>
+
+<script>
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js";
+
+/* ---------- Laatste tekening bewaren (IndexedDB, alleen op dit apparaat) ---------- */
+const IDB = {
+  open() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open("meetmaat", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("files");
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  },
+  async run(mode, fn) {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction("files", mode), q = fn(tx.objectStore("files"));
+      tx.oncomplete = () => res(q && q.result); tx.onerror = () => rej(tx.error);
+    });
+  },
+  get(k) { return this.run("readonly", s => s.get(k)); },
+  put(k, v) { return this.run("readwrite", s => s.put(v, k)); },
+  del(k) { return this.run("readwrite", s => s.delete(k)); }
+};
+const recToFile = r => new File([r.blob], r.name, { type: r.type || "" });
+
+const $ = id => document.getElementById(id);
+const view = $("view"), stage = $("stage"), cv = $("cv"), ov = $("ov");
+const nl0 = n => Math.round(n).toLocaleString("nl-NL", { useGrouping: false });   // maatvoering zoals op tekening: 47970
+const nl = (n, d) => n.toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const TYPE_NAME = { dist: "Afstand", poly: "Lengte", area: "Oppervlak", set: "Uitzetmaat" };
+const MEASURE_TOOLS = ["dist", "poly", "area", "set"];
+
+let img = { w: 0, h: 0, key: "", name: "", sample: false };
+let T = { s: 1, x: 0, y: 0 };
+let st = blank();
+let tool = "pan", draft = [], ortho = false, sel = null, hover = null, hoverShift = false;
+let pdfDoc = null, pageNo = 1, fileMeta = null;
+let piles = [], pileR = 8, pilesOn = true, pileGrid = new Map();
+const PG = 64;   // rastermaat (px) voor snel zoeken naar de dichtstbijzijnde paal
+
+/* ---------- Palen ---------- */
+function setPiles(list, r) {
+  piles = list; pileR = r || 8; pileGrid = new Map();
+  piles.forEach(p => {
+    const k = `${Math.floor(p.x / PG)},${Math.floor(p.y / PG)}`;
+    if (!pileGrid.has(k)) pileGrid.set(k, []);
+    pileGrid.get(k).push(p);
+  });
+}
+function nearestPile(p, maxD = Infinity) {
+  if (!piles.length) return null;
+  const cx = Math.floor(p.x / PG), cy = Math.floor(p.y / PG);
+  let best = null, bd = Infinity;
+  for (let r = 0; r < 400; r++) {
+    for (let i = cx - r; i <= cx + r; i++) for (let j = cy - r; j <= cy + r; j++) {
+      if (Math.max(Math.abs(i - cx), Math.abs(j - cy)) !== r) continue;
+      const arr = pileGrid.get(`${i},${j}`);
+      if (arr) for (const q of arr) { const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; best = q; } }
+    }
+    if (best && bd <= r * PG) break;
+    if (r * PG > maxD) break;
+  }
+  return best && bd <= maxD ? best : null;
+}
+function snap(p) {
+  if (!pilesOn || !piles.length || tool === "calib") return p;
+  const q = nearestPile(p, 14 / T.s);
+  return q ? { x: q.x, y: q.y } : p;
+}
+// Automatisch ijken: maatgetallen in de PDF koppelen aan hun maatlijn en hulplijnen
+async function autoScale(page, vp) {
+  const O = pdfjsLib.OPS, list = await page.getOperatorList();
+  const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+  let ctm = [1, 0, 0, 1, 0, 0]; const stack = [], hs = [], vs = [];
+  for (let i = 0; i < list.fnArray.length; i++) {
+    const fn = list.fnArray[i], args = list.argsArray[i];
+    if (fn === O.save) stack.push(ctm);
+    else if (fn === O.restore) ctm = stack.pop() || ctm;
+    else if (fn === O.transform) ctm = mul(ctm, args);
+    else if (fn === O.paintFormXObjectBegin) { stack.push(ctm); if (args && args[0]) ctm = mul(ctm, args[0]); }
+    else if (fn === O.paintFormXObjectEnd) ctm = stack.pop() || ctm;
+    else if (fn === O.constructPath) {
+      const ops = args[0], c = args[1]; let ci = 0, cur = null;
+      const P = (x, y) => [ctm[0] * x + ctm[2] * y + ctm[4], ctm[1] * x + ctm[3] * y + ctm[5]];
+      for (const op of ops) {
+        if (op === O.moveTo) { cur = P(c[ci], c[ci + 1]); ci += 2; }
+        else if (op === O.lineTo) {
+          const nx = P(c[ci], c[ci + 1]); ci += 2;
+          if (cur) {
+            if (Math.abs(cur[1] - nx[1]) < 0.3 && Math.abs(cur[0] - nx[0]) > 2) hs.push({ p: (cur[1] + nx[1]) / 2, a: Math.min(cur[0], nx[0]), b: Math.max(cur[0], nx[0]) });
+            else if (Math.abs(cur[0] - nx[0]) < 0.3 && Math.abs(cur[1] - nx[1]) > 2) vs.push({ p: (cur[0] + nx[0]) / 2, a: Math.min(cur[1], nx[1]), b: Math.max(cur[1], nx[1]) });
+          }
+          cur = nx;
+        }
+        else if (op === O.curveTo) { cur = P(c[ci + 4], c[ci + 5]); ci += 6; }
+        else if (op === O.curveTo2 || op === O.curveTo3) { cur = P(c[ci + 2], c[ci + 3]); ci += 4; }
+        else if (op === O.rectangle) { ci += 4; cur = null; }
+      }
+    }
+  }
+  const tc = await page.getTextContent();
+  const found = [];
+  for (const t of tc.items) {
+    const s = (t.str || "").trim();
+    if (!/^\d{3,6}$/.test(s)) continue;
+    const val = +s; if (val < 500) continue;
+    const [a, b, , , e, f] = t.transform, n = Math.hypot(a, b), h = t.height || n;
+    const dx = a / n, dy = b / n;
+    const horiz = Math.abs(dy) < 0.01, vert = Math.abs(dx) < 0.01;
+    if (!horiz && !vert) continue;
+    const cx = e + dx * t.width / 2, cy = f + dy * t.width / 2;      // midden van de tekst
+    const down = [dy, -dx];                                          // richting "onder de tekst"
+    const lines = horiz ? hs : vs, cross = horiz ? vs : hs;
+    const along = horiz ? cx : cy, across = horiz ? cy : cx, dsign = horiz ? down[1] : down[0];
+    let best = null;
+    for (const L of lines) {
+      if (L.b - L.a < t.width || along < L.a || along > L.b) continue;
+      const off = (L.p - across) * dsign;                          // afstand onder de tekst
+      if (off < -0.5 * h || off > 1.6 * h) continue;
+      if (!best || Math.abs(off) < Math.abs(best.off)) best = { ...L, off };
+    }
+    if (!best) continue;
+    const ext = (x, dir) => {                                        // dichtstbijzijnde hulplijn bij een eind
+      let bx = null, bd = 20;
+      for (const C of cross) {
+        if (C.b - C.a < Math.max(8, h)) continue;                    // pijlpuntjes en streepjes overslaan
+        if (best.p < C.a - 0.5 || best.p > C.b + 0.5) continue;
+        const d = (C.p - x) * dir;
+        if (d > -2 && Math.abs(d) < bd) { bd = Math.abs(d); bx = C.p; }
+      }
+      return bx === null ? x : bx;
+    };
+    const lo = ext(best.a, -1), hi = ext(best.b, 1);
+    if (hi - lo < 20) continue;
+    found.push({ val, ratio: val / (hi - lo), horiz, lo, hi, p: best.p });
+  }
+  if (found.length < 2) return null;
+  const rs = found.map(x => x.ratio).sort((x, y) => x - y), med = rs[Math.floor(rs.length / 2)];
+  const ok = found.filter(x => Math.abs(x.ratio / med - 1) < 0.005);
+  if (ok.length < 2) return null;
+  const top = ok.sort((x, y) => (y.hi - y.lo) - (x.hi - x.lo))[0];
+  const A = top.horiz ? [top.lo, top.p] : [top.p, top.lo], B = top.horiz ? [top.hi, top.p] : [top.p, top.hi];
+  const ca = vp.convertToViewportPoint(A[0], A[1]), cb = vp.convertToViewportPoint(B[0], B[1]);
+  const vals = [...new Set(ok.map(x => x.val))];
+  return { a: { x: ca[0], y: ca[1] }, b: { x: cb[0], y: cb[1] }, mm: top.val, n: ok.length, vals, spread: (Math.max(...ok.map(x => x.ratio)) / Math.min(...ok.map(x => x.ratio)) - 1) * 100 };
+}
+
+// Rondjes (palen) uit de vectordata van een PDF-pagina halen
+async function extractPiles(page, vp) {
+  const O = pdfjsLib.OPS, list = await page.getOperatorList();
+  const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+  let ctm = [1, 0, 0, 1, 0, 0]; const stack = [], circles = [];
+  for (let i = 0; i < list.fnArray.length; i++) {
+    const fn = list.fnArray[i], args = list.argsArray[i];
+    if (fn === O.save) stack.push(ctm);
+    else if (fn === O.restore) ctm = stack.pop() || ctm;
+    else if (fn === O.transform) ctm = mul(ctm, args);
+    else if (fn === O.paintFormXObjectBegin) { stack.push(ctm); if (args && args[0]) ctm = mul(ctm, args[0]); }
+    else if (fn === O.paintFormXObjectEnd) ctm = stack.pop() || ctm;
+    else if (fn === O.constructPath) {
+      const M = mul(vp.transform, ctm), ops = args[0], c = args[1];
+      let ci = 0, sub = null;
+      const add = (x, y) => { sub.xs.push(M[0] * x + M[2] * y + M[4]); sub.ys.push(M[1] * x + M[3] * y + M[5]); };
+      const flush = () => {
+        if (sub && sub.curves >= 4 && !sub.lines) {
+          const x0 = Math.min(...sub.xs), x1 = Math.max(...sub.xs), y0 = Math.min(...sub.ys), y1 = Math.max(...sub.ys);
+          const w = x1 - x0, h = y1 - y0;
+          if (w > 2 && w < 30 * vp.scale && Math.abs(w - h) < 0.15 * Math.max(w, h)) circles.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, d: (w + h) / 2 });
+        }
+        sub = null;
+      };
+      for (const op of ops) {
+        if (op === O.moveTo) { flush(); sub = { xs: [], ys: [], curves: 0, lines: 0 }; add(c[ci], c[ci + 1]); ci += 2; }
+        else if (op === O.lineTo) { if (sub) { sub.lines++; add(c[ci], c[ci + 1]); } ci += 2; }
+        else if (op === O.curveTo) { if (sub) { sub.curves++; add(c[ci], c[ci + 1]); add(c[ci + 2], c[ci + 3]); add(c[ci + 4], c[ci + 5]); } ci += 6; }
+        else if (op === O.curveTo2 || op === O.curveTo3) { if (sub) { sub.curves++; add(c[ci], c[ci + 1]); add(c[ci + 2], c[ci + 3]); } ci += 4; }
+        else if (op === O.rectangle) { flush(); ci += 4; }
+      }
+      flush();
+    }
+  }
+  if (!circles.length) return { list: [], r: 0 };
+  // de meest voorkomende rondjesmaat zijn de palen
+  const cnt = new Map();
+  circles.forEach(c => { const k = Math.round(c.d * 2) / 2; cnt.set(k, (cnt.get(k) || 0) + 1); });
+  const mode = [...cnt.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const out = [];
+  circles.filter(c => Math.abs(c.d - mode) <= 0.15 * mode).forEach(c => {
+    if (!out.some(o => Math.abs(o.x - c.x) < 1.5 && Math.abs(o.y - c.y) < 1.5)) out.push({ x: c.x, y: c.y });
+  });
+  return { list: out.length >= 4 ? out : [], r: mode / 2 };
+}
+
+function blank() { return { mmPerPx: null, calib: null, origin: null, items: [], seq: 1 }; }
+
+/* ---------- Opslaan per tekening (alleen in deze browser) ---------- */
+function save() {
+  if (img.sample || !img.key) return;
+  try { localStorage.setItem("meetmaat:" + img.key, JSON.stringify(st)); } catch (e) {}
+}
+function loadState(key) {
+  try { const s = JSON.parse(localStorage.getItem("meetmaat:" + key) || "null"); if (s && Array.isArray(s.items)) return s; } catch (e) {}
+  return null;
+}
+
+/* ---------- Meetkunde ---------- */
+const d2 = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+function constrain(p, ref) {
+  if (!ref) return p;
+  return Math.abs(p.x - ref.x) >= Math.abs(p.y - ref.y) ? { x: p.x, y: ref.y } : { x: ref.x, y: p.y };
+}
+function polyLen(pts, closed) {
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) L += d2(pts[i - 1], pts[i]);
+  if (closed && pts.length > 2) L += d2(pts[pts.length - 1], pts[0]);
+  return L;
+}
+function polyArea(pts) {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; a += p.x * q.y - q.x * p.y; }
+  return Math.abs(a) / 2;
+}
+const UNIT = { mm: { f: 1, d: 0, ex: "47970" }, cm: { f: 10, d: 0, ex: "4797" }, m: { f: 1000, d: 2, ex: "47,97" } };
+let unit = "mm";
+try { const u = localStorage.getItem("meetmaat:unit"); if (UNIT[u]) unit = u; } catch (e) {}
+const fmtMM = mm => { const u = UNIT[unit]; return `${u.d ? nl(mm / u.f, u.d) : nl0(mm / u.f)} ${unit}`; };
+const fmtLen = px => st.mmPerPx ? fmtMM(px * st.mmPerPx) : `${nl0(px)} px`;
+const fmtArea = px2 => st.mmPerPx ? `${nl(px2 * st.mmPerPx ** 2 / 1e6, 2)} m²` : `${nl0(px2)} px²`;
+const sgn = v => v < -1e-9 ? "−" : "";
+
+function describe(it) {
+  if (it.type === "dist") {
+    const [a, b] = it.pts;
+    return { main: fmtLen(d2(a, b)), sub: `ΔX ${fmtLen(Math.abs(b.x - a.x))} · ΔY ${fmtLen(Math.abs(b.y - a.y))}`, short: fmtLen(d2(a, b)) };
+  }
+  if (it.type === "poly") {
+    const L = polyLen(it.pts);
+    return { main: fmtLen(L), sub: `${it.pts.length - 1} ${it.pts.length === 2 ? "stuk" : "stukken"}${st.mmPerPx && unit !== "m" ? ` · ${nl(L * st.mmPerPx / 1000, 2)} m` : ""}`, short: fmtLen(L) };
+  }
+  if (it.type === "area") {
+    return { main: fmtArea(polyArea(it.pts)), sub: `omtrek ${fmtLen(polyLen(it.pts, true))}`, short: fmtArea(polyArea(it.pts)) };
+  }
+  if (it.type === "set") {
+    const o = st.origin, p = it.pts[0];
+    if (!o) return { main: "geen nulpunt", sub: "Zet een nulpunt om de maat te zien", short: "?" };
+    const dx = p.x - o.x, dy = o.y - p.y;
+    const txt = `X ${sgn(dx)}${fmtLen(Math.abs(dx))} · Y ${sgn(dy)}${fmtLen(Math.abs(dy))}`;
+    let sub = `schuin ${fmtLen(Math.hypot(dx, dy))}`;
+    const pp = nearestPile(p);
+    if (pp) {
+      const ex = p.x - pp.x, ey = pp.y - p.y;
+      sub += Math.hypot(ex, ey) < 0.5 ? " · precies op een paal"
+        : ` · vanaf dichtstbijzijnde paal: X ${sgn(ex)}${fmtLen(Math.abs(ex))} · Y ${sgn(ey)}${fmtLen(Math.abs(ey))}`;
+    }
+    return { main: txt, sub, short: txt };
+  }
+}
+
+/* ---------- Beeld en zoom ---------- */
+function applyT(redraw) {
+  stage.style.transform = `translate(${T.x}px, ${T.y}px) scale(${T.s})`;
+  if (redraw) scheduleOverlay();
+}
+function fitScale() {
+  const r = view.getBoundingClientRect();
+  return img.w ? Math.min(r.width / img.w, r.height / img.h) * 0.94 : 1;
+}
+const clampS = s => Math.max(fitScale() * 0.4, Math.min(8, s));
+function fit() {
+  const r = view.getBoundingClientRect();
+  T.s = fitScale();
+  T.x = (r.width - img.w * T.s) / 2;
+  T.y = (r.height - img.h * T.s) / 2;
+  applyT(true);
+}
+function toImg(cx, cy) {
+  const r = view.getBoundingClientRect();
+  return { x: (cx - r.left - T.x) / T.s, y: (cy - r.top - T.y) / T.s };
+}
+function zoomAt(cx, cy, f) {
+  const r = view.getBoundingClientRect();
+  const p = toImg(cx, cy);
+  T.s = clampS(T.s * f);
+  T.x = cx - r.left - p.x * T.s;
+  T.y = cy - r.top - p.y * T.s;
+  applyT(true);
+}
+function zoomCenter(f) { const r = view.getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, f); }
+function showPts(pts) {
+  if (!pts.length) return;
+  const r = view.getBoundingClientRect();
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const bw = Math.max(...xs) - Math.min(...xs), bh = Math.max(...ys) - Math.min(...ys);
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+  const s = Math.min(r.width / (bw + 1) , r.height / (bh + 1)) * 0.6;
+  T.s = clampS(Math.min(s, Math.max(T.s, 1.5)));
+  T.x = r.width / 2 - cx * T.s;
+  T.y = r.height / 2 - cy * T.s;
+  applyT(true);
+}
+
+/* ---------- Overlay tekenen ---------- */
+let ovQueued = false;
+function scheduleOverlay() {
+  if (ovQueued) return; ovQueued = true;
+  requestAnimationFrame(() => { ovQueued = false; drawOverlay(); });
+}
+ov.innerHTML = `<g id="gp"></g><g id="gm"></g>`;
+function drawPiles() {
+  $("gp").innerHTML = pilesOn && piles.length
+    ? piles.map(p => `<circle class="pl" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(pileR + 3).toFixed(1)}"/>`).join("")
+    : "";
+}
+function drawOverlay() {
+  const gm = $("gm");
+  if (!img.w) { gm.innerHTML = ""; return; }
+  ov.setAttribute("width", img.w); ov.setAttribute("height", img.h);
+  ov.setAttribute("viewBox", `0 0 ${img.w} ${img.h}`);
+  const k = 1 / T.s, fs = 13 * k;
+  const P = pts => pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+  const label = (x, y, txt, cls = "", anchor = "middle") =>
+    `<text class="lb ${cls}" x="${x}" y="${y}" text-anchor="${anchor}" style="font-size:${fs}px;stroke-width:${4 * k}px">${esc(txt)}</text>`;
+  const handle = (p, id, cls = "") =>
+    `<circle class="hd ${cls}" cx="${p.x}" cy="${p.y}" r="${6 * k}"/><circle class="hit" data-h="${id}" cx="${p.x}" cy="${p.y}" r="${16 * k}"/>`;
+  let s = "";
+
+  if (st.calib) {
+    const { a, b, mm } = st.calib;
+    s += `<path class="halo" d="${P([a, b])}"/><path class="cal" d="${P([a, b])}"/>`;
+    s += label((a.x + b.x) / 2, (a.y + b.y) / 2 - 9 * k, `IJk ${fmtMM(mm)}`, "cal");
+    if (tool === "pan" || tool === "calib") s += handle(a, "c:0", "c") + handle(b, "c:1", "c");
+  }
+  if (st.origin) {
+    const o = st.origin, L = 22 * k;
+    const d = `M${o.x - L} ${o.y}H${o.x + L}M${o.x} ${o.y - L}V${o.y + L}`;
+    s += `<path class="halo" d="${d}"/><path class="org" d="${d}"/><circle class="orgc" cx="${o.x}" cy="${o.y}" r="${6 * k}"/>`;
+    s += label(o.x + 12 * k, o.y - 12 * k, "0-punt", "", "start");
+    if (tool === "pan" || tool === "origin") s += handle(o, "o", "o");
+  }
+
+  st.items.forEach((it, i) => {
+    const on = it.id === sel, n = i + 1, d = describe(it);
+    if (it.type === "set") {
+      const p = it.pts[0];
+      if (st.origin) s += `<path class="lead" d="M${st.origin.x} ${st.origin.y}H${p.x}V${p.y}"/>`;
+      const pp = nearestPile(p);
+      if (pp && d2(p, pp) > 0.5) s += `<path class="plink" d="M${pp.x} ${pp.y}H${p.x}V${p.y}"/>`;
+      s += `<path class="halo${on ? " on" : ""}" d="M${p.x} ${p.y}h0.01"/>`;
+      s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${5 * k}"/>`;
+      s += `<circle class="hit" data-sel="${it.id}" cx="${p.x}" cy="${p.y}" r="${14 * k}" style="cursor:pointer"/>`;
+      s += label(p.x + 10 * k, p.y - 10 * k, `${n}. ${d.short}`, "mkc", "start");
+    } else {
+      const closed = it.type === "area";
+      const dd = P(it.pts) + (closed ? " Z" : "");
+      if (closed) s += `<path class="fill" d="${dd}"/>`;
+      s += `<path class="halo${on ? " on" : ""}" d="${dd}"/><path class="mk" d="${dd}"/>`;
+      s += `<path class="selhit" data-sel="${it.id}" d="${dd}"/>`;
+      it.pts.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${3.5 * k}"/>`; });
+      let lx, ly, anc = "middle";
+      if (it.type === "dist") { lx = (it.pts[0].x + it.pts[1].x) / 2; ly = (it.pts[0].y + it.pts[1].y) / 2 - 9 * k; }
+      else if (it.type === "area") { lx = it.pts.reduce((a, p) => a + p.x, 0) / it.pts.length; ly = it.pts.reduce((a, p) => a + p.y, 0) / it.pts.length; }
+      else { const l = it.pts[it.pts.length - 1]; lx = l.x + 10 * k; ly = l.y - 10 * k; anc = "start"; }
+      s += label(lx, ly, `${n}. ${d.short}`, "mkc", anc);
+    }
+    if (on) it.pts.forEach((p, j) => { s += handle(p, `i:${it.id}:${j}`); });
+  });
+  if (hover && pilesOn && piles.length && tool !== "pan" && tool !== "calib") {
+    const q = nearestPile(hover, 14 / T.s);
+    if (q) s += `<circle class="pl" cx="${q.x}" cy="${q.y}" r="${pileR + 7 * k}" style="stroke-width:3;opacity:1"/>`;
+  }
+
+  if (draft.length) {
+    let pts = draft.slice();
+    if (hover && draft.length && !(tool === "calib" && draft.length >= 2)) {
+      const last = draft[draft.length - 1];
+      pts.push(snap((ortho || hoverShift) ? constrain(hover, last) : hover));
+    }
+    const closed = tool === "area" && pts.length > 2;
+    const dd = P(pts) + (closed ? " Z" : "");
+    s += `<path class="halo" d="${dd}"/><path class="${tool === "calib" ? "cal" : "dr"}" d="${dd}"/>`;
+    draft.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${4 * k}"/>`; });
+    if (pts.length >= 2 && tool !== "calib") {
+      const l = pts[pts.length - 1];
+      const val = tool === "area" && pts.length > 2 ? fmtArea(polyArea(pts)) : fmtLen(polyLen(pts));
+      s += label(l.x + 12 * k, l.y + 18 * k, val, "mkc", "start");
+    }
+  }
+  gm.innerHTML = s;
+}
+
+/* ---------- Zijpaneel ---------- */
+function renderList() {
+  const L = $("list");
+  if (!st.items.length) { L.innerHTML = `<li class="empty">Nog geen metingen. Kies een gereedschap en tik op de tekening.</li>`; return; }
+  L.innerHTML = st.items.map((it, i) => {
+    const d = describe(it);
+    return `<li class="m${it.id === sel ? " on" : ""}" data-id="${it.id}">
+      <div class="mh"><span class="num">${i + 1}</span><span class="tag">${TYPE_NAME[it.type]}</span>
+        <button type="button" data-act="show">Toon</button><button type="button" data-act="del" aria-label="Meting ${i + 1} verwijderen">✕</button></div>
+      <input class="nm" type="text" data-act="name" value="${esc(it.name)}" aria-label="Naam van meting ${i + 1}">
+      <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div></li>`;
+  }).join("");
+}
+function renderCal() {
+  const c = $("calinfo");
+  if (!img.w) { c.className = "calinfo"; c.innerHTML = "Open eerst een tekening."; return; }
+  if (!st.mmPerPx) {
+    c.className = "calinfo no";
+    c.innerHTML = `<span>Nog niet geijkt. Maten staan in pixels.</span><span class="hint">Kies <b>IJken</b> en tik begin en eind van een maatlijn waarvan je de maat weet. Hoe langer de lijn, hoe nauwkeuriger.</span>
+      ${lastAuto ? `<div class="btns"><button type="button" class="ghost" data-cal="auto">Automatisch ijken</button></div>` : ""}`;
+    return;
+  }
+  c.className = "calinfo";
+  c.innerHTML = `<span class="big">${st.calib && st.calib.auto ? `Automatisch geijkt op ${st.calib.n} maatlijnen` : `IJkmaat ${st.calib ? fmtMM(st.calib.mm) : "–"}`}</span>
+    ${st.calib && st.calib.auto ? `<span class="hint">Gevonden maten: ${st.calib.vals.join(", ")} mm · onderling ${nl(st.calib.spread, 2)}% verschil. Zelf ijken met <b>IJken</b> mag altijd.</span>` : ""}
+    <span>1 pixel = ${nl(st.mmPerPx, 1)} mm · nauwkeurigheid ±${fmtMM(Math.max(st.mmPerPx, unit === "mm" ? 1 : 10))} per punt</span>
+    <span class="hint">Zoom flink in bij het aantikken. Elke klik naast de lijn telt mee in de maat.</span>
+    <div class="btns"><button type="button" class="ghost" data-cal="clear">IJking verwijderen</button>${lastAuto && !(st.calib && st.calib.auto) ? `<button type="button" class="ghost" data-cal="auto">Automatisch ijken</button>` : ""}</div>`;
+}
+const HINTS = {
+  pan: "Sleep om te schuiven, knijp of scroll om te zoomen. Tik een meting aan om hem te selecteren en versleep de bolletjes om bij te stellen.",
+  calib: ["IJken: tik het begin van een maatlijn waarvan je de maat weet.", "Tik nu het eind van die maatlijn.", "Vul de echte maat in."],
+  dist: ["Afstand: tik het eerste punt.", "Tik het tweede punt."],
+  poly: ["Lengte: tik de punten langs de lijn, bijvoorbeeld een sleuf.", "Tik het volgende punt. Tik het laatste punt nog een keer of druk Klaar om af te ronden."],
+  area: ["Oppervlak: tik de hoeken één voor één.", "Tik de volgende hoek. Tik het eerste punt opnieuw of druk Klaar om te sluiten."],
+  origin: "Nulpunt: tik het punt waar je in het werk vanaf meet, bijvoorbeeld de kruising van twee assen.",
+  set: "Uitzetmaat: tik een punt. Je krijgt de maat in X (naar rechts) en Y (naar boven) vanaf het nulpunt, en vanaf de dichtstbijzijnde paal."
+};
+function updateHint() {
+  const h = $("hint");
+  h.classList.remove("flash");
+  if (!img.w) { h.textContent = "Open een tekening om te beginnen."; return; }
+  const v = HINTS[tool];
+  let t = Array.isArray(v) ? v[Math.min(draft.length, v.length - 1)] : v;
+  if (tool === "set" && !st.origin) t = "Zet eerst een nulpunt met het gereedschap Nulpunt.";
+  if (MEASURE_TOOLS.includes(tool) && !st.mmPerPx) t += " Let op: nog niet geijkt, maten staan in pixels.";
+  h.textContent = t;
+}
+function flashHint(t) { const h = $("hint"); h.textContent = t; h.classList.add("flash"); }
+// Melding bovenin de tekening, zodat hij ook op een telefoon zonder scrollen te zien is
+function showBanner(html, err, hideMs) {
+  const b = $("banner");
+  clearTimeout(showBanner.tm);
+  b.innerHTML = html; b.classList.toggle("err", !!err); b.hidden = false;
+  if (hideMs) showBanner.tm = setTimeout(() => { b.hidden = true; }, hideMs);
+}
+function toast(t) { const el = $("toast"); el.textContent = t; clearTimeout(toast.tm); toast.tm = setTimeout(() => el.textContent = "", 2500); }
+
+function renderTools() {
+  document.querySelectorAll("#tools button").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === tool));
+  view.classList.toggle("measure", tool !== "pan");
+  $("finish").hidden = !((tool === "poly" && draft.length >= 2) || (tool === "area" && draft.length >= 3));
+  $("ortho").setAttribute("aria-pressed", ortho);
+  document.querySelectorAll("#units button").forEach(b => b.setAttribute("aria-pressed", b.dataset.unit === unit));
+}
+function renderPileInfo() {
+  const el = $("pileinfo"), b = $("pilesbtn");
+  b.hidden = !piles.length;
+  b.setAttribute("aria-pressed", pilesOn);
+  if (!img.w) { el.innerHTML = ""; return; }
+  if (!piles.length) {
+    el.innerHTML = `<span class="hint">Geen palen gevonden. Palen worden alleen herkend in een PDF-tekening waarin ze als rondjes getekend zijn, niet in een foto of screenshot.</span>`;
+    return;
+  }
+  el.innerHTML = `<span class="big">${piles.length} palen herkend</span>
+    <span class="hint">${pilesOn ? "Tik je vlak bij een paal, dan klikt je punt vast op het hart van de paal. Bij een uitzetmaat zie je ook de maat vanaf de dichtstbijzijnde paal." : "Palen staan uit: punten klikken niet vast."}</span>`;
+}
+function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(); updateHint(); renderTools(); }
+
+/* ---------- Acties ---------- */
+function setTool(t) {
+  tool = t; draft = []; hover = null; $("calibbox").hidden = true;
+  renderAll();
+}
+function addItem(type, pts) {
+  const count = st.items.filter(x => x.type === type).length + 1;
+  const it = { id: st.seq++, type, pts: pts.map(p => ({ x: p.x, y: p.y })), name: `${TYPE_NAME[type]} ${count}` };
+  st.items.push(it);
+  sel = it.id; draft = []; hover = null;
+  save(); renderAll();
+}
+function finish() {
+  if (tool === "poly" && draft.length >= 2) addItem("poly", draft);
+  else if (tool === "area" && draft.length >= 3) addItem("area", draft);
+}
+function onTap(p0, g, shift) {
+  if (!img.w) return;
+  if (tool === "pan") { sel = g.sel ? +g.sel : null; renderAll(); return; }
+  const lastD = draft[draft.length - 1];
+  const p = snap((ortho || shift) && lastD && tool !== "calib" ? constrain(p0, lastD) : p0);
+  if (tool === "origin") { st.origin = p; save(); toast("Nulpunt gezet"); renderAll(); return; }
+  if (tool === "set") {
+    if (!st.origin) { flashHint("Zet eerst een nulpunt met het gereedschap Nulpunt."); return; }
+    addItem("set", [p]); return;
+  }
+  if (tool === "calib" && draft.length >= 2) return;
+  const last = draft[draft.length - 1];
+  if (tool === "area" && draft.length >= 3 && d2(p, draft[0]) * T.s < 16) { finish(); return; }
+  if (tool === "poly" && draft.length >= 2 && d2(p, last) * T.s < 16) { finish(); return; }
+  draft.push(tool === "calib" && (ortho || shift) && last ? constrain(p, last) : p);
+  if (tool === "calib" && draft.length === 2) openCalib();
+  if (tool === "dist" && draft.length === 2) { addItem("dist", draft); return; }
+  renderAll();
+}
+function moveHandle(h, p0, shift) {
+  const o = ortho || shift;
+  const p = h.startsWith("c:") ? p0 : snap(p0);
+  if (h === "o") st.origin = p;
+  else if (h.startsWith("c:")) {
+    const i = +h[2], other = i ? st.calib.a : st.calib.b, q = o ? constrain(p, other) : p;
+    if (i) st.calib.b = q; else st.calib.a = q;
+    st.mmPerPx = st.calib.mm / Math.max(1e-6, d2(st.calib.a, st.calib.b));
+  } else {
+    const [, id, j] = h.split(":");
+    const it = st.items.find(x => x.id === +id); if (!it) return;
+    const kk = +j, ref = it.pts[kk - 1] || it.pts[kk + 1];
+    it.pts[kk] = o && ref && p === p0 ? constrain(p, ref) : p;
+  }
+  scheduleOverlay();
+}
+function openCalib() {
+  $("calibbox").hidden = false;
+  $("calerr").textContent = "";
+  $("calpx").textContent = `Getekende lijn: ${nl0(d2(draft[0], draft[1]))} pixels.`;
+  $("calmm").value = st.calib ? +(st.calib.mm / UNIT[unit].f).toFixed(3) : "";
+  $("calunit").textContent = unit;
+  $("calmm").placeholder = "bijv. " + UNIT[unit].ex;
+  setTimeout(() => $("calmm").focus(), 0);
+}
+$("calibbox").addEventListener("submit", e => {
+  e.preventDefault();
+  const mm = parseFloat(String($("calmm").value).replace(",", ".")) * UNIT[unit].f;
+  if (!(mm > 0)) { $("calerr").textContent = `Vul de echte lengte in ${unit} in, bijvoorbeeld ${UNIT[unit].ex}.`; return; }
+  const px = d2(draft[0], draft[1]);
+  if (px < 5) { $("calerr").textContent = "De lijn is te kort. Kies een langere maatlijn."; return; }
+  st.calib = { a: draft[0], b: draft[1], mm, auto: false };
+  st.mmPerPx = mm / px;
+  $("calibbox").hidden = true;
+  save();
+  toast(`Geijkt: 1 pixel = ${nl(st.mmPerPx, 1)} mm`);
+  setTool("dist");
+});
+$("calcancel").addEventListener("click", () => { draft = []; $("calibbox").hidden = true; renderAll(); });
+
+/* ---------- Aanwijzer: schuiven, knijpen, tikken, slepen ---------- */
+const ptrs = new Map();
+let G = null;
+view.addEventListener("pointerdown", e => {
+  if (e.target.closest(".zoom, .calibbox, .banner")) return;
+  if (!img.w) return;
+  view.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    G = { kind: "pinch", d0: Math.hypot(b.x - a.x, b.y - a.y) || 1, c0: toImg((a.x + b.x) / 2, (a.y + b.y) / 2), s0: T.s };
+    return;
+  }
+  if (ptrs.size > 2) return;
+  const h = e.target.closest("[data-h]"), sl = e.target.closest("[data-sel]");
+  G = { kind: h ? "handle" : "tap", h: h && h.dataset.h, sel: sl && sl.dataset.sel, sx: e.clientX, sy: e.clientY, tx: T.x, ty: T.y };
+  e.preventDefault();
+});
+view.addEventListener("pointermove", e => {
+  if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (!G) {
+    if (e.pointerType === "mouse" && draft.length) { hover = toImg(e.clientX, e.clientY); hoverShift = e.shiftKey; scheduleOverlay(); }
+    return;
+  }
+  if (G.kind === "pinch") {
+    if (ptrs.size < 2) return;
+    const [a, b] = [...ptrs.values()], r = view.getBoundingClientRect();
+    T.s = clampS(G.s0 * Math.hypot(b.x - a.x, b.y - a.y) / G.d0);
+    T.x = (a.x + b.x) / 2 - r.left - G.c0.x * T.s;
+    T.y = (a.y + b.y) / 2 - r.top - G.c0.y * T.s;
+    applyT(true); return;
+  }
+  if (G.kind === "handle") { moveHandle(G.h, toImg(e.clientX, e.clientY), e.shiftKey); return; }
+  if (G.kind === "done") return;
+  const dx = e.clientX - G.sx, dy = e.clientY - G.sy;
+  if (G.kind === "tap" && Math.hypot(dx, dy) > 6) { G.kind = "pan"; view.classList.add("panning"); }
+  if (G.kind === "pan") { T.x = G.tx + dx; T.y = G.ty + dy; applyT(false); }
+});
+function endPtr(e) {
+  ptrs.delete(e.pointerId);
+  if (!G) return;
+  if (G.kind === "pinch" || G.kind === "done") { G = ptrs.size ? { kind: "done" } : null; return; }
+  if (G.kind === "tap" && e.type === "pointerup") onTap(toImg(e.clientX, e.clientY), G, e.shiftKey);
+  if (G.kind === "handle") { save(); renderAll(); }
+  view.classList.remove("panning");
+  G = null;
+}
+view.addEventListener("pointerup", endPtr);
+view.addEventListener("pointercancel", endPtr);
+view.addEventListener("pointerleave", () => { if (hover) { hover = null; scheduleOverlay(); } });
+view.addEventListener("wheel", e => { if (!img.w) return; e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+["gesturestart", "gesturechange"].forEach(ev => view.addEventListener(ev, e => e.preventDefault()));
+
+$("zin").addEventListener("click", () => zoomCenter(1.5));
+$("zout").addEventListener("click", () => zoomCenter(1 / 1.5));
+$("zfit").addEventListener("click", fit);
+$("tools").addEventListener("click", e => { const b = e.target.closest("[data-tool]"); if (b) setTool(b.dataset.tool); });
+$("ortho").addEventListener("click", () => { ortho = !ortho; renderTools(); });
+$("pilesbtn").addEventListener("click", () => { pilesOn = !pilesOn; drawPiles(); renderAll(); });
+$("units").addEventListener("click", e => {
+  const b = e.target.closest("[data-unit]"); if (!b || b.dataset.unit === unit) return;
+  const old = UNIT[unit].f;
+  unit = b.dataset.unit;
+  try { localStorage.setItem("meetmaat:unit", unit); } catch (err) {}
+  if (!$("calibbox").hidden) {
+    const v = parseFloat(String($("calmm").value).replace(",", "."));
+    if (v > 0) $("calmm").value = +(v * old / UNIT[unit].f).toFixed(3);
+    $("calunit").textContent = unit; $("calmm").placeholder = "bijv. " + UNIT[unit].ex;
+  }
+  renderAll();
+});
+$("finish").addEventListener("click", finish);
+$("undo").addEventListener("click", () => {
+  if (draft.length) { draft.pop(); $("calibbox").hidden = true; }
+  else if (st.items.length) { const it = st.items.pop(); if (sel === it.id) sel = null; save(); }
+  renderAll();
+});
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input, select, textarea")) return;
+  if (e.key === "Escape") { draft = []; $("calibbox").hidden = true; renderAll(); }
+  else if (e.key === "Enter") finish();
+  else if ((e.key === "Delete" || e.key === "Backspace") && sel != null) { st.items = st.items.filter(x => x.id !== sel); sel = null; save(); renderAll(); }
+});
+
+$("list").addEventListener("click", e => {
+  const li = e.target.closest("li.m"); if (!li) return;
+  const id = +li.dataset.id, it = st.items.find(x => x.id === id);
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if (act === "del") { st.items = st.items.filter(x => x.id !== id); if (sel === id) sel = null; save(); renderAll(); return; }
+  if (act === "name") { if (sel !== id) { sel = id; drawOverlay(); document.querySelectorAll("#list li.m").forEach(x => x.classList.toggle("on", +x.dataset.id === id)); } return; }
+  sel = id;
+  if (act === "show" && it) showPts(it.type === "set" && st.origin ? [it.pts[0], st.origin] : it.pts);
+  renderAll();
+});
+$("list").addEventListener("input", e => {
+  if (e.target.dataset.act !== "name") return;
+  const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id);
+  if (it) { it.name = e.target.value; save(); }
+});
+$("copy").addEventListener("click", () => {
+  const head = `${img.name || "Tekening"}${st.calib ? ` — geijkt op ${fmtMM(st.calib.mm)}` : " — niet geijkt"}`;
+  const lines = st.items.map((it, i) => { const d = describe(it); return `${i + 1}. ${it.name}: ${d.main}`; });
+  const txt = [head, ...lines].join("\n");
+  const fail = () => toast("Kopiëren lukte niet. Selecteer de waardes in de lijst handmatig.");
+  try { navigator.clipboard.writeText(txt).then(() => toast("Lijst gekopieerd"), fail); } catch (e) { fail(); }
+});
+let calArmed = null;
+$("calinfo").addEventListener("click", e => {
+  const b = e.target.closest("[data-cal]"); if (!b) return;
+  if (b.dataset.cal === "auto" && lastAuto) {
+    applyAuto(lastAuto); renderAll();
+    toast(`Automatisch geijkt op ${lastAuto.n} maatlijnen`);
+    return;
+  }
+  if (b.dataset.cal === "clear") {
+    if (!calArmed) { b.textContent = "Zeker? Tik nogmaals"; calArmed = setTimeout(() => { calArmed = null; renderCal(); }, 3000); return; }
+    clearTimeout(calArmed); calArmed = null;
+    st.calib = null; st.mmPerPx = null; st.noAuto = true;
+    save(); renderAll();
+    toast("IJking verwijderd. Maten staan weer in pixels.");
+  }
+});
+let clearArmed = null;
+$("clearall").addEventListener("click", () => {
+  const b = $("clearall");
+  if (!clearArmed) { b.textContent = "Zeker? Tik nogmaals"; clearArmed = setTimeout(() => { b.textContent = "Alles wissen"; clearArmed = null; }, 3000); return; }
+  clearTimeout(clearArmed); clearArmed = null; b.textContent = "Alles wissen";
+  st.items = []; st.origin = null; sel = null; draft = []; save(); renderAll(); toast("Metingen en nulpunt gewist. De ijking is bewaard.");
+});
+
+/* ---------- Tekening laden ---------- */
+let lastAuto = null;
+function applyAuto(auto) {
+  const oldK = st.mmPerPx && st.calib && st.calib.auto ? d2(st.calib.a, st.calib.b) : null, newK = d2(auto.a, auto.b);
+  if (oldK && Math.abs(oldK / newK - 1) > 0.001) { const f = newK / oldK; st.items.forEach(it => it.pts.forEach(p => { p.x *= f; p.y *= f; })); if (st.origin) { st.origin.x *= f; st.origin.y *= f; } }
+  st.calib = { a: auto.a, b: auto.b, mm: auto.mm, auto: true, n: auto.n, vals: auto.vals, spread: auto.spread };
+  st.mmPerPx = auto.mm / newK;
+  st.noAuto = false;
+  save();
+}
+function setImage(key, name, sample, auto) {
+  img = { w: cv.width, h: cv.height, key, name, sample };
+  stage.style.width = img.w + "px"; stage.style.height = img.h + "px";
+  cv.style.width = img.w + "px"; cv.style.height = img.h + "px";
+  st = sample ? sampleState() : (loadState(key) || blank());
+  draft = []; sel = null; hover = null;
+  $("fname").textContent = name;
+  lastAuto = sample ? null : (auto || null);
+  let autoUsed = false;
+  // Automatische ijking, of een eerdere automatische ijking verversen (telefoon kan op een andere resolutie tekenen)
+  if (!sample && auto && !st.noAuto && (!st.mmPerPx || (st.calib && st.calib.auto))) { applyAuto(auto); autoUsed = true; }
+  if (sample) showBanner("<b>Voorbeeldtekening.</b> De ijking en metingen zijn voorbeelden. Open je eigen tekening met <b>Tekening openen</b>.");
+  else if (autoUsed) showBanner(`<b>${esc(name)}</b> geopend en <b>automatisch geijkt</b> op ${auto.n} maatlijnen (${auto.vals.slice(0, 5).join(", ")}${auto.vals.length > 5 ? ", …" : ""}).${piles.length ? ` ${piles.length} palen herkend.` : ""}`, false, 7000);
+  else if (st.items.length || st.calib) showBanner(`<b>${esc(name)}</b> geopend. Eerdere ijking en metingen teruggezet.`, false, 5000);
+  else showBanner(`<b>${esc(name)}</b> geopend${piles.length ? `, ${piles.length} palen herkend` : ""}. Begin met <b>IJken</b>.`, false, 5000);
+  drawPiles();
+  setTool(sample ? "pan" : (st.mmPerPx ? "dist" : "calib"));
+  fit();
+}
+function canvasLimits(w, h) {
+  const mem = navigator.deviceMemory || 4;
+  const maxArea = mem <= 2 ? 8e6 : 14e6, maxLong = 6500;
+  return Math.min(maxLong / Math.max(w, h), Math.sqrt(maxArea / (w * h)));
+}
+async function renderPdfPage() {
+  $("loading").hidden = false;
+  try {
+    const page = await pdfDoc.getPage(pageNo);
+    const vp1 = page.getViewport({ scale: 1 });
+    const vp = page.getViewport({ scale: canvasLimits(vp1.width, vp1.height) });
+    cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cv.width, cv.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    try { const r = await extractPiles(page, vp); setPiles(r.list, r.r); } catch (e) { setPiles([], 0); }
+    let auto = null;
+    try { auto = await autoScale(page, vp); } catch (e) { auto = null; }
+    setImage(`${fileMeta.name}|${fileMeta.size}|p${pageNo}`, fileMeta.name + (pdfDoc.numPages > 1 ? ` · blad ${pageNo}` : ""), false, auto);
+  } finally { $("loading").hidden = true; }
+}
+async function openFile(f, fromStore) {
+  fileMeta = { name: f.name, size: f.size };
+  if (!fromStore) IDB.put("last", { name: f.name, type: f.type, size: f.size, blob: new Blob([f], { type: f.type }) }).catch(() => {});
+  const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+  showBanner(`Bezig met openen: <b>${esc(f.name)}</b> (${nl(f.size / 1024, 0)} kB)…`);
+  $("loading").hidden = false;
+  try {
+    if (isPdf) {
+      if (!window.pdfjsLib) throw new Error("De PDF-lezer is niet geladen. Herlaad de pagina, of open een screenshot of foto van de tekening.");
+      const buf = await f.arrayBuffer();
+      pdfDoc = await pdfjsLib.getDocument({ data: buf, isEvalSupported: false, disableFontFace: true }).promise;
+      pageNo = 1;
+      const sel = $("page");
+      sel.innerHTML = Array.from({ length: pdfDoc.numPages }, (_, i) => `<option value="${i + 1}">Blad ${i + 1}</option>`).join("");
+      sel.hidden = pdfDoc.numPages < 2;
+      await renderPdfPage();
+    } else {
+      pdfDoc = null; $("page").hidden = true;
+      const url = URL.createObjectURL(f);
+      const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("Dit bestand kan niet als afbeelding worden geopend.")); i.src = url; });
+      const s = Math.min(1, canvasLimits(im.naturalWidth, im.naturalHeight));
+      cv.width = Math.round(im.naturalWidth * s); cv.height = Math.round(im.naturalHeight * s);
+      const ctx = cv.getContext("2d");
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(im, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      setPiles([], 0);
+      setImage(`${f.name}|${f.size}`, f.name, false);
+    }
+  } catch (err) {
+    const msg = "Kon de tekening niet openen: " + (err && err.message ? err.message : err);
+    flashHint(msg);
+    showBanner(esc(msg), true);
+  } finally { $("loading").hidden = true; }
+}
+$("file").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0];
+  if (f) openFile(f);
+  else showBanner("Er is geen bestand gekozen.", true, 4000);
+  e.target.value = "";
+});
+$("page").addEventListener("change", e => { pageNo = +e.target.value; renderPdfPage(); });
+view.addEventListener("dragover", e => e.preventDefault());
+view.addEventListener("drop", e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) openFile(f); });
+
+/* ---------- Voorbeeldtekening (getekend in de pagina zelf) ---------- */
+const SX = mm => 240 + mm / 12.5, SY = mm => 1160 - mm / 12.5;   // 1 px = 12,5 mm
+function sampleSVG() {
+  let g = "";
+  for (let x = 1000; x < 24000; x += 2000) for (let y = 1000; y < 12000; y += 2000)
+    g += `<circle cx="${SX(x)}" cy="${SY(y)}" r="7" fill="none" stroke="#b5b5b5" stroke-width="2"/>`;
+  [["A", 0], ["B", 12000], ["C", 24000]].forEach(([n, x]) => {
+    g += `<line x1="${SX(x)}" y1="160" x2="${SX(x)}" y2="1240" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="26 8 4 8"/>`;
+    g += `<circle cx="${SX(x)}" cy="1278" r="24" fill="#fff" stroke="#555" stroke-width="2"/><text x="${SX(x)}" y="1287" font-size="24" text-anchor="middle">${n}</text>`;
+  });
+  [["1", 0], ["2", 6000], ["3", 12000]].forEach(([n, y]) => {
+    g += `<line x1="110" y1="${SY(y)}" x2="2290" y2="${SY(y)}" stroke="#8a8a8a" stroke-width="1.5" stroke-dasharray="26 8 4 8"/>`;
+    g += `<circle cx="76" cy="${SY(y)}" r="24" fill="#fff" stroke="#555" stroke-width="2"/><text x="76" y="${SY(y) + 9}" font-size="24" text-anchor="middle">${n}</text>`;
+  });
+  g += `<rect x="${SX(0)}" y="${SY(12000)}" width="${24000 / 12.5}" height="${12000 / 12.5}" fill="none" stroke="#111" stroke-width="6"/>`;
+  g += `<line x1="${SX(0)}" y1="130" x2="${SX(24000)}" y2="130" stroke="#1e6fd9" stroke-width="2"/>`;
+  [0, 12000, 24000].forEach(x => { g += `<line x1="${SX(x) - 9}" y1="139" x2="${SX(x) + 9}" y2="121" stroke="#1e6fd9" stroke-width="3"/>`; });
+  g += `<text x="${SX(6000)}" y="116" font-size="26" fill="#1e6fd9" text-anchor="middle">12000</text><text x="${SX(18000)}" y="116" font-size="26" fill="#1e6fd9" text-anchor="middle">12000</text>`;
+  g += `<text x="${SX(12000)}" y="70" font-size="30" fill="#1e6fd9" text-anchor="middle">24000</text>`;
+  g += `<line x1="${SX(0)}" y1="60" x2="${SX(24000)}" y2="60" stroke="#1e6fd9" stroke-width="2"/>`;
+  g += `<line x1="165" y1="${SY(12000)}" x2="165" y2="${SY(0)}" stroke="#1e6fd9" stroke-width="2"/>`;
+  g += `<text x="150" y="${SY(6000)}" font-size="26" fill="#1e6fd9" text-anchor="middle" transform="rotate(-90 150 ${SY(6000)})">12000</text>`;
+  g += `<polyline points="${SX(0)},${SY(4500)} ${SX(16000)},${SY(4500)} ${SX(16000)},${SY(12000)}" fill="none" stroke="#c2185b" stroke-width="4" stroke-dasharray="18 10"/>`;
+  g += `<text x="${SX(4000)}" y="${SY(4500) - 14}" font-size="22" fill="#c2185b">waterleiding</text>`;
+  g += `<text x="2290" y="1360" font-size="30" font-weight="700" text-anchor="end">VOORBEELDTEKENING</text>`;
+  g += `<text x="2290" y="1390" font-size="20" fill="#555" text-anchor="end">Maatvoering: mm</text>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1400" viewBox="0 0 2400 1400"><rect width="2400" height="1400" fill="#ffffff"/><g font-family="Arial, Helvetica, sans-serif" fill="#111">${g}</g></svg>`;
+}
+function sampleState() {
+  return {
+    mmPerPx: 12.5,
+    calib: { a: { x: SX(0), y: 60 }, b: { x: SX(24000), y: 60 }, mm: 24000 },
+    origin: { x: SX(0), y: SY(0) },
+    items: [
+      { id: 1, type: "poly", name: "Sleuf waterleiding", pts: [{ x: SX(0), y: SY(4500) }, { x: SX(16000), y: SY(4500) }, { x: SX(16000), y: SY(12000) }] },
+      { id: 2, type: "set", name: "Bocht waterleiding", pts: [{ x: SX(16000), y: SY(4500) }] },
+      { id: 3, type: "dist", name: "Breedte op as B", pts: [{ x: SX(12000), y: SY(0) }, { x: SX(12000), y: SY(12000) }] }
+    ],
+    seq: 4
+  };
+}
+function loadSample() {
+  const im = new Image();
+  im.onload = () => {
+    cv.width = 2400; cv.height = 1400;
+    const ctx = cv.getContext("2d");
+    ctx.drawImage(im, 0, 0);
+    const sp = [];
+    for (let x = 1000; x < 24000; x += 2000) for (let y = 1000; y < 12000; y += 2000) sp.push({ x: SX(x), y: SY(y) });
+    setPiles(sp, 8);
+    setImage("voorbeeld", "Voorbeeldtekening", true);
+  };
+  im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(sampleSVG());
+}
+window.addEventListener("resize", () => { if (img.w) scheduleOverlay(); });
+
+/* ---------- App: installeren, delen, laatste tekening ---------- */
+let installEvt = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("install").hidden = false; });
+window.addEventListener("appinstalled", () => { $("install").hidden = true; installEvt = null; toast("App geïnstalleerd"); });
+$("install").addEventListener("click", async () => {
+  if (!installEvt) return;
+  installEvt.prompt();
+  try { await installEvt.userChoice; } catch (e) {}
+  installEvt = null; $("install").hidden = true;
+});
+if ("launchQueue" in window) {
+  launchQueue.setConsumer(async params => {
+    if (params.files && params.files.length) { try { openFile(await params.files[0].getFile()); } catch (e) {} }
+  });
+}
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+async function boot() {
+  renderAll();
+  if (!window.pdfjsLib) setTimeout(() => showBanner("De PDF-lezer is niet geladen. Herlaad de app. Een foto of screenshot van de tekening openen werkt wel.", true), 300);
+  try {
+    // gedeeld vanuit WhatsApp, mail, Bestanden …
+    if (new URLSearchParams(location.search).has("shared")) {
+      history.replaceState(null, "", location.pathname);
+      const s = await IDB.get("shared");
+      if (s && s.blob) { await IDB.del("shared"); return openFile(recToFile(s)); }
+    }
+    const last = await IDB.get("last");
+    if (last && last.blob) return openFile(recToFile(last), true);
+  } catch (e) {}
+  loadSample();
+}
+boot();
+</script>
+</body>
+</html>

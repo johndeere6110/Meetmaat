@@ -1,0 +1,31 @@
+{
+  "id": "/meetmaat/",
+  "name": "Meetmaat",
+  "short_name": "Meetmaat",
+  "description": "Bouwtekening openen, ijken en maten aflezen voor uitzetten in het werk.",
+  "lang": "nl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#e9ecec",
+  "theme_color": "#1d2427",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "share_target": {
+    "action": "./share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        { "name": "file", "accept": ["application/pdf", ".pdf", "image/*"] }
+      ]
+    }
+  },
+  "file_handlers": [
+    { "action": "./", "accept": { "application/pdf": [".pdf"] } }
+  ]
+}
