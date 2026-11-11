@@ -331,6 +331,16 @@ input[type="number"], input[type="text"], .nm {
         <label for="sMin">Waarschuw bij zand dunner dan (cm)<input id="sMin" type="number" inputmode="decimal" step="0.5" min="0"></label>
 
         <div class="sres" id="sRes"></div>
+
+        <h3>Stand nu (afwerken)</h3>
+        <p class="hint" style="margin:0">Ligt het zand er al in? Vul in hoe hoog het nu ligt. Je ziet hoeveel er nog af moet, of bij, en hoeveel zand vrijkomt bij het vrijmaken van de paalkoppen en de goot.</p>
+        <div class="row3">
+          <label for="sNow">Zand ligt op (cm onder 0-peil)<input id="sNow" type="number" inputmode="decimal" step="0.5" placeholder="bijv. 17"></label>
+          <label for="sPd">Paalkop onder zand (cm)<input id="sPd" type="number" inputmode="decimal" step="1" min="0"></label>
+          <label for="sPw">Gat om paal (cm)<input id="sPw" type="number" inputmode="decimal" step="5" min="0"></label>
+        </div>
+        <div class="sres" id="sRes2"></div>
+        <div class="flags" id="sFlags2" style="display:grid;gap:6px"></div>
         <div class="flags" id="sFlags" style="display:grid;gap:6px"></div>
         <div class="btns"><button type="button" id="sCopy">Kopieer zandberekening</button></div>
       </div>
@@ -537,7 +547,7 @@ async function extractPiles(page, vp) {
 function blank() { return { mmPerPx: null, calib: null, origin: null, items: [], seq: 1, sand: sandDefaults() }; }
 
 /* ---------- Zand: peilmaten en volume ---------- */
-function sandDefaults() { return { area: null, conc: 18, ins: 0, gl: 0, gw: 100, gd: 40, comp: 15, dens: 1.6, truck: 18, min: 5, start: "tl", dir: "col", snake: "1", list: "", pts: [] }; }
+function sandDefaults() { return { area: null, conc: 18, ins: 0, gl: 0, gw: 100, gd: 40, comp: 15, dens: 1.6, truck: 18, min: 5, now: null, pd: 20, pw: 50, start: "tl", dir: "col", snake: "1", list: "", pts: [] }; }
 let peilCur = null, cellCache = null;
 
 // Nederlandse telwoorden, zodat ingesproken metingen ("negenendertig") ook werken
@@ -678,9 +688,10 @@ function sandCalc() {
     outside: meas.filter(m => !inPoly(m, A.pts)).length
   };
 }
-const SAND_FIELDS = { sConc: "conc", sIns: "ins", sGl: "gl", sGw: "gw", sGd: "gd", sComp: "comp", sDens: "dens", sTruck: "truck", sMin: "min" };
+const SAND_FIELDS = { sConc: "conc", sIns: "ins", sGl: "gl", sGw: "gw", sGd: "gd", sComp: "comp", sDens: "dens", sTruck: "truck", sMin: "min", sPd: "pd", sPw: "pw" };
 function syncSandInputs() {
   const S = st.sand;
+  $("sNow").value = S.now == null ? "" : S.now;
   Object.entries(SAND_FIELDS).forEach(([id, k]) => { $(id).value = S[k]; });
   $("sStart").value = S.start; $("sDir").value = S.dir; $("sSnake").value = String(S.snake); $("sList").value = S.list || "";
 }
@@ -717,6 +728,44 @@ function renderSand() {
   }
   if (S.over > 0) fl.push(`<div class="sflag">Er waren ${S.over} ${S.over === 1 ? "meting" : "metingen"} meer dan vakjes. Die zijn niet gebruikt.</div>`);
   $("sFlags").innerHTML = fl.join("");
+  renderStand();
+}
+// Stand nu: zand ligt er al in. Wat moet er nog af of bij, en wat komt vrij bij paalkoppen en goot?
+function standCalc() {
+  const S = st.sand, A = sandArea();
+  if (S.now == null) return null;
+  if (!A) return { err: "Kies eerst een vloerveld." };
+  if (!st.mmPerPx) return { err: "De tekening is nog niet geijkt." };
+  const areaM2 = polyArea(A.pts) * st.mmPerPx ** 2 / 1e6;
+  const target = (+S.conc || 0) + (+S.ins || 0);          // onderkant beton/isolatie, cm onder 0-peil
+  const layer = target - S.now;                           // >0: zand te hoog (eraf), <0: te laag (erbij)
+  const nPiles = piles.filter(p => inPoly(p, A.pts)).length;
+  const w = (+S.pw || 0) / 100, pd = (+S.pd || 0);
+  const pitDepth = Math.max(0, pd - Math.max(0, layer)); // wat na het afhalen van de laag nog onder de paalkop ligt
+  const pits = nPiles * w * w * pitDepth / 100;
+  const gArea = Math.min(areaM2, (+S.gl || 0) * (+S.gw || 0) / 100);
+  const goot = gArea * Math.max(0, (+S.gd || 0) - Math.max(target, S.now)) / 100;
+  const off = areaM2 * layer / 100;                       // + = vrij, - = nodig
+  const free = off + pits + goot;
+  return { areaM2, target, layer, nPiles, pits, goot, off, free, loose: free * (1 + (+S.comp || 0) / 100) };
+}
+function renderStand() {
+  const r = standCalc(), box = $("sRes2"), fl = [];
+  if (!r) { box.innerHTML = ""; $("sFlags2").innerHTML = ""; return; }
+  if (r.err) { box.innerHTML = ""; $("sFlags2").innerHTML = `<div class="sflag">${esc(r.err)}</div>`; return; }
+  const cell = (k, v, u, main) => `<div${main ? ' class="main"' : ""}><span class="k">${k}</span><span class="v">${v}<small>${u}</small></span></div>`;
+  const lay = r.layer > 0 ? cell(`${nl(r.layer, 1)} cm eraf`, nl(r.off, 1), "m³")
+    : r.layer < 0 ? cell(`${nl(-r.layer, 1)} cm erbij`, nl(-r.off, 1), "m³") : cell("Laag", "op hoogte", "");
+  box.innerHTML =
+    cell(r.free >= 0 ? "Zand over" : "Zand tekort", nl(Math.abs(r.free), 1), "m³ verdicht", true) +
+    cell(r.free >= 0 ? "Los op de hoop" : "Los bestellen", "±" + nl(Math.abs(r.loose), 1), "m³") +
+    lay +
+    cell(`Paalkoppen (${r.nPiles})`, nl(r.pits, 1), "m³") +
+    (r.goot ? cell("Goot uitgraven", nl(r.goot, 1), "m³") : "");
+  if (!r.nPiles && piles.length) fl.push(`<div class="sflag">Er staan geen palen binnen dit vloerveld.</div>`);
+  if (!piles.length) fl.push(`<div class="sflag">Geen palen herkend in de tekening, dus de paalkoppen tellen niet mee.</div>`);
+  fl.push(`<div class="sflag ok">Doel: zand op ${nl(r.target, 1)} cm onder 0-peil (onderkant ${+st.sand.ins ? "isolatie" : "beton"}). Per paal een gat van ${nl0(+st.sand.pw || 0)} × ${nl0(+st.sand.pw || 0)} cm${r.layer > 0 ? `, ${nl(Math.max(0, (+st.sand.pd || 0) - r.layer), 1)} cm dieper dan na het afhalen` : ""}. Losgegraven zand neemt ±${nl0(+st.sand.comp || 0)}% meer ruimte in.</div>`);
+  $("sFlags2").innerHTML = fl.join("");
 }
 function openPeil(i) {
   peilCur = i;
@@ -1451,7 +1500,8 @@ $("peildel").addEventListener("click", () => {
 $("peilclose").addEventListener("click", closePeil);
 $("sand").addEventListener("input", e => {
   const id = e.target.id, S = st.sand; if (!S) return;
-  if (SAND_FIELDS[id]) { const v = parseFloat(String(e.target.value).replace(",", ".")); S[SAND_FIELDS[id]] = isFinite(v) ? v : 0; }
+  if (id === "sNow") { const v = parseFloat(String(e.target.value).replace(",", ".")); S.now = isFinite(v) ? v : null; }
+  else if (SAND_FIELDS[id]) { const v = parseFloat(String(e.target.value).replace(",", ".")); S[SAND_FIELDS[id]] = isFinite(v) ? v : 0; }
   else if (id === "sList") { S.list = e.target.value; save(); return; }
   else return;
   save(); renderSand(); drawOverlay();

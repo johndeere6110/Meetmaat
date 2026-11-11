@@ -3,7 +3,7 @@
 //
 // Let op: alle apps op johndeere6110.github.io (Zaaihulp, Perceelkaart, Meetmaat) delen één
 // cache-opslag. Ruim daarom alleen caches op die met "meetmaat-" beginnen.
-const VERSION = "meetmaat-v2";
+const VERSION = "meetmaat-v3";
 const PREFIX = "meetmaat-";
 const CORE = [
   "./",
