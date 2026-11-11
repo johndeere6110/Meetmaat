@@ -2,8 +2,8 @@
 
 Bouwtekening openen, ijken en maten aflezen voor uitzetten in het werk. Werkt op je telefoon, ook zonder internet.
 
-**Openen:** https://johndeere6110.github.io/meetmaat/
-**Installeren of doorsturen naar iemand anders:** https://johndeere6110.github.io/meetmaat/installeren.html
+**Openen:** https://johndeere6110.github.io/Meetmaat/
+**Installeren of doorsturen naar iemand anders:** https://johndeere6110.github.io/Meetmaat/installeren.html
 
 ## Wat de app doet
 
