@@ -12,6 +12,7 @@ Bouwtekening openen, ijken en maten aflezen voor uitzetten in het werk. Werkt op
 - **Palen:** in een PDF worden de palen (de rondjes) herkend. Punten klikken vast op het hart van een paal.
 - **Meten:** Afstand (2 punten), Lengte (route met bochten, bijv. een sleuf), Oppervlak.
 - **Uitzetten:** zet een nulpunt (bijv. op een paal) en tik punten aan. Je krijgt X (naar rechts) en Y (naar boven) vanaf het nulpunt én vanaf de dichtstbijzijnde paal.
+- **Zand:** kies een vloerveld (een Oppervlak), zet peilmaten in de paalvakken (één tik per vak, of in één keer "Vakjes tussen palen maken" en je rij metingen invullen of inspreken). Met beton, isolatie, goot en inklinken krijg je m³, tonnen en vrachten, plus een hoogtekaart op de tekening. Elk stukje vloer telt met de dichtstbijzijnde peilmaat.
 - **Eenheid:** mm, cm of m. **Haaks:** alleen horizontaal of verticaal meten.
 - **Delen naar Meetmaat** (Android, na installeren): een PDF uit WhatsApp, mail of Bestanden direct openen.
 

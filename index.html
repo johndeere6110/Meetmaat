@@ -40,6 +40,8 @@
   --pile: #00838f;
   --paper-ink: #111111;
   --paper: #ffffff;
+  --sandc: #d9b56c;
+  --pwarn: #e2541b;
   --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -174,6 +176,29 @@ input[type="number"], input[type="text"], .nm {
 .val { font: 600 16px var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .subv { font: 12.5px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
 .toast { font-size: 13px; color: var(--ok); min-height: 1.2em; }
+
+/* Zand */
+.sand { display: grid; gap: 10px; }
+.sand h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 6px 0 -4px; font-weight: 600; }
+.sand .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sand .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.sand label { display: grid; gap: 3px; font-size: 12.5px; font-weight: 500; align-content: start; }
+.sand input, .sand select, .sand textarea { width: 100%; min-width: 0; font: 500 14px/1.35 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
+.sand select { font-family: var(--body); }
+.sand textarea { min-height: 72px; resize: vertical; }
+.sres { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.sres > div { padding: 8px 10px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 0 -1px -1px 0; display: grid; gap: 1px; min-width: 0; }
+.sres .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.sres .v { font: 600 22px/1.15 var(--display); font-variant-numeric: tabular-nums; }
+.sres .v small { font: 500 12px var(--body); color: var(--muted); margin-left: 3px; }
+.sres .main { background: var(--accent); color: var(--accent-ink); }
+.sres .main .k, .sres .main .v small { color: var(--accent-ink); opacity: .8; }
+.sflag { font-size: 13px; border-left: 3px solid var(--warn); padding: 5px 9px; background: color-mix(in srgb, var(--warn) 10%, transparent); border-radius: 0 4px 4px 0; }
+.sflag.ok { border-left-color: var(--ok); background: transparent; border: 1px solid var(--line); border-left: 3px solid var(--ok); }
+#ov .pp { stroke: var(--paper); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+#ov .pp.empty { fill: none; stroke: var(--paper-ink); stroke-dasharray: 4 3; opacity: .7; }
+#ov .pp.cur { stroke: var(--paper-ink); stroke-width: 3.5; stroke-dasharray: none; opacity: 1; }
+#ov .lb.pv { fill: var(--paper-ink); }
 </style>
 <script src="vendor/pdf.min.js"></script>
 </head>
@@ -203,6 +228,7 @@ input[type="number"], input[type="text"], .nm {
       <button type="button" data-tool="area">Oppervlak</button>
       <button type="button" data-tool="origin">Nulpunt</button>
       <button type="button" data-tool="set">Uitzetmaat</button>
+      <button type="button" data-tool="peil">Peilmaat</button>
     </div>
     <div class="btns">
       <div class="seg" id="units" role="group" aria-label="Eenheid">
@@ -231,6 +257,13 @@ input[type="number"], input[type="text"], .nm {
           <span class="hint" id="calerr" style="color:var(--warn)"></span>
           <div class="btns"><button type="submit">IJken</button><button type="button" class="ghost" id="calcancel">Annuleren</button></div>
         </form>
+        <form class="calibbox" id="peilbox" hidden>
+          <strong id="peilttl">Peilmaat</strong>
+          <label for="peilv">Diepte onder 0-peil
+            <div class="unit"><input id="peilv" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 27"><span>cm</span></div>
+          </label>
+          <div class="btns"><button type="submit">Opslaan, volgende</button><button type="button" class="ghost" id="peildel">Punt wissen</button><button type="button" class="ghost" id="peilclose">Sluiten</button></div>
+        </form>
         <div class="zoom">
           <button type="button" id="zin" aria-label="Inzoomen">+</button>
           <button type="button" id="zout" aria-label="Uitzoomen">−</button>
@@ -253,6 +286,54 @@ input[type="number"], input[type="text"], .nm {
         <button type="button" class="ghost" id="clearall">Alles wissen</button>
       </div>
       <div class="toast" id="toast"></div>
+
+      <h2>Zand</h2>
+      <div class="sand" id="sand">
+        <label for="sArea">Vloerveld
+          <select id="sArea"></select>
+        </label>
+        <p class="hint" id="sAreaHint" style="margin:-4px 0 0"></p>
+
+        <h3>Peilmaten</h3>
+        <p class="hint" style="margin:0">Met <b>Peilmaat</b> tik je een vakje aan en vul je de diepte in. Of maak in één keer een punt in elk paalvak en vul je rij metingen in volgorde in. Niet gemeten vakjes (bijv. bij de goot): tik ze aan en kies <b>Punt wissen</b>.</p>
+        <p class="hint" style="margin:0"><b>Eigen volgorde?</b> Wis de peilmaten en tik met Peilmaat de vakjes aan in de volgorde waarin je gemeten hebt. Vul daarna je rij metingen in.</p>
+        <div class="btns">
+          <button type="button" class="ghost" id="sGen">Vakjes tussen palen maken</button>
+          <button type="button" class="ghost" id="sClearPts">Peilmaten wissen</button>
+        </div>
+        <div class="row3">
+          <label for="sStart">Begin<select id="sStart"><option value="tl">linksboven</option><option value="bl">linksonder</option><option value="tr">rechtsboven</option><option value="br">rechtsonder</option></select></label>
+          <label for="sDir">Lopen<select id="sDir"><option value="col">in kolommen</option><option value="row">in rijen</option></select></label>
+          <label for="sSnake">Heen en weer<select id="sSnake"><option value="1">ja</option><option value="0">nee</option></select></label>
+        </div>
+        <label for="sList">Metingen in volgorde (cm onder 0-peil)
+          <span class="hint" style="font-weight:400">Typen of inspreken: "40, 39, 37" of "veertig negenendertig".</span>
+          <textarea id="sList" spellcheck="false"></textarea>
+        </label>
+        <div class="btns"><button type="button" id="sApply">Invullen in volgorde</button></div>
+
+        <h3>Opbouw</h3>
+        <div class="row2">
+          <label for="sConc">Beton (cm)<input id="sConc" type="number" inputmode="decimal" step="0.5" min="0"></label>
+          <label for="sIns">Isolatie (cm)<input id="sIns" type="number" inputmode="decimal" step="0.5" min="0"></label>
+        </div>
+        <div class="row3">
+          <label for="sGl">Goot (m¹)<input id="sGl" type="number" inputmode="decimal" step="0.1" min="0"></label>
+          <label for="sGw">Breed (cm)<input id="sGw" type="number" inputmode="decimal" step="5" min="0"></label>
+          <label for="sGd">Diep (cm)<input id="sGd" type="number" inputmode="decimal" step="1" min="0"></label>
+        </div>
+        <h3>Bestellen</h3>
+        <div class="row3">
+          <label for="sComp">Inklinken %<input id="sComp" type="number" inputmode="decimal" step="1" min="0"></label>
+          <label for="sDens">Ton/m³<input id="sDens" type="number" inputmode="decimal" step="0.05" min="0"></label>
+          <label for="sTruck">Vracht m³<input id="sTruck" type="number" inputmode="decimal" step="1" min="0"></label>
+        </div>
+        <label for="sMin">Waarschuw bij zand dunner dan (cm)<input id="sMin" type="number" inputmode="decimal" step="0.5" min="0"></label>
+
+        <div class="sres" id="sRes"></div>
+        <div class="flags" id="sFlags" style="display:grid;gap:6px"></div>
+        <div class="btns"><button type="button" id="sCopy">Kopieer zandberekening</button></div>
+      </div>
       <p class="hint">X is naar rechts, Y is naar boven op de tekening, gemeten vanaf het nulpunt. Controleer je ijking door met Afstand een tweede bekende maatlijn na te meten.</p>
       <p class="hint"><a href="installeren.html" style="color:inherit">Meetmaat installeren of doorsturen</a></p>
     </aside>
@@ -302,7 +383,7 @@ const PG = 64;   // rastermaat (px) voor snel zoeken naar de dichtstbijzijnde pa
 
 /* ---------- Palen ---------- */
 function setPiles(list, r) {
-  piles = list; pileR = r || 8; pileGrid = new Map();
+  piles = list; pileR = r || 8; pileGrid = new Map(); cellCache = null;
   piles.forEach(p => {
     const k = `${Math.floor(p.x / PG)},${Math.floor(p.y / PG)}`;
     if (!pileGrid.has(k)) pileGrid.set(k, []);
@@ -453,7 +534,210 @@ async function extractPiles(page, vp) {
   return { list: out.length >= 4 ? out : [], r: mode / 2 };
 }
 
-function blank() { return { mmPerPx: null, calib: null, origin: null, items: [], seq: 1 }; }
+function blank() { return { mmPerPx: null, calib: null, origin: null, items: [], seq: 1, sand: sandDefaults() }; }
+
+/* ---------- Zand: peilmaten en volume ---------- */
+function sandDefaults() { return { area: null, conc: 18, ins: 0, gl: 0, gw: 100, gd: 40, comp: 15, dens: 1.6, truck: 18, min: 5, start: "tl", dir: "col", snake: "1", list: "", pts: [] }; }
+let peilCur = null, cellCache = null;
+
+// Nederlandse telwoorden, zodat ingesproken metingen ("negenendertig") ook werken
+const NL_UNITS = { nul: 0, een: 1, twee: 2, drie: 3, vier: 4, vijf: 5, zes: 6, zeven: 7, acht: 8, negen: 9 };
+const NL_TEENS = { tien: 10, elf: 11, twaalf: 12, dertien: 13, veertien: 14, vijftien: 15, zestien: 16, zeventien: 17, achttien: 18, negentien: 19 };
+const NL_TENS = { twintig: 20, dertig: 30, veertig: 40, vijftig: 50, zestig: 60, zeventig: 70, tachtig: 80, negentig: 90 };
+const NL_COMPOUND = new RegExp(`^(${Object.keys(NL_UNITS).slice(1).join("|")})en(${Object.keys(NL_TENS).join("|")})$`);
+function nlWord(w) {
+  if (w in NL_UNITS) return NL_UNITS[w];
+  if (w in NL_TEENS) return NL_TEENS[w];
+  if (w in NL_TENS) return NL_TENS[w];
+  const m = w.match(NL_COMPOUND);
+  return m ? NL_UNITS[m[1]] + NL_TENS[m[2]] : null;
+}
+function parseNums(txt) {
+  const plain = String(txt).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const out = [];
+  for (let tok of plain.split(/[^a-z0-9.]+/)) {
+    tok = tok.replace(/^\.+|\.+$/g, "");
+    if (!tok) continue;
+    const d = tok.match(/^(\d+(?:\.\d+)?)[a-z]*$/);
+    if (d) { out.push(parseFloat(d[1])); continue; }
+    const w = nlWord(tok);
+    if (w !== null) out.push(w);
+  }
+  return out;
+}
+
+// Paalafstand apart voor X en Y: de afstand die het vaakst voorkomt (losse kolompalen tellen dan niet mee)
+function modeOf(arr) {
+  if (!arr.length) return 0;
+  const key = v => Math.round(Math.log(v) / 0.04), bins = new Map();
+  arr.forEach(v => bins.set(key(v), (bins.get(key(v)) || 0) + 1));
+  let bk = null, bc = 0; bins.forEach((c, k) => { if (c > bc) { bc = c; bk = k; } });
+  const sel = arr.filter(v => Math.abs(key(v) - bk) <= 1);
+  return sel.reduce((a, b) => a + b, 0) / sel.length;
+}
+function gridSteps() {
+  const hx = [], hy = [];
+  for (const p of piles) {
+    let bx = Infinity, by = Infinity;
+    for (const q of piles) {
+      const dx = q.x - p.x, dy = q.y - p.y;
+      if (dx > 1 && Math.abs(dy) < dx * 0.2 && dx < bx) bx = dx;
+      if (dy > 1 && Math.abs(dx) < dy * 0.2 && dy < by) by = dy;
+    }
+    if (isFinite(bx)) hx.push(bx);
+    if (isFinite(by)) hy.push(by);
+  }
+  return [modeOf(hx), modeOf(hy)];
+}
+// Midden tussen 4 palen ("in het hart van de X")
+function cellCenters() {
+  if (cellCache) return cellCache;
+  if (piles.length < 4) return (cellCache = { s: 0, sx: 0, sy: 0, list: [] });
+  const [sx, sy] = gridSteps(), out = [];
+  if (!sx || !sy) return (cellCache = { s: 0, sx: 0, sy: 0, list: [] });
+  const s = (sx + sy) / 2, tol = 0.3 * Math.min(sx, sy);
+  const near = (x, y) => nearestPile({ x, y }, tol);
+  for (const p of piles) {
+    const r = near(p.x + sx, p.y), d = near(p.x, p.y + sy);
+    if (!r || !d || r === p || d === p) continue;
+    const q = near(r.x + d.x - p.x, r.y + d.y - p.y);
+    if (!q || q === p) continue;
+    const c = { x: (p.x + r.x + d.x + q.x) / 4, y: (p.y + r.y + d.y + q.y) / 4 };
+    if (!out.some(o => Math.abs(o.x - c.x) < 0.25 * sx && Math.abs(o.y - c.y) < 0.25 * sy)) out.push(c);
+  }
+  return (cellCache = { s, sx, sy, list: out });
+}
+function inPoly(p, poly) {
+  let ins = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) ins = !ins;
+  }
+  return ins;
+}
+const sandArea = () => st.sand && st.items.find(i => i.id === st.sand.area && i.type === "area");
+function ptSpacing(pts) {
+  const cc = piles.length ? cellCenters() : null;
+  if (cc && cc.s) return cc.s;
+  const ds = pts.map(p => { let b = Infinity; pts.forEach(q => { const d = d2(p, q); if (d > 1 && d < b) b = d; }); return b; }).filter(isFinite).sort((a, b) => a - b);
+  return ds[Math.floor(ds.length / 2)] || 50;
+}
+// Volgorde waarin gemeten is: beginhoek, kolommen of rijen, heen en weer
+function orderPts(pts) {
+  if (pts.length < 2) return pts.slice();
+  const S = st.sand, s = ptSpacing(pts), byCol = S.dir === "col";
+  const major = p => byCol ? p.x : p.y, minor = p => byCol ? p.y : p.x;
+  const groups = [];
+  pts.slice().sort((a, b) => major(a) - major(b)).forEach(p => {
+    const g = groups[groups.length - 1];
+    if (g && Math.abs(major(p) - g.m) < s * 0.5) { g.items.push(p); g.m += (major(p) - g.m) / g.items.length; }
+    else groups.push({ m: major(p), items: [p] });
+  });
+  const left = S.start[1] === "l", top = S.start[0] === "t";
+  const gs = (byCol ? left : top) ? groups : groups.slice().reverse();
+  const firstAsc = byCol ? top : left, out = [];
+  gs.forEach((g, i) => {
+    const asc = String(S.snake) === "1" && i % 2 === 1 ? !firstAsc : firstAsc;
+    out.push(...g.items.slice().sort((a, b) => asc ? minor(a) - minor(b) : minor(b) - minor(a)));
+  });
+  return out;
+}
+function sandCalc() {
+  const S = st.sand, A = sandArea();
+  if (!A) return { err: "Kies een vloerveld. Teken het eerst met Oppervlak." };
+  if (!st.mmPerPx) return { err: "De tekening is nog niet geijkt." };
+  const areaM2 = polyArea(A.pts) * st.mmPerPx ** 2 / 1e6;
+  const meas = S.pts.filter(p => p.v != null && isFinite(p.v));
+  if (!meas.length) return { err: "Nog geen peilmaten ingevuld.", areaM2 };
+  const build = (+S.conc || 0) + (+S.ins || 0);
+  // Elk stukje vloer krijgt de diepte van de dichtstbijzijnde peilmaat
+  const xs = A.pts.map(p => p.x), ys = A.pts.map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const step = Math.max(x1 - x0, y1 - y0) / 120 || 1;
+  let n = 0, sumD = 0, sumS = 0, sumG = 0;
+  for (let y = y0 + step / 2; y < y1; y += step) for (let x = x0 + step / 2; x < x1; x += step) {
+    if (!inPoly({ x, y }, A.pts)) continue;
+    let bd = Infinity, v = 0;
+    for (const m of meas) { const d = (m.x - x) ** 2 + (m.y - y) ** 2; if (d < bd) { bd = d; v = m.v; } }
+    n++; sumD += v; sumS += Math.max(0, v - build); sumG += Math.max(0, build - v);
+  }
+  if (!n) return { err: "Het vloerveld is te klein.", areaM2 };
+  const avgD = sumD / n, avgSand = sumS / n, avgDig = sumG / n;
+  const gArea = Math.min(areaM2, (+S.gl || 0) * (+S.gw || 0) / 100);
+  const gSand = meas.reduce((a, m) => a + Math.max(0, m.v - (+S.gd || 0)), 0) / meas.length;
+  const gDig = meas.reduce((a, m) => a + Math.max(0, (+S.gd || 0) - m.v), 0) / meas.length;
+  const floor = Math.max(0, areaM2 - gArea);
+  const net = floor * avgSand / 100 + gArea * gSand / 100;
+  const dig = floor * avgDig / 100 + gArea * gDig / 100;
+  const order = net * (1 + (+S.comp || 0) / 100);
+  return {
+    areaM2, build, n: meas.length, total: S.pts.length, avgD, avgSand, net, dig, order, gArea, gDig,
+    tons: order * (+S.dens || 0), trucks: (+S.truck || 0) > 0 ? order / S.truck : 0,
+    thin: meas.filter(m => m.v - build >= 0 && m.v - build < (+S.min || 0)).length,
+    neg: meas.filter(m => m.v - build < 0).length,
+    outside: meas.filter(m => !inPoly(m, A.pts)).length
+  };
+}
+const SAND_FIELDS = { sConc: "conc", sIns: "ins", sGl: "gl", sGw: "gw", sGd: "gd", sComp: "comp", sDens: "dens", sTruck: "truck", sMin: "min" };
+function syncSandInputs() {
+  const S = st.sand;
+  Object.entries(SAND_FIELDS).forEach(([id, k]) => { $(id).value = S[k]; });
+  $("sStart").value = S.start; $("sDir").value = S.dir; $("sSnake").value = String(S.snake); $("sList").value = S.list || "";
+}
+function renderSand() {
+  const S = st.sand; if (!S) return;
+  const areas = st.items.filter(i => i.type === "area");
+  if ((S.area == null || !areas.some(a => a.id === S.area)) && areas.length) S.area = areas[areas.length - 1].id;
+  const sel = $("sArea");
+  sel.innerHTML = areas.length
+    ? areas.map(a => `<option value="${a.id}"${a.id === S.area ? " selected" : ""}>${st.items.indexOf(a) + 1}. ${esc(a.name)}${st.mmPerPx ? " · " + fmtArea(polyArea(a.pts)) : ""}</option>`).join("")
+    : `<option value="">Nog geen Oppervlak getekend</option>`;
+  sel.disabled = !areas.length;
+  $("sAreaHint").textContent = areas.length ? "" : "Teken het vloerveld eerst met Oppervlak, langs de randen van het veld.";
+  const r = sandCalc();
+  const fl = [];
+  if (r.err) {
+    $("sRes").innerHTML = "";
+    fl.push(`<div class="sflag">${esc(r.err)}</div>`);
+  } else {
+    const cell = (k, v, u, main) => `<div${main ? ' class="main"' : ""}><span class="k">${k}</span><span class="v">${v}<small>${u}</small></span></div>`;
+    $("sRes").innerHTML =
+      cell("Bestellen", nl(r.order, 1), "m³", true) +
+      cell("Vrachten", r.trucks ? nl(r.trucks, 1) : "–", r.trucks ? `× ${nl0(S.truck)} m³` : "") +
+      cell("Netto", nl(r.net, 1), "m³") + cell("Gewicht", "±" + nl0(r.tons), "ton") +
+      cell("Gem. zandlaag", nl(r.avgSand, 1), "cm") + cell("Gem. diepte", nl(r.avgD, 1), "cm") +
+      cell("Vloerveld", nl(r.areaM2, 1), "m²") + cell("Peilmaten", r.n + (r.total > r.n ? ` / ${r.total}` : ""), "");
+    if (r.neg) fl.push(`<div class="sflag"><b>Afgraven:</b> op ${r.neg} ${r.neg === 1 ? "plek" : "plekken"} ligt de bodem hoger dan onderkant ${r.build > (+S.conc || 0) ? "isolatie" : "beton"}. Samen met de goot ±${nl(r.dig, 1)} m³ grond eruit.</div>`);
+    else if (r.dig > 0.05) fl.push(`<div class="sflag"><b>Afgraven:</b> ±${nl(r.dig, 1)} m³ (goot).</div>`);
+    if (r.thin) fl.push(`<div class="sflag"><b>Dunne zandlaag:</b> ${r.thin} ${r.thin === 1 ? "plek" : "plekken"} met minder dan ${nl0(+S.min || 0)} cm zand. Een kleine meetfout betekent daar al te weinig ruimte voor het beton.</div>`);
+    if (r.total > r.n) fl.push(`<div class="sflag ok">${r.total - r.n} ${r.total - r.n === 1 ? "vakje" : "vakjes"} zonder meting. Daar telt de dichtstbijzijnde meting.</div>`);
+    if (r.outside) fl.push(`<div class="sflag">${r.outside} ${r.outside === 1 ? "peilmaat ligt" : "peilmaten liggen"} buiten het vloerveld.</div>`);
+    if (r.gArea) fl.push(`<div class="sflag ok">Goot: ${nl(+S.gl, 1)} m¹ × ${nl((+S.gw || 0) / 100, 2)} m, beton tot ${nl0(+S.gd || 0)} cm diep.</div>`);
+    fl.push(`<div class="sflag ok">Elke centimeter die de gemiddelde hoogte afwijkt, scheelt ${nl(r.areaM2 / 100, 2)} m³ zand.</div>`);
+  }
+  if (S.over > 0) fl.push(`<div class="sflag">Er waren ${S.over} ${S.over === 1 ? "meting" : "metingen"} meer dan vakjes. Die zijn niet gebruikt.</div>`);
+  $("sFlags").innerHTML = fl.join("");
+}
+function openPeil(i) {
+  peilCur = i;
+  const p = st.sand.pts[i];
+  $("peilttl").textContent = `Peilmaat ${i + 1} van ${st.sand.pts.length}`;
+  $("peilv").value = p.v == null ? "" : String(p.v).replace(".", ",");
+  $("peilbox").hidden = false;
+  const r = view.getBoundingClientRect(), sx = T.x + p.x * T.s, sy = T.y + p.y * T.s;
+  if (sx < 30 || sx > r.width - 30 || sy < 170 || sy > r.height - 30) { T.x = r.width / 2 - p.x * T.s; T.y = r.height * 0.62 - p.y * T.s; applyT(false); }
+  renderAll();
+  setTimeout(() => { $("peilv").focus(); $("peilv").select(); }, 0);
+}
+function closePeil() { peilCur = null; $("peilbox").hidden = true; renderAll(); }
+function armed(btn, fn) {
+  if (!btn.dataset.armed) {
+    btn.dataset.label = btn.textContent; btn.dataset.armed = "1"; btn.textContent = "Zeker? Tik nogmaals";
+    btn._t = setTimeout(() => { btn.textContent = btn.dataset.label; delete btn.dataset.armed; }, 3000);
+    return;
+  }
+  clearTimeout(btn._t); btn.textContent = btn.dataset.label; delete btn.dataset.armed; fn();
+}
 
 /* ---------- Opslaan per tekening (alleen in deze browser) ---------- */
 function save() {
@@ -626,7 +910,30 @@ function drawOverlay() {
     }
     if (on) it.pts.forEach((p, j) => { s += handle(p, `i:${it.id}:${j}`); });
   });
-  if (hover && pilesOn && piles.length && tool !== "pan" && tool !== "calib") {
+  if (st.sand && st.sand.pts.length) {
+    const S = st.sand, build = (+S.conc || 0) + (+S.ins || 0);
+    const cc = piles.length ? cellCenters() : { s: 0 };
+    const hx = cc.sx ? cc.sx * 0.42 : 12 * k, hy = cc.sy ? cc.sy * 0.42 : 12 * k, half = Math.min(hx, hy);
+    const sands = S.pts.filter(p => p.v != null).map(p => p.v - build);
+    const maxS = Math.max(1, ...sands);
+    const boxOpen = !$("peilbox").hidden;
+    S.pts.forEach((p, i) => {
+      const cur = boxOpen && i === peilCur ? " cur" : "";
+      const r = `x="${p.x - hx}" y="${p.y - hy}" width="${2 * hx}" height="${2 * hy}" rx="${half * 0.18}"`;
+      const numTxt = half * T.s > 24 ? `<text class="lb" x="${p.x - hx + 4 * k}" y="${p.y - hy + 11 * k}" style="font-size:${9.5 * k}px;stroke-width:${3 * k}px;font-weight:500">${i + 1}</text>` : "";
+      if (p.v == null) {
+        s += `<rect class="pp empty${cur}" ${r}/>` + numTxt;
+        return;
+      }
+      const sand = p.v - build, t = Math.max(0, Math.min(1, sand / maxS));
+      const fill = sand < (+S.min || 0) ? "var(--pwarn)"
+        : t < .6 ? `color-mix(in srgb, var(--sandc) ${Math.round(30 + t / .6 * 70)}%, var(--paper))`
+                 : `color-mix(in srgb, var(--sandc) ${Math.round(100 - (t - .6) / .4 * 35)}%, var(--paper-ink))`;
+      s += `<rect class="pp${cur}" ${r} style="fill:${fill};opacity:.88"/>`;
+      s += label(p.x, p.y + 4.5 * k, nl(p.v, p.v % 1 ? 1 : 0), "pv") + numTxt;
+    });
+  }
+  if (hover && pilesOn && piles.length && tool !== "pan" && tool !== "calib" && tool !== "peil") {
     const q = nearestPile(hover, 14 / T.s);
     if (q) s += `<circle class="pl" cx="${q.x}" cy="${q.y}" r="${pileR + 7 * k}" style="stroke-width:3;opacity:1"/>`;
   }
@@ -686,7 +993,8 @@ const HINTS = {
   poly: ["Lengte: tik de punten langs de lijn, bijvoorbeeld een sleuf.", "Tik het volgende punt. Tik het laatste punt nog een keer of druk Klaar om af te ronden."],
   area: ["Oppervlak: tik de hoeken één voor één.", "Tik de volgende hoek. Tik het eerste punt opnieuw of druk Klaar om te sluiten."],
   origin: "Nulpunt: tik het punt waar je in het werk vanaf meet, bijvoorbeeld de kruising van twee assen.",
-  set: "Uitzetmaat: tik een punt. Je krijgt de maat in X (naar rechts) en Y (naar boven) vanaf het nulpunt, en vanaf de dichtstbijzijnde paal."
+  set: "Uitzetmaat: tik een punt. Je krijgt de maat in X (naar rechts) en Y (naar boven) vanaf het nulpunt, en vanaf de dichtstbijzijnde paal.",
+  peil: "Peilmaat: tik een vakje en vul de diepte onder 0-peil in (cm). Bij palen springt het punt naar het midden van 4 palen. Tik een bestaand punt om het te wijzigen."
 };
 function updateHint() {
   const h = $("hint");
@@ -727,11 +1035,11 @@ function renderPileInfo() {
   el.innerHTML = `<span class="big">${piles.length} palen herkend</span>
     <span class="hint">${pilesOn ? "Tik je vlak bij een paal, dan klikt je punt vast op het hart van de paal. Bij een uitzetmaat zie je ook de maat vanaf de dichtstbijzijnde paal." : "Palen staan uit: punten klikken niet vast."}</span>`;
 }
-function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(); updateHint(); renderTools(); }
+function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(); renderSand(); updateHint(); renderTools(); }
 
 /* ---------- Acties ---------- */
 function setTool(t) {
-  tool = t; draft = []; hover = null; $("calibbox").hidden = true;
+  tool = t; draft = []; hover = null; $("calibbox").hidden = true; $("peilbox").hidden = true; peilCur = null;
   renderAll();
 }
 function addItem(type, pts) {
@@ -748,6 +1056,21 @@ function finish() {
 function onTap(p0, g, shift) {
   if (!img.w) return;
   if (tool === "pan") { sel = g.sel ? +g.sel : null; renderAll(); return; }
+  if (tool === "peil") {
+    const cc = piles.length ? cellCenters() : { s: 0, list: [] };
+    const rad = Math.max(16 / T.s, cc.s * 0.45);
+    let best = -1, bd = Infinity;
+    st.sand.pts.forEach((q, i) => { const d = d2(q, p0); if (d < bd) { bd = d; best = i; } });
+    if (best >= 0 && bd <= rad) { openPeil(best); return; }
+    let q = p0;
+    if (cc.list.length) {
+      let bc = null, bdc = Infinity;
+      cc.list.forEach(c => { const d = d2(c, p0); if (d < bdc) { bdc = d; bc = c; } });
+      if (bc && bdc < cc.s * 0.75) q = { x: bc.x, y: bc.y };
+    }
+    st.sand.pts.push({ x: q.x, y: q.y, v: null });
+    save(); openPeil(st.sand.pts.length - 1); return;
+  }
   const lastD = draft[draft.length - 1];
   const p = snap((ortho || shift) && lastD && tool !== "calib" ? constrain(p0, lastD) : p0);
   if (tool === "origin") { st.origin = p; save(); toast("Nulpunt gezet"); renderAll(); return; }
@@ -883,7 +1206,7 @@ $("undo").addEventListener("click", () => {
 });
 document.addEventListener("keydown", e => {
   if (e.target.closest("input, select, textarea")) return;
-  if (e.key === "Escape") { draft = []; $("calibbox").hidden = true; renderAll(); }
+  if (e.key === "Escape") { draft = []; $("calibbox").hidden = true; $("peilbox").hidden = true; peilCur = null; renderAll(); }
   else if (e.key === "Enter") finish();
   else if ((e.key === "Delete" || e.key === "Backspace") && sel != null) { st.items = st.items.filter(x => x.id !== sel); sel = null; save(); renderAll(); }
 });
@@ -938,7 +1261,7 @@ $("clearall").addEventListener("click", () => {
 let lastAuto = null;
 function applyAuto(auto) {
   const oldK = st.mmPerPx && st.calib && st.calib.auto ? d2(st.calib.a, st.calib.b) : null, newK = d2(auto.a, auto.b);
-  if (oldK && Math.abs(oldK / newK - 1) > 0.001) { const f = newK / oldK; st.items.forEach(it => it.pts.forEach(p => { p.x *= f; p.y *= f; })); if (st.origin) { st.origin.x *= f; st.origin.y *= f; } }
+  if (oldK && Math.abs(oldK / newK - 1) > 0.001) { const f = newK / oldK; st.items.forEach(it => it.pts.forEach(p => { p.x *= f; p.y *= f; })); if (st.origin) { st.origin.x *= f; st.origin.y *= f; } if (st.sand) st.sand.pts.forEach(p => { p.x *= f; p.y *= f; }); }
   st.calib = { a: auto.a, b: auto.b, mm: auto.mm, auto: true, n: auto.n, vals: auto.vals, spread: auto.spread };
   st.mmPerPx = auto.mm / newK;
   st.noAuto = false;
@@ -949,7 +1272,9 @@ function setImage(key, name, sample, auto) {
   stage.style.width = img.w + "px"; stage.style.height = img.h + "px";
   cv.style.width = img.w + "px"; cv.style.height = img.h + "px";
   st = sample ? sampleState() : (loadState(key) || blank());
-  draft = []; sel = null; hover = null;
+  st.sand = Object.assign(sandDefaults(), st.sand || {});
+  draft = []; sel = null; hover = null; peilCur = null; $("peilbox").hidden = true;
+  syncSandInputs();
   $("fname").textContent = name;
   lastAuto = sample ? null : (auto || null);
   let autoUsed = false;
@@ -1103,6 +1428,83 @@ if ("launchQueue" in window) {
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
+
+/* ---------- Zand: bediening ---------- */
+$("peilbox").addEventListener("submit", e => {
+  e.preventDefault();
+  if (peilCur == null || !st.sand.pts[peilCur]) return closePeil();
+  const t = $("peilv").value.trim();
+  let v = parseFloat(t.replace(",", "."));
+  if (!/^-?\d+([.,]\d+)?$/.test(t)) { const w = parseNums(t); v = w.length ? w[0] : NaN; }
+  st.sand.pts[peilCur].v = isFinite(v) ? v : null;
+  save();
+  const n = st.sand.pts.length;
+  let next = -1;
+  for (let j = 1; j < n; j++) { const q = (peilCur + j) % n; if (st.sand.pts[q].v == null) { next = q; break; } }
+  if (next >= 0) openPeil(next);
+  else { closePeil(); toast("Alle peilmaten ingevuld"); }
+});
+$("peildel").addEventListener("click", () => {
+  if (peilCur != null) { st.sand.pts.splice(peilCur, 1); save(); }
+  closePeil();
+});
+$("peilclose").addEventListener("click", closePeil);
+$("sand").addEventListener("input", e => {
+  const id = e.target.id, S = st.sand; if (!S) return;
+  if (SAND_FIELDS[id]) { const v = parseFloat(String(e.target.value).replace(",", ".")); S[SAND_FIELDS[id]] = isFinite(v) ? v : 0; }
+  else if (id === "sList") { S.list = e.target.value; save(); return; }
+  else return;
+  save(); renderSand(); drawOverlay();
+});
+$("sand").addEventListener("change", e => {
+  const id = e.target.id, S = st.sand; if (!S) return;
+  if (id === "sArea") S.area = +e.target.value || null;
+  else if (id === "sStart" || id === "sDir" || id === "sSnake") {
+    S[{ sStart: "start", sDir: "dir", sSnake: "snake" }[id]] = e.target.value;
+    if (S.pts.length) { S.pts = orderPts(S.pts); toast("Volgorde aangepast"); }
+  } else return;
+  save(); renderAll();
+});
+$("sGen").addEventListener("click", e => {
+  const go = () => {
+    const A = sandArea();
+    if (!A) { flashHint("Kies of teken eerst een vloerveld met Oppervlak."); return; }
+    const cc = cellCenters();
+    if (!cc.list.length) { flashHint("Geen palen gevonden. Tik de peilmaten zelf aan met Peilmaat."); return; }
+    const inside = cc.list.filter(c => inPoly(c, A.pts));
+    if (!inside.length) { flashHint("Er liggen geen paalvakken binnen dit vloerveld."); return; }
+    st.sand.pts = orderPts(inside.map(c => ({ x: c.x, y: c.y, v: null })));
+    st.sand.over = 0; save(); renderAll();
+    toast(`${st.sand.pts.length} vakjes gemaakt`);
+  };
+  if (st.sand.pts.some(p => p.v != null)) armed(e.currentTarget, go); else go();
+});
+$("sClearPts").addEventListener("click", e => {
+  if (!st.sand.pts.length) return;
+  armed(e.currentTarget, () => { st.sand.pts = []; st.sand.over = 0; peilCur = null; $("peilbox").hidden = true; save(); renderAll(); toast("Peilmaten gewist"); });
+});
+$("sApply").addEventListener("click", () => {
+  const S = st.sand, vals = parseNums($("sList").value);
+  if (!vals.length) { flashHint("Vul eerst metingen in, bijvoorbeeld: 40, 39, 37."); return; }
+  if (!S.pts.length) { flashHint("Maak eerst de vakjes, of tik de punten aan met Peilmaat."); return; }
+  S.pts.forEach((p, i) => { if (i < vals.length) p.v = vals[i]; });
+  S.over = Math.max(0, vals.length - S.pts.length);
+  save(); renderAll();
+  toast(`${Math.min(vals.length, S.pts.length)} metingen ingevuld`);
+});
+$("sCopy").addEventListener("click", () => {
+  const r = sandCalc(), S = st.sand, A = sandArea();
+  if (r.err) { toast(r.err); return; }
+  const lines = [
+    `Zand ${A ? A.name : "vloerveld"}: ${nl(r.areaM2, 1)} m², ${r.n} peilmaten, gem. ${nl(r.avgD, 1)} cm onder 0-peil`,
+    `Opbouw ${nl0(+S.conc || 0)} cm beton${+S.ins ? ` + ${nl0(+S.ins)} cm isolatie` : ""}${+S.gl ? `, goot ${nl(+S.gl, 1)} m¹` : ""} → gem. ${nl(r.avgSand, 1)} cm zand`,
+    `Netto ${nl(r.net, 1)} m³, met ${nl0(+S.comp || 0)}% inklinken ${nl(r.order, 1)} m³ (±${nl0(r.tons)} ton${r.trucks ? `, ${nl(r.trucks, 1)} vracht à ${nl0(S.truck)} m³` : ""})`
+  ];
+  if (r.dig > 0.05) lines.push(`Uitgraven ±${nl(r.dig, 1)} m³`);
+  const txt = lines.join("\n");
+  const fail = () => toast("Kopiëren lukte niet.");
+  try { navigator.clipboard.writeText(txt).then(() => toast("Zandberekening gekopieerd"), fail); } catch (err) { fail(); }
+});
 
 async function boot() {
   renderAll();
