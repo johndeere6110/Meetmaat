@@ -103,7 +103,9 @@ button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visib
 .tools svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .tools svg .f { fill: currentColor; fill-opacity: .18; }
 .tools button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent-ink); }
-@media (max-width: 640px) { .toolbar > .btns { gap: 6px; } .toolbar > .btns button { padding: 8px 9px; font-size: 13px; } .tools { grid-template-columns: repeat(4, minmax(0, 1fr)); flex-basis: 100%; } .tools button { font-size: 12px; } }
+button .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -4px; margin-right: 5px; }
+@media (max-width: 640px) { .toolbar > .btns { gap: 4px; flex: 1 1 100%; justify-content: space-between; } .toolbar > .btns button { padding: 7px 6px; font-size: 12px; } .toolbar > .btns .seg button { padding: 7px 6px; }
+  #undo .lbl { display: none; } #undo .ic { margin: 0; } .tools { grid-template-columns: repeat(4, minmax(0, 1fr)); flex-basis: 100%; } .tools button { font-size: 12px; } }
 .work { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
 @media (max-width: 920px) { .work { grid-template-columns: minmax(0, 1fr); } }
 
@@ -199,6 +201,15 @@ input[type="number"], input[type="text"], .nm {
 
 /* Zand */
 .sand { display: grid; gap: 10px; }
+.pplist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pplist li { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; display: grid; gap: 4px; background: var(--bg); }
+.pplist .pph { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.pplist .ppv { font: 600 16px var(--mono); }
+.pplist .ppm { font-size: 12px; color: var(--muted); }
+.pplist .btns button { padding: 6px 10px; font-size: 13px; }
+.ppres { font-size: 14px; border-left: 3px solid var(--accent); padding: 4px 10px; min-height: 1.6em; }
+.ppres b { font: 600 17px var(--mono); }
+#ov .ppt { fill: var(--accent); stroke: var(--paper-ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .sand h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 6px 0 -4px; font-weight: 600; }
 .sand .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .sand .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
@@ -265,7 +276,7 @@ input[type="number"], input[type="text"], .nm {
       </div>
       <button type="button" class="ghost" id="ortho" aria-pressed="false" title="Alleen horizontaal of verticaal meten (of houd Shift ingedrukt)">Haaks</button>
       <button type="button" id="finish" hidden>Klaar</button>
-      <button type="button" class="ghost" id="undo">Ongedaan</button>
+      <button type="button" class="ghost" id="undo" aria-label="Ongedaan"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg><span class="lbl">Ongedaan</span></button>
     </div>
   </div>
 
@@ -319,6 +330,33 @@ input[type="number"], input[type="text"], .nm {
         <button type="button" class="ghost" id="clearall">Alles wissen</button>
       </div>
       <div class="toast" id="toast"></div>
+
+      <h2>Peilpunten</h2>
+      <div class="sand" id="peil">
+        <p class="hint" style="margin:0">Leg een hulppeil vast, bijvoorbeeld op een balk of kolom, voor als je met de laser niet bij het 0-punt kunt. Alles in mm ten opzichte van 0-peil: boven is +, onder is −.</p>
+        <ul class="pplist" id="ppList"></ul>
+
+        <h3>Peil overbrengen met de laser</h3>
+        <label for="ppFrom">Vanaf (bekend peil)<select id="ppFrom"></select></label>
+        <div class="row2">
+          <label for="ppA">Aflezing op bekend punt (mm)<input id="ppA" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 1450"></label>
+          <label for="ppB">Aflezing op nieuw punt (mm)<input id="ppB" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 1210"></label>
+        </div>
+        <p class="hint" style="margin:0">Aflezing = op de baak of rolmaat, van het punt omhoog tot de laserlijn. Laser niet verzetten tussen de aflezingen.</p>
+        <div class="ppres" id="ppRes"></div>
+
+        <h3>Opslaan als peilpunt</h3>
+        <div class="row2">
+          <label for="ppName">Naam<input id="ppName" type="text" autocomplete="off" placeholder="bijv. Balk as C-4"></label>
+          <label for="ppH">Peil (mm)<input id="ppH" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. +1240"></label>
+        </div>
+        <div class="btns"><button type="button" class="ghost" id="ppPlace">Plek op tekening</button><button type="button" id="ppSave">Peilpunt opslaan</button></div>
+        <p class="hint" id="ppPlaceHint" style="margin:0"></p>
+
+        <h3>Hoogte uitzetten</h3>
+        <label for="ppT">Gewenst peil (mm), met dezelfde laser en aflezing op bekend punt<input id="ppT" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. −180 voor bovenkant zand"></label>
+        <div class="ppres" id="ppRes2"></div>
+      </div>
 
       <h2>Zand</h2>
       <div class="sand" id="sand">
@@ -1073,6 +1111,11 @@ function drawOverlay() {
     s += label(o.x + 12 * k, o.y - 12 * k, "0-punt", "", "start");
     if (tool === "pan" || tool === "origin") s += handle(o, "o", "o");
   }
+  [...(st.pp || []).filter(q => q.x != null), ...(ppPending ? [{ ...ppPending, name: "nieuw", h: null }] : [])].forEach(q => {
+    const w = 9 * k, hh = 13 * k;
+    s += `<path class="ppt" d="M${q.x} ${q.y}L${q.x - w} ${q.y - hh}H${q.x + w}Z"/>`;
+    s += label(q.x + 12 * k, q.y - 6 * k, `${q.name}${q.h != null ? " " + fmtPeil(q.h).replace(" mm", "") : ""}`, "", "start");
+  });
 
   st.items.forEach((it, i) => {
     const on = it.id === sel, n = i + 1, d = describe(it);
@@ -1190,6 +1233,7 @@ const HINTS = {
   area: ["Oppervlak: tik de hoeken één voor één.", "Tik de volgende hoek. Tik het eerste punt opnieuw of druk Klaar om te sluiten."],
   origin: "Nulpunt: tik het punt waar je in het werk vanaf meet, bijvoorbeeld de kruising van twee assen.",
   set: "Uitzetmaat: tik een punt. Je krijgt de maat in X (naar rechts) en Y (naar boven) vanaf het nulpunt, en vanaf de dichtstbijzijnde paal.",
+  ppick: "Tik de plek van het peilpunt, bijvoorbeeld de balk of kolom.",
   peil: "Peilmaat: tik een vakje en vul de diepte onder 0-peil in (cm). Bij palen springt het punt naar het midden van 4 palen. Tik een bestaand punt om het te wijzigen."
 };
 const VZ_HINTS = {
@@ -1199,6 +1243,7 @@ const VZ_HINTS = {
   area: ["Kruisje op de eerste hoek, druk op + Punt.", "Schuif naar de volgende hoek, + Punt. Druk op Klaar om het vlak te sluiten."],
   origin: "Kruisje op het punt waar je in het werk vanaf meet, druk op + Punt.",
   set: "Kruisje op het punt dat je wilt uitzetten, druk op + Punt. Je krijgt X en Y vanaf het nulpunt en de dichtstbijzijnde paal.",
+  ppick: "Kruisje op de plek van het peilpunt, druk op + Punt.",
   peil: "Kruisje in een vakje, druk op + Punt en vul de diepte onder 0-peil in (cm). Bij palen springt het punt naar het midden van 4 palen."
 };
 function updateHint() {
@@ -1246,7 +1291,73 @@ function renderPileInfo() {
   el.innerHTML = `<span class="big">${piles.length} rondjes herkend</span>
     <span class="hint">${pilesOn ? "Meestal palen, op een riolerings- of inrichtingstekening ook putten. Tik je vlak bij een rondje, dan klikt je punt vast op het hart. Bij een uitzetmaat zie je ook de maat vanaf het dichtstbijzijnde rondje. Zit het in de weg? Zet <b>Palen</b> uit." : "Palen staan uit: punten klikken niet vast."}</span>`;
 }
-function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(); renderSand(); updateHint(); renderTools(); }
+function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); updateHint(); renderTools(); }
+
+/* ---------- Peilpunten: hulppeil vastleggen en peil overbrengen met de laser ---------- */
+let ppPending = null, ppPrevTool = "pan", ppFromVal = "0";
+const numIn = v => { const t = String(v || "").trim().replace(/\s/g, "").replace("−", "-").replace(",", "."); return t === "" || t === "-" || t === "+" ? null : (isFinite(+t) ? +t : NaN); };
+const fmtPeil = h => (h > 0 ? "+" : h < 0 ? "−" : "") + nl0(Math.abs(h)) + " mm";
+function ppFromH() { if (ppFromVal === "0") return 0; const q = (st.pp || []).find(x => String(x.id) === ppFromVal); return q ? q.h : null; }
+function ppFromName() { if (ppFromVal === "0") return "0-peil"; const q = (st.pp || []).find(x => String(x.id) === ppFromVal); return q ? q.name : "?"; }
+function ppCalc(fill) {
+  const H = ppFromH(), a = numIn($("ppA").value), b = numIn($("ppB").value), t = numIn($("ppT").value);
+  const r1 = $("ppRes"), r2 = $("ppRes2");
+  if (H == null) { r1.textContent = "Kies een bekend peil."; r2.textContent = ""; return; }
+  if (a == null || Number.isNaN(a)) { r1.innerHTML = `Vul de aflezing op ${esc(ppFromName())} in.`; }
+  else if (b == null || Number.isNaN(b)) {
+    r1.innerHTML = `Laserlijn ligt op <b>${fmtPeil(H + a)}</b>. Vul de aflezing op het nieuwe punt in.`;
+  } else {
+    const nh = H + a - b;
+    r1.innerHTML = `Nieuw punt: <b>${fmtPeil(nh)}</b><br><span class="hint">${fmtPeil(H)} + ${nl0(a)} − ${nl0(b)}</span>`;
+    if (fill) $("ppH").value = (nh > 0 ? "+" : "") + nl0(nh);
+  }
+  if (a != null && !Number.isNaN(a) && t != null && !Number.isNaN(t)) {
+    const rd = H + a - t;
+    r2.innerHTML = rd >= 0 ? `Lees op de baak: <b>${nl0(rd)} mm</b><br><span class="hint">Laserlijn ${fmtPeil(H + a)} − gewenst ${fmtPeil(t)}</span>`
+      : `Dit peil ligt ${nl0(-rd)} mm <b>boven</b> de laserlijn. Zet de laser hoger.`;
+  } else r2.textContent = t != null && (a == null || Number.isNaN(a)) ? "Vul eerst de aflezing op het bekende punt in." : "";
+}
+function renderPeil() {
+  if (!st.pp) st.pp = [];
+  const L = st.pp;
+  if (ppFromVal !== "0" && !L.some(x => String(x.id) === ppFromVal)) ppFromVal = "0";
+  $("ppFrom").innerHTML = `<option value="0">0-peil (0 mm)</option>` + L.map(x => `<option value="${x.id}">${esc(x.name)} (${fmtPeil(x.h)})</option>`).join("");
+  $("ppFrom").value = ppFromVal;
+  $("ppList").innerHTML = L.length ? L.map(x => `<li data-pp="${x.id}">
+      <div class="pph"><strong>${esc(x.name)}</strong><span class="ppv">${fmtPeil(x.h)}</span></div>
+      <div class="ppm">${esc(x.date || "")}${x.from ? ` · vanaf ${esc(x.from)}` : ""} · ${x.x != null ? "op de tekening" : "geen plek op de tekening"}</div>
+      <div class="btns">${x.x != null ? `<button type="button" class="ghost" data-ppa="show">Toon</button>` : ""}<button type="button" class="ghost" data-ppa="from">Gebruik als vanaf</button><button type="button" class="ghost" data-ppa="del">Wissen</button></div></li>`).join("")
+    : `<li class="ppm" style="border-style:dashed">Nog geen peilpunten.</li>`;
+  $("ppPlaceHint").textContent = ppPending ? "Plek gekozen. Druk op Peilpunt opslaan." : "";
+  ppCalc(false);
+}
+$("ppFrom").addEventListener("change", e => { ppFromVal = e.target.value; ppCalc(true); });
+["ppA", "ppB"].forEach(id => $(id).addEventListener("input", () => ppCalc(true)));
+$("ppT").addEventListener("input", () => ppCalc(false));
+$("ppPlace").addEventListener("click", () => {
+  if (!img.w) { toast("Open eerst een tekening."); return; }
+  ppPrevTool = tool === "ppick" ? ppPrevTool : tool;
+  setTool("ppick");
+  view.scrollIntoView({ block: "center", behavior: "smooth" });
+});
+$("ppSave").addEventListener("click", () => {
+  const h = numIn($("ppH").value);
+  if (h == null || Number.isNaN(h)) { flashHint("Vul het peil in, bijvoorbeeld +1240 of −180 (mm)."); $("ppH").focus(); return; }
+  if (!st.pp) st.pp = [];
+  st.ppSeq = (st.ppSeq || 0) + 1;
+  const name = $("ppName").value.trim() || `Peilpunt ${st.ppSeq}`;
+  const a = numIn($("ppA").value), b = numIn($("ppB").value), viaLaser = a != null && b != null && !Number.isNaN(a) && !Number.isNaN(b) && Math.abs(ppFromH() + a - b - h) < 0.5;
+  st.pp.push({ id: st.ppSeq, name, h, date: new Date().toLocaleDateString("nl-NL"), from: viaLaser ? ppFromName() : "", x: ppPending ? ppPending.x : null, y: ppPending ? ppPending.y : null });
+  ppPending = null; $("ppName").value = ""; $("ppH").value = ""; $("ppB").value = "";
+  save(); renderAll(); toast(`${name} opgeslagen: ${fmtPeil(h)}`);
+});
+$("ppList").addEventListener("click", e => {
+  const b = e.target.closest("[data-ppa]"), li = e.target.closest("[data-pp]"); if (!b || !li) return;
+  const q = st.pp.find(x => String(x.id) === li.dataset.pp); if (!q) return;
+  if (b.dataset.ppa === "show") { showPts([{ x: q.x, y: q.y }]); view.scrollIntoView({ block: "center", behavior: "smooth" }); }
+  else if (b.dataset.ppa === "from") { ppFromVal = String(q.id); $("ppA").value = ""; $("ppB").value = ""; renderPeil(); $("ppA").focus(); toast(`Vanaf ${q.name} (${fmtPeil(q.h)}). Lees de baak af op dit punt.`); }
+  else if (b.dataset.ppa === "del") armed(b, () => { st.pp = st.pp.filter(x => x !== q); save(); renderAll(); });
+});
 
 /* ---------- Acties ---------- */
 function setTool(t) {
@@ -1282,6 +1393,10 @@ function onTap(p0, g, shift) {
     }
     st.sand.pts.push({ x: q.x, y: q.y, v: null });
     save(); openPeil(st.sand.pts.length - 1); return;
+  }
+  if (tool === "ppick") {
+    ppPending = snap(p0); setTool(ppPrevTool || "pan"); renderPeil(); drawOverlay();
+    toast("Plek gekozen"); $("ppSave").scrollIntoView({ block: "center", behavior: "smooth" }); return;
   }
   const lastD = draft[draft.length - 1];
   const p = snap((ortho || shift) && lastD && tool !== "calib" ? constrain(p0, lastD) : p0);
@@ -1471,6 +1586,7 @@ $("list").addEventListener("input", e => {
 $("copy").addEventListener("click", () => {
   const head = `${img.name || "Tekening"}${st.calib ? ` — geijkt op ${fmtMM(st.calib.mm)}` : " — niet geijkt"}`;
   const lines = st.items.map((it, i) => { const d = describe(it); return `${i + 1}. ${it.name}: ${d.main}`; });
+  if (st.pp && st.pp.length) lines.push("", "Peilpunten (t.o.v. 0-peil):", ...st.pp.map(q => `- ${q.name}: ${fmtPeil(q.h)}${q.from ? ` (vanaf ${q.from})` : ""}`));
   const txt = [head, ...lines].join("\n");
   const fail = () => toast("Kopiëren lukte niet. Selecteer de waardes in de lijst handmatig.");
   try { navigator.clipboard.writeText(txt).then(() => toast("Lijst gekopieerd"), fail); } catch (e) { fail(); }
@@ -1513,7 +1629,7 @@ $("clearall").addEventListener("click", () => {
 let lastAuto = null;
 function applyAuto(auto) {
   const oldK = st.mmPerPx && st.calib && st.calib.auto ? d2(st.calib.a, st.calib.b) : null, newK = d2(auto.a, auto.b);
-  if (oldK && Math.abs(oldK / newK - 1) > 0.001) { const f = newK / oldK; st.items.forEach(it => it.pts.forEach(p => { p.x *= f; p.y *= f; })); if (st.origin) { st.origin.x *= f; st.origin.y *= f; } if (st.sand) st.sand.pts.forEach(p => { p.x *= f; p.y *= f; }); }
+  if (oldK && Math.abs(oldK / newK - 1) > 0.001) { const f = newK / oldK; st.items.forEach(it => it.pts.forEach(p => { p.x *= f; p.y *= f; })); if (st.origin) { st.origin.x *= f; st.origin.y *= f; } if (st.sand) st.sand.pts.forEach(p => { p.x *= f; p.y *= f; }); (st.pp || []).forEach(p => { if (p.x != null) { p.x *= f; p.y *= f; } }); }
   st.calib = { a: auto.a, b: auto.b, mm: auto.mm, auto: true, n: auto.n, vals: auto.vals, spread: auto.spread };
   if (auto.scale) { st.calib.scale = auto.scale; st.calib.others = auto.others || []; }
   st.mmPerPx = auto.mm / newK;
@@ -1526,6 +1642,8 @@ function setImage(key, name, sample, auto) {
   cv.style.width = img.w + "px"; cv.style.height = img.h + "px";
   st = sample ? sampleState() : (loadState(key) || blank());
   st.sand = Object.assign(sandDefaults(), st.sand || {});
+  if (!Array.isArray(st.pp)) st.pp = [];
+  ppPending = null; ppFromVal = "0";
   draft = []; sel = null; hover = null; peilCur = null; $("peilbox").hidden = true;
   syncSandInputs();
   $("fname").textContent = name;
