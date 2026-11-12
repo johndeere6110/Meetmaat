@@ -168,6 +168,8 @@ input[type="number"], input[type="text"], .nm {
 .calinfo { font-size: 14px; display: grid; gap: 4px; }
 .calinfo .big { font-family: var(--mono); font-size: 14px; font-weight: 500; }
 .calinfo.no { color: var(--warn); }
+.scaleform { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; color: var(--ink); }
+.scaleform input { width: 6.5em; font: 500 14px var(--mono); padding: 7px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
 .hint { color: var(--muted); font-size: 12.5px; margin: 0; }
 
 #list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 60vh; overflow-y: auto; }
@@ -394,7 +396,7 @@ let img = { w: 0, h: 0, key: "", name: "", sample: false };
 let T = { s: 1, x: 0, y: 0 };
 let st = blank();
 let tool = "pan", draft = [], ortho = false, sel = null, hover = null, hoverShift = false;
-let pdfDoc = null, pageNo = 1, fileMeta = null;
+let pdfDoc = null, pageNo = 1, fileMeta = null, pdfVp = null;
 let piles = [], pileR = 8, pilesOn = true, pileGrid = new Map();
 const PG = 64;   // rastermaat (px) voor snel zoeken naar de dichtstbijzijnde paal
 
@@ -503,6 +505,24 @@ async function autoScale(page, vp) {
   const ca = vp.convertToViewportPoint(A[0], A[1]), cb = vp.convertToViewportPoint(B[0], B[1]);
   const vals = [...new Set(ok.map(x => x.val))];
   return { a: { x: ca[0], y: ca[1] }, b: { x: cb[0], y: cb[1] }, mm: top.val, n: ok.length, vals, spread: (Math.max(...ok.map(x => x.ratio)) / Math.min(...ok.map(x => x.ratio)) - 1) * 100 };
+}
+
+// Schaal uit de tekst van de tekening ("SCHAAL 1:300", "1 : 300"). Vaakst genoemde wint, bij gelijkspel de kleinste.
+async function scaleFromText(page) {
+  const tc = await page.getTextContent(), cnt = new Map();
+  for (const t of tc.items) {
+    const m = /^(?:schaal\s*:?\s*)?1\s*:\s*(\d{1,5})$/i.exec((t.str || "").trim());
+    if (!m) continue;
+    const n = +m[1]; if (n < 1 || n > 10000) continue;
+    cnt.set(n, (cnt.get(n) || 0) + 1);
+  }
+  const all = [...cnt].sort((x, y) => y[1] - x[1] || x[0] - y[0]);
+  return all.length ? { scale: all[0][0], others: all.slice(1).map(x => x[0]) } : null;
+}
+// IJking op schaal: 1 PDF-punt is 25,4/72 mm op papier. Klopt alleen als de PDF op ware grootte is.
+function scaleCal(n, vp, others) {
+  const L = 1000, a = vp.convertToViewportPoint(0, 0), b = vp.convertToViewportPoint(L, 0);
+  return { a: { x: a[0], y: a[1] }, b: { x: b[0], y: b[1] }, mm: L * 25.4 / 72 * n, n: 0, vals: [], spread: 0, scale: n, others: others || [] };
 }
 
 // Rondjes (palen) uit de vectordata van een PDF-pagina halen
@@ -934,7 +954,7 @@ function drawOverlay() {
     `<circle class="hd ${cls}" cx="${p.x}" cy="${p.y}" r="${6 * k}"/><circle class="hit" data-h="${id}" cx="${p.x}" cy="${p.y}" r="${16 * k}"/>`;
   let s = "";
 
-  if (st.calib) {
+  if (st.calib && !st.calib.scale) {
     const { a, b, mm } = st.calib;
     s += `<path class="halo" d="${P([a, b])}"/><path class="cal" d="${P([a, b])}"/>`;
     s += label((a.x + b.x) / 2, (a.y + b.y) / 2 - 9 * k, `IJk ${fmtMM(mm)}`, "cal");
@@ -1040,15 +1060,21 @@ function renderCal() {
   if (!st.mmPerPx) {
     c.className = "calinfo no";
     c.innerHTML = `<span>Nog niet geijkt. Maten staan in pixels.</span><span class="hint">Kies <b>IJken</b> en tik begin en eind van een maatlijn waarvan je de maat weet. Hoe langer de lijn, hoe nauwkeuriger.</span>
-      ${lastAuto ? `<div class="btns"><button type="button" class="ghost" data-cal="auto">Automatisch ijken</button></div>` : ""}`;
+      ${lastAuto ? `<div class="btns"><button type="button" class="ghost" data-cal="auto">Automatisch ijken</button></div>` : ""}${scaleForm()}`;
     return;
   }
   c.className = "calinfo";
-  c.innerHTML = `<span class="big">${st.calib && st.calib.auto ? `Automatisch geijkt op ${st.calib.n} maatlijnen` : `IJkmaat ${st.calib ? fmtMM(st.calib.mm) : "–"}`}</span>
-    ${st.calib && st.calib.auto ? `<span class="hint">Gevonden maten: ${st.calib.vals.join(", ")} mm · onderling ${nl(st.calib.spread, 2)}% verschil. Zelf ijken met <b>IJken</b> mag altijd.</span>` : ""}
+  const sc = st.calib && st.calib.scale;
+  c.innerHTML = `<span class="big">${sc ? `Geijkt op schaal 1:${sc}` : st.calib && st.calib.auto ? `Automatisch geijkt op ${st.calib.n} maatlijnen` : `IJkmaat ${st.calib ? fmtMM(st.calib.mm) : "–"}`}</span>
+    ${sc ? `<span class="hint">${st.calib.auto ? "Deze schaal staat op de tekening." : "Zelf ingevuld."} Klopt alleen als de PDF op ware grootte is. Meet daarom één maat na die je kent; wijkt hij af, ijk dan met <b>IJken</b>.${st.calib.others && st.calib.others.length ? ` Er staat ook ${st.calib.others.map(n => "1:" + n).join(", ")} op (bijv. een overzichtskaartje).` : ""}</span>` : ""}
+    ${st.calib && st.calib.auto && !sc ? `<span class="hint">Gevonden maten: ${st.calib.vals.join(", ")} mm · onderling ${nl(st.calib.spread, 2)}% verschil. Zelf ijken met <b>IJken</b> mag altijd.</span>` : ""}
     <span>1 pixel = ${nl(st.mmPerPx, 1)} mm · nauwkeurigheid ±${fmtMM(Math.max(st.mmPerPx, unit === "mm" ? 1 : 10))} per punt</span>
     <span class="hint">Zoom flink in bij het aantikken. Elke klik naast de lijn telt mee in de maat.</span>
-    <div class="btns"><button type="button" class="ghost" data-cal="clear">IJking verwijderen</button>${lastAuto && !(st.calib && st.calib.auto) ? `<button type="button" class="ghost" data-cal="auto">Automatisch ijken</button>` : ""}</div>`;
+    <div class="btns"><button type="button" class="ghost" data-cal="clear">IJking verwijderen</button>${lastAuto && !(st.calib && st.calib.auto) ? `<button type="button" class="ghost" data-cal="auto">Automatisch ijken</button>` : ""}</div>${scaleForm()}`;
+}
+function scaleForm() {
+  if (!pdfVp) return "";
+  return `<form class="scaleform" data-scaleform><label for="calScale">Of ijk op schaal: 1 :</label><input id="calScale" type="text" inputmode="numeric" autocomplete="off" placeholder="bijv. 300" value="${st.calib && st.calib.scale ? st.calib.scale : ""}"><button type="submit" class="ghost">Gebruik schaal</button></form>`;
 }
 const HINTS = {
   pan: "Sleep om te schuiven, knijp of scroll om te zoomen. Tik een meting aan om hem te selecteren en versleep de bolletjes om bij te stellen.",
@@ -1096,8 +1122,8 @@ function renderPileInfo() {
     el.innerHTML = `<span class="hint">Geen palen gevonden. Palen worden alleen herkend in een PDF-tekening waarin ze als rondjes getekend zijn, niet in een foto of screenshot.</span>`;
     return;
   }
-  el.innerHTML = `<span class="big">${piles.length} palen herkend</span>
-    <span class="hint">${pilesOn ? "Tik je vlak bij een paal, dan klikt je punt vast op het hart van de paal. Bij een uitzetmaat zie je ook de maat vanaf de dichtstbijzijnde paal." : "Palen staan uit: punten klikken niet vast."}</span>`;
+  el.innerHTML = `<span class="big">${piles.length} rondjes herkend</span>
+    <span class="hint">${pilesOn ? "Meestal palen, op een riolerings- of inrichtingstekening ook putten. Tik je vlak bij een rondje, dan klikt je punt vast op het hart. Bij een uitzetmaat zie je ook de maat vanaf het dichtstbijzijnde rondje. Zit het in de weg? Zet <b>Palen</b> uit." : "Palen staan uit: punten klikken niet vast."}</span>`;
 }
 function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(); renderSand(); updateHint(); renderTools(); }
 
@@ -1297,12 +1323,22 @@ $("copy").addEventListener("click", () => {
   const fail = () => toast("Kopiëren lukte niet. Selecteer de waardes in de lijst handmatig.");
   try { navigator.clipboard.writeText(txt).then(() => toast("Lijst gekopieerd"), fail); } catch (e) { fail(); }
 });
+$("calinfo").addEventListener("submit", e => {
+  if (!e.target.matches("[data-scaleform]")) return;
+  e.preventDefault();
+  const n = parseFloat(String($("calScale").value).replace(",", ".").replace(/^1\s*:\s*/, ""));
+  if (!pdfVp || !isFinite(n) || n <= 0) { flashHint("Vul de schaal in, bijvoorbeeld 300 voor 1:300."); return; }
+  applyAuto(scaleCal(n, pdfVp));
+  st.calib.auto = false;
+  save(); renderAll();
+  toast(`Geijkt op schaal 1:${n}`);
+});
 let calArmed = null;
 $("calinfo").addEventListener("click", e => {
   const b = e.target.closest("[data-cal]"); if (!b) return;
   if (b.dataset.cal === "auto" && lastAuto) {
     applyAuto(lastAuto); renderAll();
-    toast(`Automatisch geijkt op ${lastAuto.n} maatlijnen`);
+    toast(lastAuto.scale ? `Geijkt op schaal 1:${lastAuto.scale}` : `Automatisch geijkt op ${lastAuto.n} maatlijnen`);
     return;
   }
   if (b.dataset.cal === "clear") {
@@ -1327,6 +1363,7 @@ function applyAuto(auto) {
   const oldK = st.mmPerPx && st.calib && st.calib.auto ? d2(st.calib.a, st.calib.b) : null, newK = d2(auto.a, auto.b);
   if (oldK && Math.abs(oldK / newK - 1) > 0.001) { const f = newK / oldK; st.items.forEach(it => it.pts.forEach(p => { p.x *= f; p.y *= f; })); if (st.origin) { st.origin.x *= f; st.origin.y *= f; } if (st.sand) st.sand.pts.forEach(p => { p.x *= f; p.y *= f; }); }
   st.calib = { a: auto.a, b: auto.b, mm: auto.mm, auto: true, n: auto.n, vals: auto.vals, spread: auto.spread };
+  if (auto.scale) { st.calib.scale = auto.scale; st.calib.others = auto.others || []; }
   st.mmPerPx = auto.mm / newK;
   st.noAuto = false;
   save();
@@ -1345,6 +1382,7 @@ function setImage(key, name, sample, auto) {
   // Automatische ijking, of een eerdere automatische ijking verversen (telefoon kan op een andere resolutie tekenen)
   if (!sample && auto && !st.noAuto && (!st.mmPerPx || (st.calib && st.calib.auto))) { applyAuto(auto); autoUsed = true; }
   if (sample) showBanner("<b>Voorbeeldtekening.</b> De ijking en metingen zijn voorbeelden. Open je eigen tekening met <b>Tekening openen</b>.");
+  else if (autoUsed && auto.scale) showBanner(`<b>${esc(name)}</b> geopend en <b>geijkt op schaal 1:${auto.scale}</b> (staat op de tekening). Meet ter controle een maat na die je kent.${piles.length ? ` ${piles.length} rondjes (palen of putten) herkend.` : ""}`, false, 8000);
   else if (autoUsed) showBanner(`<b>${esc(name)}</b> geopend en <b>automatisch geijkt</b> op ${auto.n} maatlijnen (${auto.vals.slice(0, 5).join(", ")}${auto.vals.length > 5 ? ", …" : ""}).${piles.length ? ` ${piles.length} palen herkend.` : ""}`, false, 7000);
   else if (st.items.length || st.calib) showBanner(`<b>${esc(name)}</b> geopend. Eerdere ijking en metingen teruggezet.`, false, 5000);
   else showBanner(`<b>${esc(name)}</b> geopend${piles.length ? `, ${piles.length} palen herkend` : ""}. Begin met <b>IJken</b>.`, false, 5000);
@@ -1370,6 +1408,8 @@ async function renderPdfPage() {
     try { const r = await extractPiles(page, vp); setPiles(r.list, r.r); } catch (e) { setPiles([], 0); }
     let auto = null;
     try { auto = await autoScale(page, vp); } catch (e) { auto = null; }
+    pdfVp = vp;
+    if (!auto) { try { const sc = await scaleFromText(page); if (sc) auto = scaleCal(sc.scale, vp, sc.others); } catch (e) {} }
     setImage(`${fileMeta.name}|${fileMeta.size}|p${pageNo}`, fileMeta.name + (pdfDoc.numPages > 1 ? ` · blad ${pageNo}` : ""), false, auto);
   } finally { $("loading").hidden = true; }
 }
@@ -1390,7 +1430,7 @@ async function openFile(f, fromStore) {
       sel.hidden = pdfDoc.numPages < 2;
       await renderPdfPage();
     } else {
-      pdfDoc = null; $("page").hidden = true;
+      pdfDoc = null; pdfVp = null; $("page").hidden = true;
       const url = URL.createObjectURL(f);
       const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("Dit bestand kan niet als afbeelding worden geopend.")); i.src = url; });
       const s = Math.min(1, canvasLimits(im.naturalWidth, im.naturalHeight));
