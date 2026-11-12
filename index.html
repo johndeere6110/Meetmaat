@@ -1091,10 +1091,12 @@ function drawOverlay() {
   if (!img.w) { gm.innerHTML = ""; return; }
   ov.setAttribute("width", img.w); ov.setAttribute("height", img.h);
   ov.setAttribute("viewBox", `0 0 ${img.w} ${img.h}`);
-  const k = 1 / T.s, fs = 13 * k;
+  // Teksten en symbolen krimpen mee bij uitzoomen (tot 55%), zodat ze de tekening niet afdekken
+  const zm = Math.max(0.55, Math.min(1, T.s / (fitScale() * 3)));
+  const k = 1 / T.s, fs = 13 * k * zm;
   const P = pts => pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
   const label = (x, y, txt, cls = "", anchor = "middle") =>
-    `<text class="lb ${cls}" x="${x}" y="${y}" text-anchor="${anchor}" style="font-size:${fs}px;stroke-width:${4 * k}px">${esc(txt)}</text>`;
+    `<text class="lb ${cls}" x="${x}" y="${y}" text-anchor="${anchor}" style="font-size:${fs}px;stroke-width:${4 * k * zm}px">${esc(txt)}</text>`;
   const handle = (p, id, cls = "") =>
     `<circle class="hd ${cls}" cx="${p.x}" cy="${p.y}" r="${6 * k}"/><circle class="hit" data-h="${id}" cx="${p.x}" cy="${p.y}" r="${16 * k}"/>`;
   let s = "";
@@ -1106,16 +1108,16 @@ function drawOverlay() {
     if (tool === "pan" || tool === "calib") s += handle(a, "c:0", "c") + handle(b, "c:1", "c");
   }
   if (st.origin) {
-    const o = st.origin, L = 22 * k;
+    const o = st.origin, L = 22 * k * zm;
     const d = `M${o.x - L} ${o.y}H${o.x + L}M${o.x} ${o.y - L}V${o.y + L}`;
     s += `<path class="halo" d="${d}"/><path class="org" d="${d}"/><circle class="orgc" cx="${o.x}" cy="${o.y}" r="${6 * k}"/>`;
-    s += label(o.x + 12 * k, o.y - 12 * k, "0-punt", "", "start");
+    s += label(o.x + 12 * k * zm, o.y - 12 * k * zm, "0-punt", "", "start");
     if (tool === "pan" || tool === "origin") s += handle(o, "o", "o");
   }
   [...(st.pp || []).filter(q => q.x != null), ...(ppPending ? [{ ...ppPending, name: "nieuw", h: null }] : [])].forEach(q => {
-    const w = 9 * k, hh = 13 * k;
+    const w = 9 * k * zm, hh = 13 * k * zm;
     s += `<path class="ppt" d="M${q.x} ${q.y}L${q.x - w} ${q.y - hh}H${q.x + w}Z"/>`;
-    s += label(q.x + 12 * k, q.y - 6 * k, `${q.name}${q.h != null ? " " + fmtPeil(q.h).replace(" cm", "") : ""}`, "", "start");
+    s += label(q.x + 12 * k * zm, q.y - 6 * k * zm, `${q.name}${q.h != null ? " " + fmtPeil(q.h).replace(" cm", "") : ""}`, "", "start");
   });
 
   st.items.forEach((it, i) => {
