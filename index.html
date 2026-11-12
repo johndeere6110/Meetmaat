@@ -143,6 +143,15 @@ button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visib
 #ov .plink { stroke: var(--pile); stroke-width: 2; stroke-dasharray: 4 4; }
 #ov .lb.pil { fill: var(--pile); }
 
+.vz { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; pointer-events: none; z-index: 2; }
+.vz svg { width: 100%; height: 100%; overflow: visible; display: block; }
+.vz .vzh { fill: none; stroke: #fff; stroke-width: 5; opacity: .9; }
+.vz .vzl { fill: none; stroke: var(--mark); stroke-width: 2.2; }
+.vz .vzd { fill: var(--mark); }
+.vzbar { position: absolute; left: 10px; right: 62px; bottom: 10px; display: flex; gap: 8px; z-index: 3; }
+.vzbar button { flex: 1 1 0; min-height: 52px; font-size: 16px; box-shadow: 0 1px 6px rgba(0,0,0,.25); }
+.vzbar button.ghost { background: var(--panel); border-color: var(--line); }
+.vzbar button.big { flex-grow: 1.5; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-size: 18px; }
 .zoom { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
 .zoom button { width: 40px; height: 40px; padding: 0; font-size: 18px; background: var(--panel); color: var(--ink); border-color: var(--line); box-shadow: 0 1px 4px rgba(0,0,0,.2); }
 .zoom button.fit { font-size: 11px; }
@@ -151,7 +160,7 @@ button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visib
 .banner.err { border-left-color: var(--warn); color: var(--warn); font-weight: 500; }
 .filebtn { position: relative; overflow: hidden; }
 .filebtn input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 40px; }
-.calibbox { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); width: min(340px, calc(100% - 28px)); background: var(--panel); border: 1px solid var(--ink); border-radius: 6px; padding: 14px; display: grid; gap: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.3); }
+.calibbox { position: absolute; z-index: 4; left: 50%; top: 14px; transform: translateX(-50%); width: min(340px, calc(100% - 28px)); background: var(--panel); border: 1px solid var(--ink); border-radius: 6px; padding: 14px; display: grid; gap: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.3); }
 .calibbox label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; }
 .unit { position: relative; }
 .unit span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font: 13px var(--mono); pointer-events: none; }
@@ -247,6 +256,7 @@ input[type="number"], input[type="text"], .nm {
         <button type="button" data-unit="m">m</button>
       </div>
       <button type="button" class="ghost" id="pilesbtn" aria-pressed="true" hidden title="Palen tonen en punten op palen laten vastklikken">Palen</button>
+      <button type="button" class="ghost" id="vizbtn" aria-pressed="false" title="Vast kruisje in het midden: schuif de tekening eronder en druk op + Punt">Vizier</button>
       <button type="button" class="ghost" id="ortho" aria-pressed="false" title="Alleen horizontaal of verticaal meten (of houd Shift ingedrukt)">Haaks</button>
       <button type="button" id="finish" hidden>Klaar</button>
       <button type="button" class="ghost" id="undo">Ongedaan</button>
@@ -275,6 +285,12 @@ input[type="number"], input[type="text"], .nm {
           </label>
           <div class="btns"><button type="submit">Opslaan, volgende</button><button type="button" class="ghost" id="peildel">Punt wissen</button><button type="button" class="ghost" id="peilclose">Sluiten</button></div>
         </form>
+        <div class="vz" id="vz" hidden aria-hidden="true"><svg viewBox="-32 -32 64 64"><circle r="14" class="vzh"/><path class="vzh" d="M0 -30v18M0 12v18M-30 0h18M12 0h18"/><circle r="14" class="vzl"/><path class="vzl" d="M0 -30v18M0 12v18M-30 0h18M12 0h18"/><circle r="1.8" class="vzd"/></svg></div>
+        <div class="vzbar" id="vzbar" hidden>
+          <button type="button" class="ghost" id="vzBack">Terug</button>
+          <button type="button" class="big" id="vzAdd">+ Punt</button>
+          <button type="button" id="vzDone" hidden>Klaar</button>
+        </div>
         <div class="zoom">
           <button type="button" id="zin" aria-label="Inzoomen">+</button>
           <button type="button" id="zout" aria-label="Uitzoomen">−</button>
@@ -854,6 +870,12 @@ function polyArea(pts) {
 const UNIT = { mm: { f: 1, d: 0, ex: "47970" }, cm: { f: 10, d: 0, ex: "4797" }, m: { f: 1000, d: 2, ex: "47,97" } };
 let unit = "mm";
 try { const u = localStorage.getItem("meetmaat:unit"); if (UNIT[u]) unit = u; } catch (e) {}
+// Vizier: op de telefoon standaard aan (vinger zit dan niet op het punt), op de pc uit
+let vizier = window.matchMedia && matchMedia("(pointer: coarse)").matches;
+try { const v = localStorage.getItem("meetmaat:vizier"); if (v === "1" || v === "0") vizier = v === "1"; } catch (e) {}
+const vzActive = () => vizier && img.w && tool !== "pan";
+function vzCenter() { const r = view.getBoundingClientRect(); return { x: (r.width / 2 - T.x) / T.s, y: (r.height / 2 - T.y) / T.s }; }
+function vzUpdate() { if (vzActive()) { hover = vzCenter(); hoverShift = false; } }
 const fmtMM = mm => { const u = UNIT[unit]; return `${u.d ? nl(mm / u.f, u.d) : nl0(mm / u.f)} ${unit}`; };
 const fmtLen = px => st.mmPerPx ? fmtMM(px * st.mmPerPx) : `${nl0(px)} px`;
 const fmtArea = px2 => st.mmPerPx ? `${nl(px2 * st.mmPerPx ** 2 / 1e6, 2)} m²` : `${nl0(px2)} px²`;
@@ -891,6 +913,7 @@ function describe(it) {
 function applyT(redraw) {
   stage.style.transform = `translate(${T.x}px, ${T.y}px) scale(${T.s})`;
   scheduleSharp();
+  if (vzActive()) { vzUpdate(); scheduleOverlay(); return; }
   if (redraw) scheduleOverlay();
 }
 /* Scherp bij inzoomen: een PDF is vector, dus het zichtbare stuk wordt opnieuw getekend op de
@@ -1071,7 +1094,7 @@ function drawOverlay() {
     if (pts.length >= 2 && tool !== "calib") {
       const l = pts[pts.length - 1];
       const val = tool === "area" && pts.length > 2 ? fmtArea(polyArea(pts)) : fmtLen(polyLen(pts));
-      s += label(l.x + 12 * k, l.y + 18 * k, val, "mkc", "start");
+      s += vzActive() ? label(l.x + 34 * k, l.y - 26 * k, val, "mkc", "start") : label(l.x + 12 * k, l.y + 18 * k, val, "mkc", "start");
     }
   }
   gm.innerHTML = s;
@@ -1122,11 +1145,20 @@ const HINTS = {
   set: "Uitzetmaat: tik een punt. Je krijgt de maat in X (naar rechts) en Y (naar boven) vanaf het nulpunt, en vanaf de dichtstbijzijnde paal.",
   peil: "Peilmaat: tik een vakje en vul de diepte onder 0-peil in (cm). Bij palen springt het punt naar het midden van 4 palen. Tik een bestaand punt om het te wijzigen."
 };
+const VZ_HINTS = {
+  calib: ["Schuif het kruisje op het begin van een maatlijn waarvan je de maat weet en druk op + Punt.", "Nu het kruisje op het eind van die maatlijn, + Punt.", "Vul de echte maat in."],
+  dist: ["Kruisje op het eerste punt, druk op + Punt.", "Kruisje op het tweede punt, + Punt."],
+  poly: ["Kruisje op het begin van de lijn, druk op + Punt.", "Schuif naar het volgende punt, + Punt. Druk op Klaar als de lijn af is."],
+  area: ["Kruisje op de eerste hoek, druk op + Punt.", "Schuif naar de volgende hoek, + Punt. Druk op Klaar om het vlak te sluiten."],
+  origin: "Kruisje op het punt waar je in het werk vanaf meet, druk op + Punt.",
+  set: "Kruisje op het punt dat je wilt uitzetten, druk op + Punt. Je krijgt X en Y vanaf het nulpunt en de dichtstbijzijnde paal.",
+  peil: "Kruisje in een vakje, druk op + Punt en vul de diepte onder 0-peil in (cm). Bij palen springt het punt naar het midden van 4 palen."
+};
 function updateHint() {
   const h = $("hint");
   h.classList.remove("flash");
   if (!img.w) { h.textContent = "Open een tekening om te beginnen."; return; }
-  const v = HINTS[tool];
+  const v = vzActive() && VZ_HINTS[tool] ? VZ_HINTS[tool] : HINTS[tool];
   let t = Array.isArray(v) ? v[Math.min(draft.length, v.length - 1)] : v;
   if (tool === "set" && !st.origin) t = "Zet eerst een nulpunt met het gereedschap Nulpunt.";
   if (MEASURE_TOOLS.includes(tool) && !st.mmPerPx) t += " Let op: nog niet geijkt, maten staan in pixels.";
@@ -1147,6 +1179,11 @@ function renderTools() {
   view.classList.toggle("measure", tool !== "pan");
   $("finish").hidden = !((tool === "poly" && draft.length >= 2) || (tool === "area" && draft.length >= 3));
   $("ortho").setAttribute("aria-pressed", ortho);
+  const va = !!vzActive();
+  $("vizbtn").setAttribute("aria-pressed", vizier);
+  $("vz").hidden = !va; $("vzbar").hidden = !va;
+  $("vzDone").hidden = $("finish").hidden;
+  $("vzBack").disabled = !draft.length && !st.items.length;
   document.querySelectorAll("#units button").forEach(b => b.setAttribute("aria-pressed", b.dataset.unit === unit));
 }
 function renderPileInfo() {
@@ -1166,13 +1203,14 @@ function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(
 /* ---------- Acties ---------- */
 function setTool(t) {
   tool = t; draft = []; hover = null; $("calibbox").hidden = true; $("peilbox").hidden = true; peilCur = null;
+  vzUpdate();
   renderAll();
 }
 function addItem(type, pts) {
   const count = st.items.filter(x => x.type === type).length + 1;
   const it = { id: st.seq++, type, pts: pts.map(p => ({ x: p.x, y: p.y })), name: `${TYPE_NAME[type]} ${count}` };
   st.items.push(it);
-  sel = it.id; draft = []; hover = null;
+  sel = it.id; draft = []; hover = null; vzUpdate();
   save(); renderAll();
 }
 function finish() {
@@ -1257,7 +1295,7 @@ $("calcancel").addEventListener("click", () => { draft = []; $("calibbox").hidde
 const ptrs = new Map();
 let G = null;
 view.addEventListener("pointerdown", e => {
-  if (e.target.closest(".zoom, .calibbox, .banner")) return;
+  if (e.target.closest(".zoom, .calibbox, .banner, .vzbar")) return;
   if (!img.w) return;
   view.setPointerCapture(e.pointerId);
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1274,7 +1312,7 @@ view.addEventListener("pointerdown", e => {
 view.addEventListener("pointermove", e => {
   if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!G) {
-    if (e.pointerType === "mouse" && draft.length) { hover = toImg(e.clientX, e.clientY); hoverShift = e.shiftKey; scheduleOverlay(); }
+    if (e.pointerType === "mouse" && draft.length && !vzActive()) { hover = toImg(e.clientX, e.clientY); hoverShift = e.shiftKey; scheduleOverlay(); }
     return;
   }
   if (G.kind === "pinch") {
@@ -1295,14 +1333,17 @@ function endPtr(e) {
   ptrs.delete(e.pointerId);
   if (!G) return;
   if (G.kind === "pinch" || G.kind === "done") { G = ptrs.size ? { kind: "done" } : null; return; }
-  if (G.kind === "tap" && e.type === "pointerup") onTap(toImg(e.clientX, e.clientY), G, e.shiftKey);
+  if (G.kind === "tap" && e.type === "pointerup") {
+    if (vzActive()) flashHint("Vizier staat aan: schuif de tekening tot het kruisje goed staat en druk op + Punt.");
+    else onTap(toImg(e.clientX, e.clientY), G, e.shiftKey);
+  }
   if (G.kind === "handle") { save(); renderAll(); }
   view.classList.remove("panning");
   G = null;
 }
 view.addEventListener("pointerup", endPtr);
 view.addEventListener("pointercancel", endPtr);
-view.addEventListener("pointerleave", () => { if (hover) { hover = null; scheduleOverlay(); } });
+view.addEventListener("pointerleave", () => { if (hover && !vzActive()) { hover = null; scheduleOverlay(); } });
 view.addEventListener("wheel", e => { if (!img.w) return; e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
 ["gesturestart", "gesturechange"].forEach(ev => view.addEventListener(ev, e => e.preventDefault()));
 
@@ -1325,6 +1366,14 @@ $("units").addEventListener("click", e => {
   renderAll();
 });
 $("finish").addEventListener("click", finish);
+$("vizbtn").addEventListener("click", () => {
+  vizier = !vizier; hover = null; vzUpdate();
+  try { localStorage.setItem("meetmaat:vizier", vizier ? "1" : "0"); } catch (e) {}
+  renderAll();
+});
+$("vzAdd").addEventListener("click", () => { if (vzActive()) { onTap(vzCenter(), {}, false); vzUpdate(); scheduleOverlay(); } });
+$("vzDone").addEventListener("click", finish);
+$("vzBack").addEventListener("click", () => $("undo").click());
 $("undo").addEventListener("click", () => {
   if (draft.length) { draft.pop(); $("calibbox").hidden = true; }
   else if (st.items.length) { const it = st.items.pop(); if (sel === it.id) sel = null; save(); }
