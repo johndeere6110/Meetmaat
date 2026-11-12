@@ -118,6 +118,7 @@ button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visib
 #stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 #cv { display: block; background: var(--paper); box-shadow: 0 1px 8px rgba(0,0,0,.25); }
 #ov { position: absolute; left: 0; top: 0; overflow: visible; }
+#sharp { position: absolute; left: 0; top: 0; pointer-events: none; }
 
 #ov path { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
 #ov .halo { stroke: var(--paper); stroke-width: 7; opacity: .9; }
@@ -256,7 +257,7 @@ input[type="number"], input[type="text"], .nm {
     <div class="viewer">
       <div class="hintbar" id="hint" aria-live="polite"></div>
       <div id="view" aria-label="Tekening">
-        <div id="stage"><canvas id="cv" width="10" height="10"></canvas><svg id="ov" xmlns="http://www.w3.org/2000/svg"></svg></div>
+        <div id="stage"><canvas id="cv" width="10" height="10"></canvas><canvas id="sharp" hidden></canvas><svg id="ov" xmlns="http://www.w3.org/2000/svg"></svg></div>
         <div class="banner" id="banner" hidden></div>
         <form class="calibbox" id="calibbox" hidden>
           <strong>Hoe lang is deze lijn in het echt?</strong>
@@ -396,7 +397,7 @@ let img = { w: 0, h: 0, key: "", name: "", sample: false };
 let T = { s: 1, x: 0, y: 0 };
 let st = blank();
 let tool = "pan", draft = [], ortho = false, sel = null, hover = null, hoverShift = false;
-let pdfDoc = null, pageNo = 1, fileMeta = null, pdfVp = null;
+let pdfDoc = null, pageNo = 1, fileMeta = null, pdfVp = null, pdfPage = null;
 let piles = [], pileR = 8, pilesOn = true, pileGrid = new Map();
 const PG = 64;   // rastermaat (px) voor snel zoeken naar de dichtstbijzijnde paal
 
@@ -889,13 +890,48 @@ function describe(it) {
 /* ---------- Beeld en zoom ---------- */
 function applyT(redraw) {
   stage.style.transform = `translate(${T.x}px, ${T.y}px) scale(${T.s})`;
+  scheduleSharp();
   if (redraw) scheduleOverlay();
+}
+/* Scherp bij inzoomen: een PDF is vector, dus het zichtbare stuk wordt opnieuw getekend op de
+   resolutie van het scherm (zoals een PDF-viewer doet). De basistekening blijft eronder liggen. */
+const sharp = $("sharp");
+let sharpTimer = null, sharpTask = null, sharpGen = 0;
+function scheduleSharp() { clearTimeout(sharpTimer); sharpTimer = setTimeout(renderSharp, 200); }
+function hideSharp() {
+  sharpGen++; clearTimeout(sharpTimer);
+  if (sharpTask) { try { sharpTask.cancel(); } catch (e) {} sharpTask = null; }
+  sharp.hidden = true; sharp.width = sharp.height = 1;
+}
+async function renderSharp() {
+  if (!pdfPage || !pdfVp || !img.w || img.sample) { sharp.hidden = true; return; }
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const z = T.s * dpr;                                     // schermpixels per pixel van de basistekening
+  if (z <= 1.2) { sharp.hidden = true; return; }
+  const r = view.getBoundingClientRect();
+  const x0 = Math.max(0, -T.x / T.s), y0 = Math.max(0, -T.y / T.s);
+  const x1 = Math.min(img.w, (r.width - T.x) / T.s), y1 = Math.min(img.h, (r.height - T.y) / T.s);
+  if (x1 <= x0 || y1 <= y0) return;
+  const W = Math.ceil((x1 - x0) * z), H = Math.ceil((y1 - y0) * z);
+  if (W * H > 12e6) return;
+  const gen = ++sharpGen;
+  if (sharpTask) { try { sharpTask.cancel(); } catch (e) {} }
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const ctx = c.getContext("2d"); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, W, H);
+  const page = pdfPage;
+  sharpTask = page.render({ canvasContext: ctx, viewport: page.getViewport({ scale: pdfVp.scale * z }), transform: [1, 0, 0, 1, -x0 * z, -y0 * z] });
+  try { await sharpTask.promise; } catch (e) { return; }      // geannuleerd: er komt een nieuwere
+  if (gen !== sharpGen || page !== pdfPage) return;
+  sharpTask = null;
+  sharp.width = W; sharp.height = H; sharp.getContext("2d").drawImage(c, 0, 0);
+  Object.assign(sharp.style, { left: x0 + "px", top: y0 + "px", width: W / z + "px", height: H / z + "px" });
+  sharp.hidden = false;
 }
 function fitScale() {
   const r = view.getBoundingClientRect();
   return img.w ? Math.min(r.width / img.w, r.height / img.h) * 0.94 : 1;
 }
-const clampS = s => Math.max(fitScale() * 0.4, Math.min(8, s));
+const clampS = s => Math.max(fitScale() * 0.4, Math.min(pdfPage ? 40 : 8, s));
 function fit() {
   const r = view.getBoundingClientRect();
   T.s = fitScale();
@@ -1068,7 +1104,7 @@ function renderCal() {
   c.innerHTML = `<span class="big">${sc ? `Geijkt op schaal 1:${sc}` : st.calib && st.calib.auto ? `Automatisch geijkt op ${st.calib.n} maatlijnen` : `IJkmaat ${st.calib ? fmtMM(st.calib.mm) : "–"}`}</span>
     ${sc ? `<span class="hint">${st.calib.auto ? "Deze schaal staat op de tekening." : "Zelf ingevuld."} Klopt alleen als de PDF op ware grootte is. Meet daarom één maat na die je kent; wijkt hij af, ijk dan met <b>IJken</b>.${st.calib.others && st.calib.others.length ? ` Er staat ook ${st.calib.others.map(n => "1:" + n).join(", ")} op (bijv. een overzichtskaartje).` : ""}</span>` : ""}
     ${st.calib && st.calib.auto && !sc ? `<span class="hint">Gevonden maten: ${st.calib.vals.join(", ")} mm · onderling ${nl(st.calib.spread, 2)}% verschil. Zelf ijken met <b>IJken</b> mag altijd.</span>` : ""}
-    <span>1 pixel = ${nl(st.mmPerPx, 1)} mm · nauwkeurigheid ±${fmtMM(Math.max(st.mmPerPx, unit === "mm" ? 1 : 10))} per punt</span>
+    ${pdfPage ? `<span>Ver inzoomen maakt de tekening scherp, dan tik je tot op een paar mm op de tekening nauwkeurig. Hoe precies de tekening zelf is, hangt af van de schaal.</span>` : `<span>1 pixel = ${nl(st.mmPerPx, 1)} mm · nauwkeurigheid ±${fmtMM(Math.max(st.mmPerPx, unit === "mm" ? 1 : 10))} per punt</span>`}
     <span class="hint">Zoom flink in bij het aantikken. Elke klik naast de lijn telt mee in de maat.</span>
     <div class="btns"><button type="button" class="ghost" data-cal="clear">IJking verwijderen</button>${lastAuto && !(st.calib && st.calib.auto) ? `<button type="button" class="ghost" data-cal="auto">Automatisch ijken</button>` : ""}</div>${scaleForm()}`;
 }
@@ -1399,6 +1435,7 @@ async function renderPdfPage() {
   $("loading").hidden = false;
   try {
     const page = await pdfDoc.getPage(pageNo);
+    hideSharp(); pdfPage = null;
     const vp1 = page.getViewport({ scale: 1 });
     const vp = page.getViewport({ scale: canvasLimits(vp1.width, vp1.height) });
     cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
@@ -1408,7 +1445,7 @@ async function renderPdfPage() {
     try { const r = await extractPiles(page, vp); setPiles(r.list, r.r); } catch (e) { setPiles([], 0); }
     let auto = null;
     try { auto = await autoScale(page, vp); } catch (e) { auto = null; }
-    pdfVp = vp;
+    pdfVp = vp; pdfPage = page;
     if (!auto) { try { const sc = await scaleFromText(page); if (sc) auto = scaleCal(sc.scale, vp, sc.others); } catch (e) {} }
     setImage(`${fileMeta.name}|${fileMeta.size}|p${pageNo}`, fileMeta.name + (pdfDoc.numPages > 1 ? ` · blad ${pageNo}` : ""), false, auto);
   } finally { $("loading").hidden = true; }
@@ -1430,7 +1467,7 @@ async function openFile(f, fromStore) {
       sel.hidden = pdfDoc.numPages < 2;
       await renderPdfPage();
     } else {
-      pdfDoc = null; pdfVp = null; $("page").hidden = true;
+      pdfDoc = null; pdfVp = null; pdfPage = null; hideSharp(); $("page").hidden = true;
       const url = URL.createObjectURL(f);
       const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("Dit bestand kan niet als afbeelding worden geopend.")); i.src = url; });
       const s = Math.min(1, canvasLimits(im.naturalWidth, im.naturalHeight));
@@ -1500,6 +1537,7 @@ function sampleState() {
   };
 }
 function loadSample() {
+  pdfPage = null; pdfVp = null; hideSharp();
   const im = new Image();
   im.onload = () => {
     cv.width = 2400; cv.height = 1400;
