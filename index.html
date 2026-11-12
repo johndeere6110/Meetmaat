@@ -208,6 +208,12 @@ input[type="number"], input[type="text"], .nm {
 .pplist .ppm { font-size: 12px; color: var(--muted); }
 .pplist .btns button { padding: 6px 10px; font-size: 13px; }
 .ppres:empty { display: none; }
+.ppres.bad { border-left-color: var(--warn); } .ppres.warn { border-left-color: var(--accent); }
+.ppres .hint, .ppset .hint { display: block; margin-top: 2px; }
+.ppset { font-size: 16px; line-height: 1.4; background: var(--bg); border: 2px solid var(--accent); border-radius: 6px; padding: 10px 12px; }
+.ppset b { font-family: var(--mono); }
+.ppold { border-top: 1px dashed var(--line); padding-top: 10px; }
+.ppold summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 .sand .seg.ppmode, .sand .seg.ppsign { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
 .sand .seg.ppmode button, .sand .seg.ppsign button { white-space: normal; padding: 8px 6px; font-size: 13px; }
 .sand .seg.ppmode button[aria-pressed="true"], .sand .seg.ppsign button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
@@ -337,43 +343,64 @@ input[type="number"], input[type="text"], .nm {
 
       <h2>Peilpunten</h2>
       <div class="sand" id="peil">
-        <p class="hint" style="margin:0">Leg een hulppeil vast, bijvoorbeeld op een balk of kolom, voor als je met de laser niet bij het 0-punt kunt. Alles in cm ten opzichte van 0-peil: boven is +, onder is −.</p>
+        <p class="hint" style="margin:0">Hulppeilen, bijvoorbeeld op een balk of kolom, voor als je met de laser niet bij het 0-punt kunt. Alles in cm ten opzichte van 0-peil.</p>
         <ul class="pplist" id="ppList"></ul>
 
-        <h3>Peil overbrengen met de laser</h3>
-        <div class="seg ppmode" id="ppMode" role="group" aria-label="Manier van meten">
-          <button type="button" data-ppm="nul">Baak op 0 gezet</button>
-          <button type="button" data-ppm="twee">Twee aflezingen</button>
-        </div>
-        <label for="ppFrom">Vanaf (bekend peil)<select id="ppFrom"></select></label>
-        <div id="ppNul" class="sand">
-          <p class="hint" style="margin:0">Zet de baak op het bekende punt op <b>0</b> (ontvanger piept op 0). Zet hem daarna op het nieuwe punt en lees af hoeveel het hoger of lager ligt.</p>
-          <label for="ppR">Aflezing op nieuw punt (cm)<input id="ppR" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 23,8"></label>
-          <div class="seg ppsign" id="ppSign" role="group" aria-label="Hoger of lager">
-            <button type="button" data-sign="1">Hoger dan vanaf (+)</button>
-            <button type="button" data-sign="-1">Lager dan vanaf (−)</button>
-          </div>
-        </div>
-        <div id="ppTwee" class="sand" hidden>
-          <div class="row2">
-            <label for="ppA">Aflezing op bekend punt (cm)<input id="ppA" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 145"></label>
-            <label for="ppB">Aflezing op nieuw punt (cm)<input id="ppB" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 121"></label>
-          </div>
-          <p class="hint" style="margin:0">Aflezing = op de baak of rolmaat, van het punt omhoog tot de laserlijn. Laser niet verzetten tussen de aflezingen.</p>
-        </div>
-        <div class="ppres" id="ppRes"></div>
+        <h3>1. Baak op peil zetten</h3>
+        <label for="ppFrom">Bekend punt<select id="ppFrom"></select></label>
+        <div class="ppset" id="ppSet"></div>
 
-        <h3>Opslaan als peilpunt</h3>
+        <h3>2. Controle op een ander punt</h3>
+        <div class="row2">
+          <label for="ppCk">Punt<select id="ppCk"></select></label>
+          <label for="ppCv">Baak wijst aan (cm)<input id="ppCv" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. +23,8"></label>
+        </div>
+        <div class="ppres" id="ppCkRes"></div>
+
+        <h3>3. Nieuw peilpunt vastleggen</h3>
+        <p class="hint" style="margin:0">Zet de baak op het nieuwe punt. Wat hij aanwijst is het peil.</p>
         <div class="row2">
           <label for="ppName">Naam<input id="ppName" type="text" autocomplete="off" placeholder="bijv. Balk as C-4"></label>
-          <label for="ppH">Peil (cm)<input id="ppH" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. +24"></label>
+          <label for="ppH">Baak wijst aan (cm)<input id="ppH" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 23,8"></label>
+        </div>
+        <div class="seg ppsign" id="ppSign" role="group" aria-label="Boven of onder 0">
+          <button type="button" data-sign="1">+ boven 0</button>
+          <button type="button" data-sign="-1">− onder 0</button>
         </div>
         <div class="btns"><button type="button" class="ghost" id="ppPlace">Plek op tekening</button><button type="button" id="ppSave">Peilpunt opslaan</button></div>
         <p class="hint" id="ppPlaceHint" style="margin:0"></p>
 
-        <h3>Hoogte uitzetten</h3>
-        <label for="ppT">Gewenst peil (cm), vanaf hetzelfde bekende punt<input id="ppT" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. −18 voor bovenkant zand"></label>
+        <h3>4. Hoogte uitzetten</h3>
+        <div class="btns" id="ppQuick"></div>
+        <label for="ppT">Of een ander peil (cm)<input id="ppT" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. −18"></label>
         <div class="ppres" id="ppRes2"></div>
+
+        <details class="ppold">
+          <summary>Rekenhulp als de baak níet op peil staat</summary>
+          <div class="sand" style="margin-top:10px">
+            <p class="hint" style="margin:0">Alleen als je de baak niet op peil kunt zetten. Rekent vanaf het bekende punt hierboven.</p>
+            <div class="seg ppmode" id="ppMode" role="group" aria-label="Manier van meten">
+              <button type="button" data-ppm="nul">Baak op 0 gezet</button>
+              <button type="button" data-ppm="twee">Twee aflezingen</button>
+            </div>
+            <div id="ppNul" class="sand">
+              <label for="ppR">Hoeveel hoger of lager dan het bekende punt (cm)<input id="ppR" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 5"></label>
+              <div class="seg ppsign" id="ppSign2" role="group" aria-label="Hoger of lager">
+                <button type="button" data-sign="1">Hoger (+)</button>
+                <button type="button" data-sign="-1">Lager (−)</button>
+              </div>
+            </div>
+            <div id="ppTwee" class="sand" hidden>
+              <div class="row2">
+                <label for="ppA">Aflezing op bekend punt (cm)<input id="ppA" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 145"></label>
+                <label for="ppB">Aflezing op nieuw punt (cm)<input id="ppB" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 121"></label>
+              </div>
+              <p class="hint" style="margin:0">Aflezing = van het punt omhoog tot de laserlijn. Laser niet verzetten tussen de aflezingen.</p>
+            </div>
+            <div class="ppres" id="ppRes"></div>
+            <div class="btns"><button type="button" class="ghost" id="ppTake" hidden>Overnemen bij nieuw peilpunt</button></div>
+          </div>
+        </details>
       </div>
 
       <h2>Zand</h2>
@@ -1313,84 +1340,103 @@ function renderPileInfo() {
 }
 function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); updateHint(); renderTools(); }
 
-/* ---------- Peilpunten: hulppeil vastleggen en peil overbrengen met de laser ---------- */
-let ppPending = null, ppPrevTool = "pan", ppFromVal = "0", ppSignV = 1;
+/* ---------- Peilpunten: baak op peil zetten, hulppeilen vastleggen, controleren en uitzetten ---------- */
+let ppPending = null, ppPrevTool = "pan", ppFromVal = "0", ppSignV = 1, ppSign2V = -1, ppCkVal = "";
 let ppMode = "nul";
 try { if (localStorage.getItem("meetmaat:ppmode") === "twee") ppMode = "twee"; } catch (e) {}
 // Invoer in cm, intern in mm (zoals de rest van de app)
 const numIn = v => { const t = String(v || "").trim().replace(/\s/g, "").replace("−", "-").replace(",", "."); return t === "" || t === "-" || t === "+" ? null : (isFinite(+t) ? +t * 10 : NaN); };
+const okN = v => v != null && !Number.isNaN(v);
+const hasSign = v => /^\s*[-+−]/.test(String(v || ""));
 const cmTxt = mm => { const c = Math.round(Math.abs(mm)) / 10; return c % 1 ? nl(c, 1) : nl0(c); };
 const fmtPeil = h => (h > 0 ? "+" : h < 0 ? "−" : "") + cmTxt(h) + " cm";
-function ppFromH() { if (ppFromVal === "0") return 0; const q = (st.pp || []).find(x => String(x.id) === ppFromVal); return q ? q.h : null; }
-function ppFromName() { if (ppFromVal === "0") return "0-peil"; const q = (st.pp || []).find(x => String(x.id) === ppFromVal); return q ? q.name : "?"; }
-const okN = v => v != null && !Number.isNaN(v);
-// Nieuw peil volgens de gekozen manier, of null als nog niet alles is ingevuld
-function ppNew() {
+const ppById = id => id === "0" ? { id: 0, name: "0-punt", h: 0 } : (st.pp || []).find(x => String(x.id) === id) || null;
+function ppFromH() { const q = ppById(ppFromVal); return q ? q.h : null; }
+function ppFromName() { const q = ppById(ppFromVal); return q ? q.name : "?"; }
+// Peil zoals de baak het aanwijst: getypt teken gaat voor, anders de knop + / −
+function ppReadH() { const v = numIn($("ppH").value); return okN(v) ? (hasSign($("ppH").value) ? v : ppSignV * Math.abs(v)) : v; }
+
+// Oude rekenhulp (baak niet op peil)
+function ppOldNew() {
   const H = ppFromH(); if (H == null) return null;
-  if (ppMode === "nul") { const r = numIn($("ppR").value); return okN(r) ? H + (r < 0 ? r : ppSignV * r) : null; }
+  if (ppMode === "nul") { const r = numIn($("ppR").value); return okN(r) ? H + (hasSign($("ppR").value) ? r : ppSign2V * Math.abs(r)) : null; }
   const a = numIn($("ppA").value), b = numIn($("ppB").value);
   return okN(a) && okN(b) ? H + a - b : null;
 }
-function ppCalc(fill) {
+function ppOldCalc() {
   document.querySelectorAll("#ppMode [data-ppm]").forEach(b => b.setAttribute("aria-pressed", b.dataset.ppm === ppMode));
-  document.querySelectorAll("#ppSign [data-sign]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.sign === ppSignV));
+  document.querySelectorAll("#ppSign2 [data-sign]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.sign === ppSign2V));
   $("ppNul").hidden = ppMode !== "nul"; $("ppTwee").hidden = ppMode !== "twee";
-  if (ppMode === "nul") return ppCalcNul(fill);
-  const H = ppFromH(), a = numIn($("ppA").value), b = numIn($("ppB").value), t = numIn($("ppT").value);
-  const r1 = $("ppRes"), r2 = $("ppRes2");
-  if (H == null) { r1.textContent = "Kies een bekend peil."; r2.textContent = ""; return; }
-  if (a == null || Number.isNaN(a)) { r1.innerHTML = `Vul de aflezing op ${esc(ppFromName())} in.`; }
-  else if (b == null || Number.isNaN(b)) {
-    r1.innerHTML = `Laserlijn ligt op <b>${fmtPeil(H + a)}</b>. Vul de aflezing op het nieuwe punt in.`;
-  } else {
-    const nh = H + a - b;
-    r1.innerHTML = `Nieuw punt: <b>${fmtPeil(nh)}</b><br><span class="hint">${fmtPeil(H)} ${a < 0 ? "−" : "+"} ${cmTxt(a)} ${b < 0 ? "+" : "−"} ${cmTxt(b)}</span>`;
-    if (fill) $("ppH").value = (nh > 0 ? "+" : nh < 0 ? "-" : "") + cmTxt(nh);
-  }
-  if (a != null && !Number.isNaN(a) && t != null && !Number.isNaN(t)) {
-    const rd = H + a - t;
-    r2.innerHTML = rd >= 0 ? `Lees op de baak: <b>${cmTxt(rd)} cm</b><br><span class="hint">Laserlijn ${fmtPeil(H + a)} − gewenst ${fmtPeil(t)}</span>`
-      : `Dit peil ligt ${cmTxt(-rd)} cm <b>boven</b> de laserlijn. Zet de laser hoger.`;
-  } else r2.textContent = t != null && (a == null || Number.isNaN(a)) ? "Vul eerst de aflezing op het bekende punt in." : "";
+  const nh = ppOldNew(), r = $("ppRes");
+  $("ppTake").hidden = nh == null;
+  if (nh == null) { r.textContent = ""; return; }
+  r.innerHTML = `Nieuw punt: <b>${fmtPeil(nh)}</b><br><span class="hint">vanaf ${esc(ppFromName())} ${fmtPeil(ppFromH())}</span>`;
 }
-function ppCalcNul(fill) {
-  const H = ppFromH(), r = numIn($("ppR").value), t = numIn($("ppT").value), r1 = $("ppRes"), r2 = $("ppRes2");
-  if (H == null) { r1.textContent = "Kies een bekend peil."; r2.textContent = ""; return; }
-  if (!okN(r)) r1.textContent = $("ppR").value.trim() ? "Vul een getal in, bijvoorbeeld 23,8." : "";
+
+function ppCalc() {
+  const from = ppById(ppFromVal);
+  $("ppSet").innerHTML = !from ? "Kies een bekend punt."
+    : ppFromVal === "0" ? `Zet de baak op het <b>0-punt</b> op <b>0</b>.<span class="hint">Daarna wijst hij overal direct het peil aan, zolang de laser blijft staan.</span>`
+    : `Zet de baak op <b>${esc(from.name)}</b> op <b>${fmtPeil(from.h).replace(" cm", "")}</b>.<span class="hint">Daarna wijst hij overal direct het peil aan, zolang de laser blijft staan.</span>`;
+  document.querySelectorAll("#ppSign [data-sign]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.sign === ppSignV));
+  // controle
+  const ck = ppById(ppCkVal), cvRaw = $("ppCv").value, cv = numIn(cvRaw), cr = $("ppCkRes");
+  if (!ck || !okN(cv)) cr.textContent = ck && cvRaw.trim() ? "Vul een getal in, bijvoorbeeld +23,8." : "";
   else {
-    const d = r < 0 ? r : ppSignV * r, nh = H + d;
-    r1.innerHTML = `Nieuw punt: <b>${fmtPeil(nh)}</b><br><span class="hint">${esc(ppFromName())} ${fmtPeil(H)}, nieuw punt ${cmTxt(d)} cm ${d >= 0 ? "hoger" : "lager"}</span>`;
-    if (fill) $("ppH").value = (nh > 0 ? "+" : nh < 0 ? "-" : "") + cmTxt(nh);
+    const v = hasSign(cvRaw) || ck.h >= 0 ? cv : -Math.abs(cv), d = v - ck.h, ad = Math.abs(d);
+    cr.innerHTML = ad <= 5 ? `<b>Klopt.</b> ${esc(ck.name)} hoort ${fmtPeil(ck.h)}, verschil ${cmTxt(d)} cm.`
+      : ad <= 10 ? `<b>Let op:</b> ${cmTxt(d)} cm verschil met ${esc(ck.name)} (${fmtPeil(ck.h)}). Klopt net niet; lees nog eens goed af.`
+      : `<b>Klopt niet:</b> ${cmTxt(d)} cm verschil met ${esc(ck.name)} (${fmtPeil(ck.h)}). Controleer de instelling van de baak, of de laser is verzet.`;
+    cr.classList.toggle("bad", ad > 10); cr.classList.toggle("warn", ad > 5 && ad <= 10);
   }
-  if (okN(t)) {
-    const d = t - H;
-    r2.innerHTML = Math.abs(d) < 0.5 ? `Precies op de 0 van de baak: zelfde hoogte als ${esc(ppFromName())}.`
-      : `Baak op ${esc(ppFromName())} op 0, dan moet hij op het punt <b>${cmTxt(d)} cm ${d > 0 ? "hoger (+)" : "lager (−)"}</b> aanwijzen.`;
-  } else r2.textContent = "";
+  // uitzetten
+  const t = numIn($("ppT").value), r2 = $("ppRes2");
+  if (!okN(t)) r2.textContent = "";
+  else {
+    const H = ppFromH(), rel = H == null ? "" : `<span class="hint">Dat is ${cmTxt(t - H)} cm ${t - H >= 0 ? "hoger" : "lager"} dan ${esc(ppFromName())}.</span>`;
+    r2.innerHTML = `Zet het punt tot de baak <b>${fmtPeil(t).replace(" cm", "")}</b> aanwijst (ontvanger piept).${Math.abs(t - (H || 0)) > 0.5 ? rel : ""}`;
+  }
+  ppOldCalc();
 }
 function renderPeil() {
   if (!st.pp) st.pp = [];
   const L = st.pp;
-  if (ppFromVal !== "0" && !L.some(x => String(x.id) === ppFromVal)) ppFromVal = "0";
-  $("ppFrom").innerHTML = `<option value="0">0-peil (0 cm)</option>` + L.map(x => `<option value="${x.id}">${esc(x.name)} (${fmtPeil(x.h)})</option>`).join("");
-  $("ppFrom").value = ppFromVal;
+  if (ppFromVal !== "0" && !ppById(ppFromVal)) ppFromVal = "0";
+  const opts = [`<option value="0">0-punt (0 cm)</option>`, ...L.map(x => `<option value="${x.id}">${esc(x.name)} (${fmtPeil(x.h)})</option>`)];
+  $("ppFrom").innerHTML = opts.join(""); $("ppFrom").value = ppFromVal;
+  const ckOpts = [`<option value="">Kies een punt</option>`, ...opts].filter(o => !o.includes(`value="${ppFromVal}"`));
+  if (ppCkVal === ppFromVal || (ppCkVal && !ppById(ppCkVal))) ppCkVal = "";
+  $("ppCk").innerHTML = ckOpts.join(""); $("ppCk").value = ppCkVal;
+  const conc = (st.sand && st.sand.conc) || 18;
+  $("ppQuick").innerHTML = `<button type="button" class="ghost" data-t="0">0 · bovenkant beton</button><button type="button" class="ghost" data-t="${-conc}">−${nl(conc, conc % 1 ? 1 : 0)} · onderkant beton</button>`;
   $("ppList").innerHTML = L.length ? L.map(x => `<li data-pp="${x.id}">
       <div class="pph"><strong>${esc(x.name)}</strong><span class="ppv">${fmtPeil(x.h)}</span></div>
       <div class="ppm">${esc(x.date || "")}${x.from ? ` · vanaf ${esc(x.from)}` : ""} · ${x.x != null ? "op de tekening" : "geen plek op de tekening"}</div>
-      <div class="btns">${x.x != null ? `<button type="button" class="ghost" data-ppa="show">Toon</button>` : ""}<button type="button" class="ghost" data-ppa="from">Gebruik als vanaf</button><button type="button" class="ghost" data-ppa="del">Wissen</button></div></li>`).join("")
+      <div class="btns">${x.x != null ? `<button type="button" class="ghost" data-ppa="show">Toon</button>` : ""}<button type="button" class="ghost" data-ppa="from">Baak hier op peil</button><button type="button" class="ghost" data-ppa="del">Wissen</button></div></li>`).join("")
     : `<li class="ppm" style="border-style:dashed">Nog geen peilpunten.</li>`;
   $("ppPlaceHint").textContent = ppPending ? "Plek gekozen. Druk op Peilpunt opslaan." : "";
-  ppCalc(false);
+  ppCalc();
 }
-$("ppFrom").addEventListener("change", e => { ppFromVal = e.target.value; ppCalc(true); });
-["ppA", "ppB", "ppR"].forEach(id => $(id).addEventListener("input", () => ppCalc(true)));
+$("ppFrom").addEventListener("change", e => { ppFromVal = e.target.value; renderPeil(); });
+$("ppCk").addEventListener("change", e => { ppCkVal = e.target.value; ppCalc(); });
+["ppCv", "ppT", "ppR", "ppA", "ppB"].forEach(id => $(id).addEventListener("input", ppCalc));
+$("ppH").addEventListener("input", e => { const v = e.target.value.trim(); if (/^[-−]/.test(v)) ppSignV = -1; else if (/^\+/.test(v)) ppSignV = 1; ppCalc(); });
+$("ppSign").addEventListener("click", e => {
+  const b = e.target.closest("[data-sign]"); if (!b) return;
+  ppSignV = +b.dataset.sign; $("ppH").value = $("ppH").value.replace(/^\s*[-+−]\s*/, ""); ppCalc();
+});
+$("ppSign2").addEventListener("click", e => { const b = e.target.closest("[data-sign]"); if (!b) return; ppSign2V = +b.dataset.sign; ppCalc(); });
 $("ppMode").addEventListener("click", e => {
   const b = e.target.closest("[data-ppm]"); if (!b) return;
   ppMode = b.dataset.ppm; try { localStorage.setItem("meetmaat:ppmode", ppMode); } catch (err) {}
-  ppCalc(true);
+  ppCalc();
 });
-$("ppSign").addEventListener("click", e => { const b = e.target.closest("[data-sign]"); if (!b) return; ppSignV = +b.dataset.sign; ppCalc(true); });
-$("ppT").addEventListener("input", () => ppCalc(false));
+$("ppTake").addEventListener("click", () => {
+  const nh = ppOldNew(); if (nh == null) return;
+  ppSignV = nh < 0 ? -1 : 1; $("ppH").value = cmTxt(nh); ppCalc();
+  $("ppH").scrollIntoView({ block: "center", behavior: "smooth" }); toast(`${fmtPeil(nh)} overgenomen`);
+});
+$("ppQuick").addEventListener("click", e => { const b = e.target.closest("[data-t]"); if (!b) return; $("ppT").value = b.dataset.t === "0" ? "0" : String(b.dataset.t).replace(".", ","); ppCalc(); });
 $("ppPlace").addEventListener("click", () => {
   if (!img.w) { toast("Open eerst een tekening."); return; }
   ppPrevTool = tool === "ppick" ? ppPrevTool : tool;
@@ -1398,14 +1444,13 @@ $("ppPlace").addEventListener("click", () => {
   view.scrollIntoView({ block: "center", behavior: "smooth" });
 });
 $("ppSave").addEventListener("click", () => {
-  const h = numIn($("ppH").value);
-  if (h == null || Number.isNaN(h)) { flashHint("Vul het peil in, bijvoorbeeld +24 of −18 (cm)."); $("ppH").focus(); return; }
+  const h = ppReadH();
+  if (!okN(h)) { flashHint("Vul in wat de baak aanwijst, bijvoorbeeld 23,8, en kies + of −."); $("ppH").focus(); return; }
   if (!st.pp) st.pp = [];
   st.ppSeq = (st.ppSeq || 0) + 1;
   const name = $("ppName").value.trim() || `Peilpunt ${st.ppSeq}`;
-  const calc = ppNew(), viaLaser = calc != null && Math.abs(calc - h) < 0.5;
-  st.pp.push({ id: st.ppSeq, name, h, date: new Date().toLocaleDateString("nl-NL"), from: viaLaser ? ppFromName() : "", x: ppPending ? ppPending.x : null, y: ppPending ? ppPending.y : null });
-  ppPending = null; $("ppName").value = ""; $("ppH").value = ""; $("ppB").value = ""; $("ppR").value = "";
+  st.pp.push({ id: st.ppSeq, name, h, date: new Date().toLocaleDateString("nl-NL"), from: ppFromName(), x: ppPending ? ppPending.x : null, y: ppPending ? ppPending.y : null });
+  ppPending = null; $("ppName").value = ""; $("ppH").value = "";
   save(); renderAll(); toast(`${name} opgeslagen: ${fmtPeil(h)}`);
 });
 $("ppList").addEventListener("click", e => {
@@ -1413,9 +1458,9 @@ $("ppList").addEventListener("click", e => {
   const q = st.pp.find(x => String(x.id) === li.dataset.pp); if (!q) return;
   if (b.dataset.ppa === "show") { showPts([{ x: q.x, y: q.y }]); view.scrollIntoView({ block: "center", behavior: "smooth" }); }
   else if (b.dataset.ppa === "from") {
-    ppFromVal = String(q.id); $("ppA").value = ""; $("ppB").value = ""; $("ppR").value = ""; renderPeil();
-    $(ppMode === "nul" ? "ppR" : "ppA").focus();
-    toast(ppMode === "nul" ? `Vanaf ${q.name} (${fmtPeil(q.h)}). Zet de baak daar op 0.` : `Vanaf ${q.name} (${fmtPeil(q.h)}). Lees de baak af op dit punt.`);
+    ppFromVal = String(q.id); $("ppCv").value = ""; renderPeil();
+    $("ppSet").scrollIntoView({ block: "center", behavior: "smooth" });
+    toast(`Zet de baak op ${q.name} op ${fmtPeil(q.h).replace(" cm", "")}`);
   }
   else if (b.dataset.ppa === "del") armed(b, () => { st.pp = st.pp.filter(x => x !== q); save(); renderAll(); });
 });
