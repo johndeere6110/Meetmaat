@@ -148,6 +148,8 @@ button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visib
 .vz .vzh { fill: none; stroke: #fff; stroke-width: 5; opacity: .9; }
 .vz .vzl { fill: none; stroke: var(--mark); stroke-width: 2.2; }
 .vz .vzd { fill: var(--mark); }
+.loupe { position: absolute; z-index: 5; width: 140px; height: 140px; border-radius: 50%; overflow: hidden; border: 3px solid var(--accent); box-shadow: 0 6px 18px rgba(0,0,0,.35); background: #fff; pointer-events: none; }
+.loupe canvas { width: 134px; height: 134px; display: block; }
 .vzbar { position: absolute; left: 10px; right: 62px; bottom: 10px; display: flex; gap: 8px; z-index: 3; }
 .vzbar button { flex: 1 1 0; min-height: 52px; font-size: 16px; box-shadow: 0 1px 6px rgba(0,0,0,.25); }
 .vzbar button.ghost { background: var(--panel); border-color: var(--line); }
@@ -256,7 +258,11 @@ input[type="number"], input[type="text"], .nm {
         <button type="button" data-unit="m">m</button>
       </div>
       <button type="button" class="ghost" id="pilesbtn" aria-pressed="true" hidden title="Palen tonen en punten op palen laten vastklikken">Palen</button>
-      <button type="button" class="ghost" id="vizbtn" aria-pressed="false" title="Vast kruisje in het midden: schuif de tekening eronder en druk op + Punt">Vizier</button>
+      <div class="seg" id="invoer" role="group" aria-label="Punten zetten">
+        <button type="button" data-inv="tik" title="Tik op de tekening om een punt te zetten">Tik</button>
+        <button type="button" data-inv="vizier" title="Vast kruisje in het midden: schuif de tekening eronder en druk op + Punt">Vizier</button>
+        <button type="button" data-inv="loep" title="Tik, of houd je vinger vast voor een vergroting boven je vinger">Loep</button>
+      </div>
       <button type="button" class="ghost" id="ortho" aria-pressed="false" title="Alleen horizontaal of verticaal meten (of houd Shift ingedrukt)">Haaks</button>
       <button type="button" id="finish" hidden>Klaar</button>
       <button type="button" class="ghost" id="undo">Ongedaan</button>
@@ -286,6 +292,7 @@ input[type="number"], input[type="text"], .nm {
           <div class="btns"><button type="submit">Opslaan, volgende</button><button type="button" class="ghost" id="peildel">Punt wissen</button><button type="button" class="ghost" id="peilclose">Sluiten</button></div>
         </form>
         <div class="vz" id="vz" hidden aria-hidden="true"><svg viewBox="-32 -32 64 64"><circle r="14" class="vzh"/><path class="vzh" d="M0 -30v18M0 12v18M-30 0h18M12 0h18"/><circle r="14" class="vzl"/><path class="vzl" d="M0 -30v18M0 12v18M-30 0h18M12 0h18"/><circle r="1.8" class="vzd"/></svg></div>
+        <div class="loupe" id="loupe" hidden aria-hidden="true"><canvas id="loupecv" width="140" height="140"></canvas></div>
         <div class="vzbar" id="vzbar" hidden>
           <button type="button" class="ghost" id="vzBack">Terug</button>
           <button type="button" class="big" id="vzAdd">+ Punt</button>
@@ -871,9 +878,49 @@ const UNIT = { mm: { f: 1, d: 0, ex: "47970" }, cm: { f: 10, d: 0, ex: "4797" },
 let unit = "mm";
 try { const u = localStorage.getItem("meetmaat:unit"); if (UNIT[u]) unit = u; } catch (e) {}
 // Vizier: op de telefoon standaard aan (vinger zit dan niet op het punt), op de pc uit
-let vizier = window.matchMedia && matchMedia("(pointer: coarse)").matches;
-try { const v = localStorage.getItem("meetmaat:vizier"); if (v === "1" || v === "0") vizier = v === "1"; } catch (e) {}
-const vzActive = () => vizier && img.w && tool !== "pan";
+// Punten zetten: tik (zoals op de pc), vizier (vast kruisje) of loep (vergroting boven de vinger)
+let invoer = window.matchMedia && matchMedia("(pointer: coarse)").matches ? "vizier" : "tik";
+try {
+  const v = localStorage.getItem("meetmaat:invoer"), old = localStorage.getItem("meetmaat:vizier");
+  if (v === "tik" || v === "vizier" || v === "loep") invoer = v; else if (old === "1" || old === "0") invoer = old === "1" ? "vizier" : "tik";
+} catch (e) {}
+const vzActive = () => invoer === "vizier" && img.w && tool !== "pan";
+const loepOn = () => invoer === "loep" && img.w && tool !== "pan";
+let holdPt = null;
+function drawLoupe() {
+  const L = $("loupe");
+  if (!holdPt) { L.hidden = true; return; }
+  const r = view.getBoundingClientRect(), S = 134, dpr = Math.min(window.devicePixelRatio || 1, 3), c = $("loupecv");
+  if (c.width !== Math.round(S * dpr)) { c.width = c.height = Math.round(S * dpr); }
+  const g = c.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = "#ffffff"; g.fillRect(0, 0, S, S);
+  const p0 = toImg(holdPt.x, holdPt.y), p = tool === "peil" ? p0 : snap(p0), k = T.s * 2.5, half = S / 2 / k;
+  const sx = p.x - half, sy = p.y - half;
+  g.imageSmoothingEnabled = true;
+  try { g.drawImage(cv, sx, sy, 2 * half, 2 * half, 0, 0, S, S); } catch (e) {}
+  if (!sharp.hidden && sharp.width > 1) {
+    const x0 = parseFloat(sharp.style.left) || 0, y0 = parseFloat(sharp.style.top) || 0, z = sharp.width / (parseFloat(sharp.style.width) || 1);
+    const ax = Math.max(sx, x0), ay = Math.max(sy, y0), bx = Math.min(sx + 2 * half, x0 + sharp.width / z), by = Math.min(sy + 2 * half, y0 + sharp.height / z);
+    if (bx > ax && by > ay) try { g.drawImage(sharp, (ax - x0) * z, (ay - y0) * z, (bx - ax) * z, (by - ay) * z, (ax - sx) * k, (ay - sy) * k, (bx - ax) * k, (by - ay) * k); } catch (e) {}
+  }
+  const css = getComputedStyle(document.documentElement), mark = css.getPropertyValue("--mark").trim() || "#d9480f";
+  const f = q => [(q.x - sx) * k, (q.y - sy) * k];
+  if (draft.length) {
+    g.lineWidth = 2.5; g.strokeStyle = mark; g.beginPath();
+    draft.forEach((q, i) => { const [x, y] = f(q); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke(); g.setLineDash([6, 5]); g.beginPath(); g.moveTo(...f(draft[draft.length - 1])); g.lineTo(S / 2, S / 2); g.stroke(); g.setLineDash([]);
+  }
+  if (p !== p0) { g.lineWidth = 3; g.strokeStyle = "#0b8a83"; g.beginPath(); g.arc(S / 2, S / 2, 16, 0, 7); g.stroke(); }
+  g.lineWidth = 2; g.strokeStyle = mark; g.beginPath();
+  g.moveTo(S / 2, S / 2 - 22); g.lineTo(S / 2, S / 2 - 7); g.moveTo(S / 2, S / 2 + 7); g.lineTo(S / 2, S / 2 + 22);
+  g.moveTo(S / 2 - 22, S / 2); g.lineTo(S / 2 - 7, S / 2); g.moveTo(S / 2 + 7, S / 2); g.lineTo(S / 2 + 22, S / 2); g.stroke();
+  g.fillStyle = mark; g.beginPath(); g.arc(S / 2, S / 2, 2, 0, 7); g.fill();
+  const fx = holdPt.x - r.left, fy = holdPt.y - r.top, LS = 140;
+  let lx = fx - LS / 2, ly = fy - LS - 70;                         // boven de vinger
+  if (ly < 4) { ly = Math.max(4, Math.min(r.height - LS - 4, fy - LS / 2)); lx = fx + 70 + LS < r.width ? fx + 70 : fx - 70 - LS; }
+  L.style.left = Math.max(4, Math.min(r.width - LS - 4, lx)) + "px"; L.style.top = ly + "px";
+  L.hidden = false;
+}
 function vzCenter() { const r = view.getBoundingClientRect(); return { x: (r.width / 2 - T.x) / T.s, y: (r.height / 2 - T.y) / T.s }; }
 function vzUpdate() { if (vzActive()) { hover = vzCenter(); hoverShift = false; } }
 const fmtMM = mm => { const u = UNIT[unit]; return `${u.d ? nl(mm / u.f, u.d) : nl0(mm / u.f)} ${unit}`; };
@@ -1160,6 +1207,7 @@ function updateHint() {
   if (!img.w) { h.textContent = "Open een tekening om te beginnen."; return; }
   const v = vzActive() && VZ_HINTS[tool] ? VZ_HINTS[tool] : HINTS[tool];
   let t = Array.isArray(v) ? v[Math.min(draft.length, v.length - 1)] : v;
+  if (loepOn() && !(tool === "calib" && draft.length >= 2)) t += " Houd je vinger vast voor een loep.";
   if (tool === "set" && !st.origin) t = "Zet eerst een nulpunt met het gereedschap Nulpunt.";
   if (MEASURE_TOOLS.includes(tool) && !st.mmPerPx) t += " Let op: nog niet geijkt, maten staan in pixels.";
   h.textContent = t;
@@ -1180,7 +1228,7 @@ function renderTools() {
   $("finish").hidden = !((tool === "poly" && draft.length >= 2) || (tool === "area" && draft.length >= 3));
   $("ortho").setAttribute("aria-pressed", ortho);
   const va = !!vzActive();
-  $("vizbtn").setAttribute("aria-pressed", vizier);
+  document.querySelectorAll("#invoer [data-inv]").forEach(b => b.setAttribute("aria-pressed", b.dataset.inv === invoer));
   $("vz").hidden = !va; $("vzbar").hidden = !va;
   $("vzDone").hidden = $("finish").hidden;
   $("vzBack").disabled = !draft.length && !st.items.length;
@@ -1300,6 +1348,8 @@ view.addEventListener("pointerdown", e => {
   view.setPointerCapture(e.pointerId);
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (ptrs.size === 2) {
+    if (G && G.timer) clearTimeout(G.timer);
+    if (holdPt) { holdPt = null; drawLoupe(); hover = null; }
     const [a, b] = [...ptrs.values()];
     G = { kind: "pinch", d0: Math.hypot(b.x - a.x, b.y - a.y) || 1, c0: toImg((a.x + b.x) / 2, (a.y + b.y) / 2), s0: T.s };
     return;
@@ -1307,6 +1357,14 @@ view.addEventListener("pointerdown", e => {
   if (ptrs.size > 2) return;
   const h = e.target.closest("[data-h]"), sl = e.target.closest("[data-sel]");
   G = { kind: h ? "handle" : "tap", h: h && h.dataset.h, sel: sl && sl.dataset.sel, sx: e.clientX, sy: e.clientY, tx: T.x, ty: T.y };
+  if (G.kind === "tap" && loepOn()) {
+    const g0 = G;
+    G.timer = setTimeout(() => {
+      if (G !== g0 || G.kind !== "tap") return;
+      G.kind = "hold"; holdPt = { x: G.sx, y: G.sy }; hover = toImg(G.sx, G.sy); hoverShift = false;
+      drawLoupe(); scheduleOverlay();
+    }, 230);
+  }
   e.preventDefault();
 });
 view.addEventListener("pointermove", e => {
@@ -1324,15 +1382,22 @@ view.addEventListener("pointermove", e => {
     applyT(true); return;
   }
   if (G.kind === "handle") { moveHandle(G.h, toImg(e.clientX, e.clientY), e.shiftKey); return; }
+  if (G.kind === "hold") { holdPt = { x: e.clientX, y: e.clientY }; hover = toImg(e.clientX, e.clientY); drawLoupe(); scheduleOverlay(); return; }
   if (G.kind === "done") return;
   const dx = e.clientX - G.sx, dy = e.clientY - G.sy;
-  if (G.kind === "tap" && Math.hypot(dx, dy) > 6) { G.kind = "pan"; view.classList.add("panning"); }
+  if (G.kind === "tap" && Math.hypot(dx, dy) > 6) { clearTimeout(G.timer); G.kind = "pan"; view.classList.add("panning"); }
   if (G.kind === "pan") { T.x = G.tx + dx; T.y = G.ty + dy; applyT(false); }
 });
 function endPtr(e) {
   ptrs.delete(e.pointerId);
   if (!G) return;
   if (G.kind === "pinch" || G.kind === "done") { G = ptrs.size ? { kind: "done" } : null; return; }
+  clearTimeout(G.timer);
+  if (G.kind === "hold") {
+    holdPt = null; drawLoupe(); hover = null;
+    if (e.type === "pointerup") onTap(toImg(e.clientX, e.clientY), G, false); else scheduleOverlay();
+    G = null; return;
+  }
   if (G.kind === "tap" && e.type === "pointerup") {
     if (vzActive()) flashHint("Vizier staat aan: schuif de tekening tot het kruisje goed staat en druk op + Punt.");
     else onTap(toImg(e.clientX, e.clientY), G, e.shiftKey);
@@ -1366,10 +1431,12 @@ $("units").addEventListener("click", e => {
   renderAll();
 });
 $("finish").addEventListener("click", finish);
-$("vizbtn").addEventListener("click", () => {
-  vizier = !vizier; hover = null; vzUpdate();
-  try { localStorage.setItem("meetmaat:vizier", vizier ? "1" : "0"); } catch (e) {}
+$("invoer").addEventListener("click", e => {
+  const b = e.target.closest("[data-inv]"); if (!b) return;
+  invoer = b.dataset.inv; hover = null; holdPt = null; drawLoupe(); vzUpdate();
+  try { localStorage.setItem("meetmaat:invoer", invoer); } catch (err) {}
   renderAll();
+  toast({ tik: "Tik: tik op de tekening voor een punt", vizier: "Vizier: schuif de tekening onder het kruisje, druk op + Punt", loep: "Loep: houd je vinger vast voor een vergroting" }[invoer]);
 });
 $("vzAdd").addEventListener("click", () => { if (vzActive()) { onTap(vzCenter(), {}, false); vzUpdate(); scheduleOverlay(); } });
 $("vzDone").addEventListener("click", finish);

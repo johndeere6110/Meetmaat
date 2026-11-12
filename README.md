@@ -13,7 +13,7 @@ Bouwtekening openen, ijken en maten aflezen voor uitzetten in het werk. Werkt op
 - **Meten:** Afstand (2 punten), Lengte (route met bochten, bijv. een sleuf), Oppervlak.
 - **Uitzetten:** zet een nulpunt (bijv. op een paal) en tik punten aan. Je krijgt X (naar rechts) en Y (naar boven) vanaf het nulpunt én vanaf de dichtstbijzijnde paal.
 - **Zand:** kies een vloerveld (een Oppervlak), zet peilmaten in de paalvakken (één tik per vak, of in één keer "Vakjes tussen palen maken" en je rij metingen invullen of inspreken). Met beton, isolatie, goot en inklinken krijg je m³, tonnen en vrachten, plus een hoogtekaart op de tekening. Elk stukje vloer telt met de dichtstbijzijnde peilmaat.
-- **Vizier** (op de telefoon standaard aan): een vast kruisje in het midden. Schuif de tekening eronder en druk op **+ Punt**; je vinger zit nooit op het punt. Met **Klaar** rond je een lijn of vlak af, **Terug** haalt het laatste punt weg. Op de pc staat het uit, zet het aan of uit met de knop Vizier.
+- **Punten zetten: Tik, Vizier of Loep.** *Vizier* (op de telefoon standaard): een vast kruisje in het midden, schuif de tekening eronder en druk op **+ Punt**; **Klaar** rondt een lijn of vlak af, **Terug** haalt het laatste punt weg. *Loep*: tik, of houd je vinger vast voor een vergroting boven je vinger en laat los op de goede plek. *Tik*: gewoon tikken, zoals op de pc.
 - **Eenheid:** mm, cm of m. **Haaks:** alleen horizontaal of verticaal meten.
 - **Delen naar Meetmaat** (Android, na installeren): een PDF uit WhatsApp, mail of Bestanden direct openen.
 
