@@ -98,6 +98,12 @@ button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visib
 .seg button:last-child { border-right: 0; }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
 
+.tools { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; flex: 1 1 560px; }
+.tools button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 58px; padding: 6px 2px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); font-size: 13px; line-height: 1.15; }
+.tools svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tools svg .f { fill: currentColor; fill-opacity: .18; }
+.tools button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent-ink); }
+@media (max-width: 640px) { .toolbar > .btns { gap: 6px; } .toolbar > .btns button { padding: 8px 9px; font-size: 13px; } .tools { grid-template-columns: repeat(4, minmax(0, 1fr)); flex-basis: 100%; } .tools button { font-size: 12px; } }
 .work { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
 @media (max-width: 920px) { .work { grid-template-columns: minmax(0, 1fr); } }
 
@@ -221,15 +227,15 @@ input[type="number"], input[type="text"], .nm {
   <div class="tape" aria-hidden="true"></div>
 
   <div class="toolbar">
-    <div class="seg" id="tools" role="group" aria-label="Gereedschap">
-      <button type="button" data-tool="pan">Schuiven</button>
-      <button type="button" data-tool="calib">IJken</button>
-      <button type="button" data-tool="dist">Afstand</button>
-      <button type="button" data-tool="poly">Lengte</button>
-      <button type="button" data-tool="area">Oppervlak</button>
-      <button type="button" data-tool="origin">Nulpunt</button>
-      <button type="button" data-tool="set">Uitzetmaat</button>
-      <button type="button" data-tool="peil">Peilmaat</button>
+    <div class="tools" id="tools" role="group" aria-label="Gereedschap">
+      <button type="button" data-tool="pan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Schuiven</span></button>
+      <button type="button" data-tool="dist"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg><span>Afstand</span></button>
+      <button type="button" data-tool="poly"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18l6-9 6 6 6-10"/><circle cx="3" cy="18" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="15" cy="15" r="1.6"/><circle cx="21" cy="5" r="1.6"/></svg><span>Lengte</span></button>
+      <button type="button" data-tool="area"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M4 7l9-3 7 7-4 9H5z"/></svg><span>Oppervlak</span></button>
+      <button type="button" data-tool="calib"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="8" width="20" height="8" rx="1"/><path d="M6 8v3M10 8v4M14 8v3M18 8v4"/></svg><span>IJken</span></button>
+      <button type="button" data-tool="origin"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><span>Nulpunt</span></button>
+      <button type="button" data-tool="set"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h16"/><circle cx="16" cy="8" r="2"/><path d="M16 10v7M7 8h7" stroke-dasharray="2 2"/></svg><span>Uitzetmaat</span></button>
+      <button type="button" data-tool="peil"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M12 3v13M8 12l4 4 4-4"/></svg><span>Peilmaat</span></button>
     </div>
     <div class="btns">
       <div class="seg" id="units" role="group" aria-label="Eenheid">
@@ -246,6 +252,7 @@ input[type="number"], input[type="text"], .nm {
 
   <div class="work">
     <div class="viewer">
+      <div class="hintbar" id="hint" aria-live="polite"></div>
       <div id="view" aria-label="Tekening">
         <div id="stage"><canvas id="cv" width="10" height="10"></canvas><svg id="ov" xmlns="http://www.w3.org/2000/svg"></svg></div>
         <div class="banner" id="banner" hidden></div>
@@ -272,7 +279,6 @@ input[type="number"], input[type="text"], .nm {
         </div>
         <div class="loading" id="loading" hidden>Tekening laden…</div>
       </div>
-      <div class="hintbar" id="hint" aria-live="polite"></div>
     </div>
 
     <aside class="side">
@@ -1075,7 +1081,7 @@ function showBanner(html, err, hideMs) {
 function toast(t) { const el = $("toast"); el.textContent = t; clearTimeout(toast.tm); toast.tm = setTimeout(() => el.textContent = "", 2500); }
 
 function renderTools() {
-  document.querySelectorAll("#tools button").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === tool));
+  document.querySelectorAll("#tools [data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === tool));
   view.classList.toggle("measure", tool !== "pan");
   $("finish").hidden = !((tool === "poly" && draft.length >= 2) || (tool === "area" && draft.length >= 3));
   $("ortho").setAttribute("aria-pressed", ortho);
