@@ -214,6 +214,7 @@ input[type="number"], input[type="text"], .nm {
       <label class="btn filebtn">Tekening openen<input id="file" type="file" accept="application/pdf,.pdf,image/*" aria-label="Tekening openen"></label>
       <select id="page" aria-label="Pagina" hidden></select>
       <button type="button" class="ghost" id="install" hidden>App installeren</button>
+      <button type="button" class="ghost" id="sendLink">Doorsturen</button>
       <span class="fname" id="fname"></span>
     </div>
   </header>
@@ -345,7 +346,7 @@ input[type="number"], input[type="text"], .nm {
         <div class="btns"><button type="button" id="sCopy">Kopieer zandberekening</button></div>
       </div>
       <p class="hint">X is naar rechts, Y is naar boven op de tekening, gemeten vanaf het nulpunt. Controleer je ijking door met Afstand een tweede bekende maatlijn na te meten.</p>
-      <p class="hint"><a href="installeren.html" style="color:inherit">Meetmaat installeren of doorsturen</a></p>
+      <p class="hint"><a href="installeren.html" style="color:inherit">Hulp bij installeren</a> · <a href="#" id="sendLink2" style="color:inherit">Meetmaat doorsturen</a></p>
     </aside>
   </div>
 </div>
@@ -1477,6 +1478,17 @@ $("install").addEventListener("click", async () => {
   try { await installEvt.userChoice; } catch (e) {}
   installEvt = null; $("install").hidden = true;
 });
+// Installatielink delen (deelmenu: WhatsApp, mail enz.), anders kopiëren
+async function sendInstallLink() {
+  const url = new URL("installeren.html", location.href).href;
+  try {
+    if (navigator.share) { await navigator.share({ title: "Meetmaat", text: "Meetmaat installeren op je telefoon:", url }); return; }
+  } catch (e) { if (e && e.name === "AbortError") return; }
+  try { await navigator.clipboard.writeText(url); toast("Link gekopieerd, plak hem in WhatsApp of een mail"); }
+  catch (e) { toast("Stuur deze link: " + url); }
+}
+$("sendLink").addEventListener("click", sendInstallLink);
+$("sendLink2").addEventListener("click", e => { e.preventDefault(); sendInstallLink(); });
 if ("launchQueue" in window) {
   launchQueue.setConsumer(async params => {
     if (params.files && params.files.length) { try { openFile(await params.files[0].getFile()); } catch (e) {} }

@@ -133,6 +133,13 @@ body.metpijl main { padding-bottom: 90px; }
     <a class="btn" href="./">Of gebruik Meetmaat hier op de computer</a>
   </section>
 
+  <section class="card" id="deel">
+    <h2>Doorsturen naar iemand anders</h2>
+    <p style="margin:0">Stuur de link via WhatsApp of mail. De ander krijgt dan deze pagina met de stappen voor zijn telefoon.</p>
+    <button type="button" class="btn" id="bDeel">Stuur de link door</button>
+    <div class="note" id="deelNote" hidden></div>
+  </section>
+
   <section class="card">
     <h2>Goed om te weten</h2>
     <ul class="know">
@@ -179,6 +186,18 @@ body.metpijl main { padding-bottom: 90px; }
   // In-app browsers op Android (WhatsApp, Facebook enz. gebruiken een WebView: "; wv)")
   const androidInApp = android && (/; wv\)/.test(ua) || /FBAN|FBAV|Instagram/.test(ua));
   const show = id => { $(id).hidden = false; };
+
+  // Doorsturen: deelmenu (WhatsApp, mail), anders kopiëren
+  const deelUrl = new URL("installeren.html", location.href).href;
+  $("bDeel").addEventListener("click", async () => {
+    const note = $("deelNote");
+    const zeg = t => { note.textContent = t; note.hidden = false; };
+    try {
+      if (navigator.share) { await navigator.share({ title: "Meetmaat", text: "Meetmaat installeren op je telefoon:", url: deelUrl }); return; }
+    } catch (e) { if (e && e.name === "AbortError") return; }
+    try { await navigator.clipboard.writeText(deelUrl); zeg("Link gekopieerd. Plak hem in WhatsApp of een mail."); }
+    catch (e) { zeg("Stuur deze link: " + deelUrl); }
+  });
 
   if (standalone) { show("vAl"); return; }
 
