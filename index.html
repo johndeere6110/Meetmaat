@@ -207,6 +207,7 @@ input[type="number"], input[type="text"], .nm {
 .pplist .ppv { font: 600 16px var(--mono); }
 .pplist .ppm { font-size: 12px; color: var(--muted); }
 .pplist .btns button { padding: 6px 10px; font-size: 13px; }
+.ppres:empty { display: none; }
 .ppres { font-size: 14px; border-left: 3px solid var(--accent); padding: 4px 10px; min-height: 1.6em; }
 .ppres b { font: 600 17px var(--mono); }
 #ov .ppt { fill: var(--accent); stroke: var(--paper-ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
@@ -333,14 +334,14 @@ input[type="number"], input[type="text"], .nm {
 
       <h2>Peilpunten</h2>
       <div class="sand" id="peil">
-        <p class="hint" style="margin:0">Leg een hulppeil vast, bijvoorbeeld op een balk of kolom, voor als je met de laser niet bij het 0-punt kunt. Alles in mm ten opzichte van 0-peil: boven is +, onder is −.</p>
+        <p class="hint" style="margin:0">Leg een hulppeil vast, bijvoorbeeld op een balk of kolom, voor als je met de laser niet bij het 0-punt kunt. Alles in cm ten opzichte van 0-peil: boven is +, onder is −.</p>
         <ul class="pplist" id="ppList"></ul>
 
         <h3>Peil overbrengen met de laser</h3>
         <label for="ppFrom">Vanaf (bekend peil)<select id="ppFrom"></select></label>
         <div class="row2">
-          <label for="ppA">Aflezing op bekend punt (mm)<input id="ppA" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 1450"></label>
-          <label for="ppB">Aflezing op nieuw punt (mm)<input id="ppB" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 1210"></label>
+          <label for="ppA">Aflezing op bekend punt (cm)<input id="ppA" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 145"></label>
+          <label for="ppB">Aflezing op nieuw punt (cm)<input id="ppB" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 121"></label>
         </div>
         <p class="hint" style="margin:0">Aflezing = op de baak of rolmaat, van het punt omhoog tot de laserlijn. Laser niet verzetten tussen de aflezingen.</p>
         <div class="ppres" id="ppRes"></div>
@@ -348,13 +349,13 @@ input[type="number"], input[type="text"], .nm {
         <h3>Opslaan als peilpunt</h3>
         <div class="row2">
           <label for="ppName">Naam<input id="ppName" type="text" autocomplete="off" placeholder="bijv. Balk as C-4"></label>
-          <label for="ppH">Peil (mm)<input id="ppH" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. +1240"></label>
+          <label for="ppH">Peil (cm)<input id="ppH" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. +24"></label>
         </div>
         <div class="btns"><button type="button" class="ghost" id="ppPlace">Plek op tekening</button><button type="button" id="ppSave">Peilpunt opslaan</button></div>
         <p class="hint" id="ppPlaceHint" style="margin:0"></p>
 
         <h3>Hoogte uitzetten</h3>
-        <label for="ppT">Gewenst peil (mm), met dezelfde laser en aflezing op bekend punt<input id="ppT" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. −180 voor bovenkant zand"></label>
+        <label for="ppT">Gewenst peil (cm), met dezelfde laser en aflezing op bekend punt<input id="ppT" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. −18 voor bovenkant zand"></label>
         <div class="ppres" id="ppRes2"></div>
       </div>
 
@@ -1114,7 +1115,7 @@ function drawOverlay() {
   [...(st.pp || []).filter(q => q.x != null), ...(ppPending ? [{ ...ppPending, name: "nieuw", h: null }] : [])].forEach(q => {
     const w = 9 * k, hh = 13 * k;
     s += `<path class="ppt" d="M${q.x} ${q.y}L${q.x - w} ${q.y - hh}H${q.x + w}Z"/>`;
-    s += label(q.x + 12 * k, q.y - 6 * k, `${q.name}${q.h != null ? " " + fmtPeil(q.h).replace(" mm", "") : ""}`, "", "start");
+    s += label(q.x + 12 * k, q.y - 6 * k, `${q.name}${q.h != null ? " " + fmtPeil(q.h).replace(" cm", "") : ""}`, "", "start");
   });
 
   st.items.forEach((it, i) => {
@@ -1295,8 +1296,10 @@ function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(
 
 /* ---------- Peilpunten: hulppeil vastleggen en peil overbrengen met de laser ---------- */
 let ppPending = null, ppPrevTool = "pan", ppFromVal = "0";
-const numIn = v => { const t = String(v || "").trim().replace(/\s/g, "").replace("−", "-").replace(",", "."); return t === "" || t === "-" || t === "+" ? null : (isFinite(+t) ? +t : NaN); };
-const fmtPeil = h => (h > 0 ? "+" : h < 0 ? "−" : "") + nl0(Math.abs(h)) + " mm";
+// Invoer in cm, intern in mm (zoals de rest van de app)
+const numIn = v => { const t = String(v || "").trim().replace(/\s/g, "").replace("−", "-").replace(",", "."); return t === "" || t === "-" || t === "+" ? null : (isFinite(+t) ? +t * 10 : NaN); };
+const cmTxt = mm => { const c = Math.round(Math.abs(mm)) / 10; return c % 1 ? nl(c, 1) : nl0(c); };
+const fmtPeil = h => (h > 0 ? "+" : h < 0 ? "−" : "") + cmTxt(h) + " cm";
 function ppFromH() { if (ppFromVal === "0") return 0; const q = (st.pp || []).find(x => String(x.id) === ppFromVal); return q ? q.h : null; }
 function ppFromName() { if (ppFromVal === "0") return "0-peil"; const q = (st.pp || []).find(x => String(x.id) === ppFromVal); return q ? q.name : "?"; }
 function ppCalc(fill) {
@@ -1308,20 +1311,20 @@ function ppCalc(fill) {
     r1.innerHTML = `Laserlijn ligt op <b>${fmtPeil(H + a)}</b>. Vul de aflezing op het nieuwe punt in.`;
   } else {
     const nh = H + a - b;
-    r1.innerHTML = `Nieuw punt: <b>${fmtPeil(nh)}</b><br><span class="hint">${fmtPeil(H)} + ${nl0(a)} − ${nl0(b)}</span>`;
-    if (fill) $("ppH").value = (nh > 0 ? "+" : "") + nl0(nh);
+    r1.innerHTML = `Nieuw punt: <b>${fmtPeil(nh)}</b><br><span class="hint">${fmtPeil(H)} ${a < 0 ? "−" : "+"} ${cmTxt(a)} ${b < 0 ? "+" : "−"} ${cmTxt(b)}</span>`;
+    if (fill) $("ppH").value = (nh > 0 ? "+" : nh < 0 ? "-" : "") + cmTxt(nh);
   }
   if (a != null && !Number.isNaN(a) && t != null && !Number.isNaN(t)) {
     const rd = H + a - t;
-    r2.innerHTML = rd >= 0 ? `Lees op de baak: <b>${nl0(rd)} mm</b><br><span class="hint">Laserlijn ${fmtPeil(H + a)} − gewenst ${fmtPeil(t)}</span>`
-      : `Dit peil ligt ${nl0(-rd)} mm <b>boven</b> de laserlijn. Zet de laser hoger.`;
+    r2.innerHTML = rd >= 0 ? `Lees op de baak: <b>${cmTxt(rd)} cm</b><br><span class="hint">Laserlijn ${fmtPeil(H + a)} − gewenst ${fmtPeil(t)}</span>`
+      : `Dit peil ligt ${cmTxt(-rd)} cm <b>boven</b> de laserlijn. Zet de laser hoger.`;
   } else r2.textContent = t != null && (a == null || Number.isNaN(a)) ? "Vul eerst de aflezing op het bekende punt in." : "";
 }
 function renderPeil() {
   if (!st.pp) st.pp = [];
   const L = st.pp;
   if (ppFromVal !== "0" && !L.some(x => String(x.id) === ppFromVal)) ppFromVal = "0";
-  $("ppFrom").innerHTML = `<option value="0">0-peil (0 mm)</option>` + L.map(x => `<option value="${x.id}">${esc(x.name)} (${fmtPeil(x.h)})</option>`).join("");
+  $("ppFrom").innerHTML = `<option value="0">0-peil (0 cm)</option>` + L.map(x => `<option value="${x.id}">${esc(x.name)} (${fmtPeil(x.h)})</option>`).join("");
   $("ppFrom").value = ppFromVal;
   $("ppList").innerHTML = L.length ? L.map(x => `<li data-pp="${x.id}">
       <div class="pph"><strong>${esc(x.name)}</strong><span class="ppv">${fmtPeil(x.h)}</span></div>
@@ -1342,7 +1345,7 @@ $("ppPlace").addEventListener("click", () => {
 });
 $("ppSave").addEventListener("click", () => {
   const h = numIn($("ppH").value);
-  if (h == null || Number.isNaN(h)) { flashHint("Vul het peil in, bijvoorbeeld +1240 of −180 (mm)."); $("ppH").focus(); return; }
+  if (h == null || Number.isNaN(h)) { flashHint("Vul het peil in, bijvoorbeeld +24 of −18 (cm)."); $("ppH").focus(); return; }
   if (!st.pp) st.pp = [];
   st.ppSeq = (st.ppSeq || 0) + 1;
   const name = $("ppName").value.trim() || `Peilpunt ${st.ppSeq}`;
