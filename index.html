@@ -122,29 +122,35 @@ button .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke
 #ov { position: absolute; left: 0; top: 0; overflow: visible; }
 #sharp { position: absolute; left: 0; top: 0; pointer-events: none; }
 
-#ov path { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
-#ov .halo { stroke: var(--paper); stroke-width: 7; opacity: .9; }
-#ov .halo.on { stroke: var(--accent); stroke-width: 11; opacity: .85; }
-#ov .mk { stroke: var(--mark); stroke-width: 3; }
+/* Lijndiktes in schermpixels: --k = 1 / zoom (de tekening zit in een CSS-transform, daar werkt non-scaling-stroke niet) */
+#ov { --k: 1; }
+#ov path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+#ov .halo { stroke: var(--paper); stroke-width: calc(7px * var(--k)); opacity: .9; }
+#ov .halo.on { stroke: var(--accent); stroke-width: calc(11px * var(--k)); opacity: .85; }
+#ov .mk { stroke: var(--mark); stroke-width: calc(3px * var(--k)); }
 #ov .fill { fill: var(--mark); opacity: .14; stroke: none; }
-#ov .cal { stroke: var(--cal); stroke-width: 3; stroke-dasharray: 9 6; }
-#ov .dr { stroke: var(--mark); stroke-width: 2; stroke-dasharray: 7 5; }
-#ov .lead { stroke: var(--mark); stroke-width: 1.5; stroke-dasharray: 5 5; }
-#ov .org { stroke: var(--paper-ink); stroke-width: 2; }
-#ov .orgc { fill: var(--paper); stroke: var(--paper-ink); stroke-width: 2; vector-effect: non-scaling-stroke; }
-#ov .pt { fill: var(--mark); stroke: var(--paper); stroke-width: 2; vector-effect: non-scaling-stroke; }
-#ov .hd { fill: var(--paper); stroke: var(--mark); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+#ov .cal { stroke: var(--cal); stroke-width: calc(3px * var(--k)); stroke-dasharray: calc(9px * var(--k)) calc(6px * var(--k)); }
+#ov .dr { stroke: var(--mark); stroke-width: calc(2px * var(--k)); stroke-dasharray: calc(7px * var(--k)) calc(5px * var(--k)); }
+#ov .lead { stroke: var(--mark); stroke-width: calc(1.5px * var(--k)); stroke-dasharray: calc(5px * var(--k)) calc(5px * var(--k)); }
+#ov .org { stroke: var(--paper-ink); stroke-width: calc(2px * var(--k)); }
+#ov .orgc { fill: var(--paper); stroke: var(--paper-ink); stroke-width: calc(2px * var(--k)); }
+#ov .pt { fill: var(--mark); stroke: var(--paper); stroke-width: calc(2px * var(--k)); }
+/* Het exacte punt: donker stipje in het midden; lijnen stoppen recht op het punt (geen ronde kop erover) */
+#ov .ptc { fill: var(--paper-ink); pointer-events: none; }
+#ov .halo, #ov .mk, #ov .dr, #ov .cal { stroke-linecap: butt; }
+#ov .halo.dot { stroke-linecap: round; }
+#ov .hd { fill: var(--paper); stroke: var(--mark); stroke-width: calc(2.5px * var(--k)); }
 #ov .hd.c { stroke: var(--cal); }
 #ov .hd.o { stroke: var(--paper-ink); }
 #ov .hit { fill: transparent; cursor: grab; }
-#ov .selhit { stroke: transparent; stroke-width: 18; cursor: pointer; }
+#ov .selhit { stroke: transparent; stroke-width: calc(18px * var(--k)); cursor: pointer; }
 #ov .lb { fill: var(--paper-ink); stroke: var(--paper); paint-order: stroke; stroke-linejoin: round; font-family: var(--mono); font-weight: 600; pointer-events: none; }
 #ov .lb.cal { fill: var(--cal); }
 #ov .lb.mkc { fill: #b34700; }
-#ov .tagc { fill: var(--mark); stroke: var(--paper); vector-effect: non-scaling-stroke; }
+#ov .tagc { fill: var(--mark); stroke: var(--paper); }
 #ov .tagn { fill: #fff; font-family: var(--mono); font-weight: 700; pointer-events: none; }
-#ov .pl { fill: none; stroke: var(--pile); stroke-width: 1.8; vector-effect: non-scaling-stroke; opacity: .75; }
-#ov .plink { stroke: var(--pile); stroke-width: 2; stroke-dasharray: 4 4; }
+#ov .pl { fill: none; stroke: var(--pile); stroke-width: calc(1.8px * var(--k)); opacity: .75; }
+#ov .plink { stroke: var(--pile); stroke-width: calc(2px * var(--k)); stroke-dasharray: calc(4px * var(--k)) calc(4px * var(--k)); }
 #ov .lb.pil { fill: var(--pile); }
 
 .vz { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; pointer-events: none; z-index: 2; }
@@ -221,7 +227,7 @@ input[type="number"], input[type="text"], .nm {
 .sand .seg.ppmode button[aria-pressed="true"], .sand .seg.ppsign button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 .ppres { font-size: 14px; border-left: 3px solid var(--accent); padding: 4px 10px; min-height: 1.6em; }
 .ppres b { font: 600 17px var(--mono); }
-#ov .ppt { fill: var(--accent); stroke: var(--paper-ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+#ov .ppt { fill: var(--accent); stroke: var(--paper-ink); stroke-width: calc(1.5px * var(--k)); }
 .sand h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 6px 0 -4px; font-weight: 600; }
 .sand .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .sand .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
@@ -238,9 +244,9 @@ input[type="number"], input[type="text"], .nm {
 .sres .main .k, .sres .main .v small { color: var(--accent-ink); opacity: .8; }
 .sflag { font-size: 13px; border-left: 3px solid var(--warn); padding: 5px 9px; background: color-mix(in srgb, var(--warn) 10%, transparent); border-radius: 0 4px 4px 0; }
 .sflag.ok { border-left-color: var(--ok); background: transparent; border: 1px solid var(--line); border-left: 3px solid var(--ok); }
-#ov .pp { stroke: var(--paper); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-#ov .pp.empty { fill: none; stroke: var(--paper-ink); stroke-dasharray: 4 3; opacity: .7; }
-#ov .pp.cur { stroke: var(--paper-ink); stroke-width: 3.5; stroke-dasharray: none; opacity: 1; }
+#ov .pp { stroke: var(--paper); stroke-width: calc(1.5px * var(--k)); }
+#ov .pp.empty { fill: none; stroke: var(--paper-ink); stroke-dasharray: calc(4px * var(--k)) calc(3px * var(--k)); opacity: .7; }
+#ov .pp.cur { stroke: var(--paper-ink); stroke-width: calc(3.5px * var(--k)); stroke-dasharray: none; opacity: 1; }
 #ov .lb.pv { fill: var(--paper-ink); }
 </style>
 <script src="vendor/pdf.min.js"></script>
@@ -1144,6 +1150,7 @@ function drawOverlay() {
   // Teksten en symbolen krimpen mee bij uitzoomen (tot 55%), zodat ze de tekening niet afdekken
   const zm = Math.max(0.55, Math.min(1, T.s / (fitScale() * 3)));
   const k = 1 / T.s, fs = 13 * k * zm;
+  ov.style.setProperty("--k", k.toFixed(6));
   const P = pts => pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
   const label = (x, y, txt, cls = "", anchor = "middle") =>
     `<text class="lb ${cls}" x="${x}" y="${y}" text-anchor="${anchor}" style="font-size:${fs}px;stroke-width:${4 * k * zm}px">${esc(txt)}</text>`;
@@ -1156,7 +1163,7 @@ function drawOverlay() {
       + label(x0 + 2 * r + gap, y, txt, "mkc", "start");
   };
   const handle = (p, id, cls = "") =>
-    `<circle class="hd ${cls}" cx="${p.x}" cy="${p.y}" r="${6 * k}"/><circle class="hit" data-h="${id}" cx="${p.x}" cy="${p.y}" r="${16 * k}"/>`;
+    `<circle class="hd ${cls}" cx="${p.x}" cy="${p.y}" r="${6 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/><circle class="hit" data-h="${id}" cx="${p.x}" cy="${p.y}" r="${16 * k}"/>`;
   let s = "";
 
   if (st.calib && !st.calib.scale) {
@@ -1185,8 +1192,8 @@ function drawOverlay() {
       if (st.origin) s += `<path class="lead" d="M${st.origin.x} ${st.origin.y}H${p.x}V${p.y}"/>`;
       const pp = nearestPile(p);
       if (pp && d2(p, pp) > 0.5) s += `<path class="plink" d="M${pp.x} ${pp.y}H${p.x}V${p.y}"/>`;
-      s += `<path class="halo${on ? " on" : ""}" d="M${p.x} ${p.y}h0.01"/>`;
-      s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${5 * k}"/>`;
+      s += `<path class="halo dot${on ? " on" : ""}" d="M${p.x} ${p.y}h0.01"/>`;
+      s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/>`;
       s += `<circle class="hit" data-sel="${it.id}" cx="${p.x}" cy="${p.y}" r="${14 * k}" style="cursor:pointer"/>`;
       s += tagLabel(p.x + 10 * k, p.y - 10 * k, n, d.short, "start");
     } else {
@@ -1195,7 +1202,7 @@ function drawOverlay() {
       if (closed) s += `<path class="fill" d="${dd}"/>`;
       s += `<path class="halo${on ? " on" : ""}" d="${dd}"/><path class="mk" d="${dd}"/>`;
       s += `<path class="selhit" data-sel="${it.id}" d="${dd}"/>`;
-      it.pts.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${3.5 * k}"/>`; });
+      it.pts.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${3.5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.2 * k}"/>`; });
       let lx, ly, anc = "middle";
       if (it.type === "dist") { lx = (it.pts[0].x + it.pts[1].x) / 2; ly = (it.pts[0].y + it.pts[1].y) / 2 - 9 * k; }
       else if (it.type === "area") { const c = innerPoint(it.pts); lx = c.x; ly = c.y + fs * 0.35; }
@@ -1229,7 +1236,7 @@ function drawOverlay() {
   }
   if (hover && pilesOn && piles.length && tool !== "pan" && tool !== "calib" && tool !== "peil") {
     const q = nearestPile(hover, 14 / T.s);
-    if (q) s += `<circle class="pl" cx="${q.x}" cy="${q.y}" r="${pileR + 7 * k}" style="stroke-width:3;opacity:1"/>`;
+    if (q) s += `<circle class="pl" cx="${q.x}" cy="${q.y}" r="${pileR + 7 * k}" style="stroke-width:${3 * k}px;opacity:1"/>`;
   }
 
   if (draft.length) {
@@ -1241,7 +1248,7 @@ function drawOverlay() {
     const closed = tool === "area" && pts.length > 2;
     const dd = P(pts) + (closed ? " Z" : "");
     s += `<path class="halo" d="${dd}"/><path class="${tool === "calib" ? "cal" : "dr"}" d="${dd}"/>`;
-    draft.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${4 * k}"/>`; });
+    draft.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${4 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/>`; });
     if (pts.length >= 2 && tool !== "calib") {
       const l = pts[pts.length - 1];
       const val = tool === "area" && pts.length > 2 ? fmtArea(polyArea(pts)) : fmtLen(polyLen(pts));
