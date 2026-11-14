@@ -1567,7 +1567,10 @@ view.addEventListener("pointerdown", e => {
   }
   if (ptrs.size > 2) return;
   const h = e.target.closest("[data-h]"), sl = e.target.closest("[data-sel]");
-  G = { kind: h ? "handle" : "tap", h: h && h.dataset.h, sel: sl && sl.dataset.sel, sx: e.clientX, sy: e.clientY, tx: T.x, ty: T.y };
+  // Bij een meetgereedschap is tikken op een sleepbolletje gewoon een nieuw punt (bijv. verder meten vanaf dezelfde paal);
+  // pas als je sleept, verschuif je het bolletje. Bij Schuiven pak je het bolletje meteen.
+  const grabNow = h && (tool === "pan" || h.dataset.h.startsWith("c:") || h.dataset.h === "o");
+  G = { kind: grabNow ? "handle" : "tap", h: h && h.dataset.h, sel: sl && sl.dataset.sel, sx: e.clientX, sy: e.clientY, tx: T.x, ty: T.y };
   if (G.kind === "tap" && loepOn()) {
     const g0 = G;
     G.timer = setTimeout(() => {
@@ -1596,7 +1599,11 @@ view.addEventListener("pointermove", e => {
   if (G.kind === "hold") { holdPt = { x: e.clientX, y: e.clientY }; hover = toImg(e.clientX, e.clientY); drawLoupe(); scheduleOverlay(); return; }
   if (G.kind === "done") return;
   const dx = e.clientX - G.sx, dy = e.clientY - G.sy;
-  if (G.kind === "tap" && Math.hypot(dx, dy) > 6) { clearTimeout(G.timer); G.kind = "pan"; view.classList.add("panning"); }
+  if (G.kind === "tap" && Math.hypot(dx, dy) > 6) {
+    clearTimeout(G.timer);
+    if (G.h) { G.kind = "handle"; moveHandle(G.h, toImg(e.clientX, e.clientY), e.shiftKey); return; }
+    G.kind = "pan"; view.classList.add("panning");
+  }
   if (G.kind === "pan") { T.x = G.tx + dx; T.y = G.ty + dy; applyT(false); }
 });
 function endPtr(e) {
