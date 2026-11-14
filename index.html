@@ -104,7 +104,7 @@ button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visib
 .tools svg .f { fill: currentColor; fill-opacity: .18; }
 .tools button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent-ink); }
 button .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -4px; margin-right: 5px; }
-@media (max-width: 640px) { .toolbar > .btns { gap: 4px; flex: 1 1 100%; justify-content: space-between; } .toolbar > .btns button { padding: 7px 6px; font-size: 12px; } .toolbar > .btns .seg button { padding: 7px 6px; }
+@media (max-width: 640px) { .toolbar > .btns { gap: 4px; flex: 1 1 100%; justify-content: space-between; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .toolbar > .btns::-webkit-scrollbar { display: none; } .toolbar > .btns > * { flex: none; } .toolbar > .btns button { padding: 7px 6px; font-size: 12px; } .toolbar > .btns .seg button { padding: 7px 6px; }
   #undo .lbl { display: none; } #undo .ic { margin: 0; } .tools { grid-template-columns: repeat(4, minmax(0, 1fr)); flex-basis: 100%; } .tools button { font-size: 12px; } }
 .work { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 14px; align-items: start; }
 @media (max-width: 920px) { .work { grid-template-columns: minmax(0, 1fr); } }
@@ -141,6 +141,8 @@ button .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke
 #ov .lb { fill: var(--paper-ink); stroke: var(--paper); paint-order: stroke; stroke-linejoin: round; font-family: var(--mono); font-weight: 600; pointer-events: none; }
 #ov .lb.cal { fill: var(--cal); }
 #ov .lb.mkc { fill: #b34700; }
+#ov .tagc { fill: var(--mark); stroke: var(--paper); vector-effect: non-scaling-stroke; }
+#ov .tagn { fill: #fff; font-family: var(--mono); font-weight: 700; pointer-events: none; }
 #ov .pl { fill: none; stroke: var(--pile); stroke-width: 1.8; vector-effect: non-scaling-stroke; opacity: .75; }
 #ov .plink { stroke: var(--pile); stroke-width: 2; stroke-dasharray: 4 4; }
 #ov .lb.pil { fill: var(--pile); }
@@ -484,7 +486,7 @@ const recToFile = r => new File([r.blob], r.name, { type: r.type || "" });
 const $ = id => document.getElementById(id);
 const view = $("view"), stage = $("stage"), cv = $("cv"), ov = $("ov");
 const nl0 = n => Math.round(n).toLocaleString("nl-NL", { useGrouping: false });   // maatvoering zoals op tekening: 47970
-const nl = (n, d) => n.toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
+const nl = (n, d) => n.toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: false });
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const TYPE_NAME = { dist: "Afstand", poly: "Lengte", area: "Oppervlak", set: "Uitzetmaat" };
 const MEASURE_TOOLS = ["dist", "poly", "area", "set"];
@@ -997,8 +999,22 @@ function drawLoupe() {
 function vzCenter() { const r = view.getBoundingClientRect(); return { x: (r.width / 2 - T.x) / T.s, y: (r.height / 2 - T.y) / T.s }; }
 function vzUpdate() { if (vzActive()) { hover = vzCenter(); hoverShift = false; } }
 const fmtMM = mm => { const u = UNIT[unit]; return `${u.d ? nl(mm / u.f, u.d) : nl0(mm / u.f)} ${unit}`; };
+function innerPoint(pts) {
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const segD = (p, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L)); return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy); };
+  const edgeD = p => Math.min(...pts.map((a, i) => segD(p, a, pts[(i + 1) % pts.length])));
+  let best = null, bd = -1;
+  const N = 24;
+  for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
+    const p = { x: x0 + (x1 - x0) * (i + 0.5) / (N + 1), y: y0 + (y1 - y0) * (j + 0.5) / (N + 1) };
+    if (!inPoly(p, pts)) continue;
+    const d = edgeD(p); if (d > bd) { bd = d; best = p; }
+  }
+  return best || { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+}
 const fmtLen = px => st.mmPerPx ? fmtMM(px * st.mmPerPx) : `${nl0(px)} px`;
-const fmtArea = px2 => st.mmPerPx ? `${nl(px2 * st.mmPerPx ** 2 / 1e6, 2)} m²` : `${nl0(px2)} px²`;
+const fmtArea = px2 => { if (!st.mmPerPx) return `${nl0(px2)} px²`; const m2 = px2 * st.mmPerPx ** 2 / 1e6; return `${nl(m2, m2 >= 100 ? 1 : 2)} m²`; };
 const sgn = v => v < -1e-9 ? "−" : "";
 
 function describe(it) {
@@ -1131,6 +1147,14 @@ function drawOverlay() {
   const P = pts => pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
   const label = (x, y, txt, cls = "", anchor = "middle") =>
     `<text class="lb ${cls}" x="${x}" y="${y}" text-anchor="${anchor}" style="font-size:${fs}px;stroke-width:${4 * k * zm}px">${esc(txt)}</text>`;
+  // Nummer in een rondje, waarde ernaast: "③ 7175,7 m²" in plaats van "3. 7.175,71 m²"
+  const tagLabel = (x, y, n, txt, anchor = "start") => {
+    const r = fs * 0.72, gap = fs * 0.35, tw = String(txt).length * fs * 0.6, w = 2 * r + gap + tw;
+    const x0 = anchor === "middle" ? x - w / 2 : x, cy = y - fs * 0.34;
+    return `<circle class="tagc" cx="${x0 + r}" cy="${cy}" r="${r}" style="stroke-width:${2 * k * zm}px"/>`
+      + `<text class="tagn" x="${x0 + r}" y="${cy + fs * 0.3}" text-anchor="middle" style="font-size:${fs * 0.8}px">${n}</text>`
+      + label(x0 + 2 * r + gap, y, txt, "mkc", "start");
+  };
   const handle = (p, id, cls = "") =>
     `<circle class="hd ${cls}" cx="${p.x}" cy="${p.y}" r="${6 * k}"/><circle class="hit" data-h="${id}" cx="${p.x}" cy="${p.y}" r="${16 * k}"/>`;
   let s = "";
@@ -1164,7 +1188,7 @@ function drawOverlay() {
       s += `<path class="halo${on ? " on" : ""}" d="M${p.x} ${p.y}h0.01"/>`;
       s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${5 * k}"/>`;
       s += `<circle class="hit" data-sel="${it.id}" cx="${p.x}" cy="${p.y}" r="${14 * k}" style="cursor:pointer"/>`;
-      s += label(p.x + 10 * k, p.y - 10 * k, `${n}. ${d.short}`, "mkc", "start");
+      s += tagLabel(p.x + 10 * k, p.y - 10 * k, n, d.short, "start");
     } else {
       const closed = it.type === "area";
       const dd = P(it.pts) + (closed ? " Z" : "");
@@ -1174,9 +1198,9 @@ function drawOverlay() {
       it.pts.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${3.5 * k}"/>`; });
       let lx, ly, anc = "middle";
       if (it.type === "dist") { lx = (it.pts[0].x + it.pts[1].x) / 2; ly = (it.pts[0].y + it.pts[1].y) / 2 - 9 * k; }
-      else if (it.type === "area") { lx = it.pts.reduce((a, p) => a + p.x, 0) / it.pts.length; ly = it.pts.reduce((a, p) => a + p.y, 0) / it.pts.length; }
+      else if (it.type === "area") { const c = innerPoint(it.pts); lx = c.x; ly = c.y + fs * 0.35; }
       else { const l = it.pts[it.pts.length - 1]; lx = l.x + 10 * k; ly = l.y - 10 * k; anc = "start"; }
-      s += label(lx, ly, `${n}. ${d.short}`, "mkc", anc);
+      s += tagLabel(lx, ly, n, d.short, anc);
     }
     if (on) it.pts.forEach((p, j) => { s += handle(p, `i:${it.id}:${j}`); });
   });
