@@ -187,6 +187,16 @@ input[type="number"], input[type="text"], .nm {
 .hintbar { font-size: 14px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; min-height: 2.6em; }
 .hintbar.flash { border-color: var(--warn); color: var(--warn); }
 
+.sec > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; padding: 2px 0; }
+.sec > summary::-webkit-details-marker { display: none; }
+.sec > summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; flex: none; align-self: center; }
+.sec[open] > summary::before { transform: rotate(45deg); }
+.secsum { margin-left: auto; font: 500 13px var(--mono); color: var(--muted); text-align: right; }
+.secsum.warn { color: var(--warn); }
+.secbody { display: grid; gap: 12px; margin-top: 10px; min-width: 0; }
+.sec + .sec, .toast + .sec { border-top: 1px solid var(--line); padding-top: 10px; }
+/* Op de pc blijft de tekening staan als je de zijkolom naar beneden scrolt */
+@media (min-width: 921px) { .viewer { position: sticky; top: 12px; } }
 .side { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
 .calinfo { font-size: 14px; display: grid; gap: 4px; }
 .calinfo .big { font-family: var(--mono); font-size: 14px; font-weight: 500; }
@@ -344,20 +354,34 @@ input[type="number"], input[type="text"], .nm {
     </div>
 
     <aside class="side">
-      <h2>IJking</h2>
+      <details class="sec" data-sec="cal">
+        <summary><h2>IJking</h2><span class="secsum" id="sum-cal"></span></summary>
+        <div class="secbody">
       <div class="calinfo" id="calinfo"></div>
-      <h2>Palen</h2>
+        </div>
+      </details>
+      <details class="sec" data-sec="pal">
+        <summary><h2>Palen</h2><span class="secsum" id="sum-pal"></span></summary>
+        <div class="secbody">
       <div class="calinfo" id="pileinfo"></div>
-      <h2>Metingen</h2>
+        </div>
+      </details>
+      <details class="sec" data-sec="list" open>
+        <summary><h2>Metingen</h2><span class="secsum" id="sum-list"></span></summary>
+        <div class="secbody">
       <ol id="list"></ol>
       <datalist id="codelist"></datalist>
       <div class="btns">
         <button type="button" id="copy">Kopieer lijst</button>
         <button type="button" class="ghost" id="clearall">Alles wissen</button>
       </div>
+        </div>
+      </details>
       <div class="toast" id="toast"></div>
 
-      <h2>Peilpunten</h2>
+      <details class="sec" data-sec="peil">
+        <summary><h2>Peilpunten</h2><span class="secsum" id="sum-peil"></span></summary>
+        <div class="secbody">
       <div class="sand" id="peil">
         <p class="hint" style="margin:0">Hulppeilen, bijvoorbeeld op een balk of kolom, voor als je met de laser niet bij het 0-punt kunt. Alles in cm ten opzichte van 0-peil.</p>
         <ul class="pplist" id="ppList"></ul>
@@ -408,8 +432,12 @@ input[type="number"], input[type="text"], .nm {
           </div>
         </details>
       </div>
+        </div>
+      </details>
 
-      <h2>Zand</h2>
+      <details class="sec" data-sec="sand">
+        <summary><h2>Zand</h2><span class="secsum" id="sum-sand"></span></summary>
+        <div class="secbody">
       <div class="sand" id="sand">
         <label for="sArea">Vloerveld
           <select id="sArea"></select>
@@ -466,6 +494,8 @@ input[type="number"], input[type="text"], .nm {
         <div class="flags" id="sFlags" style="display:grid;gap:6px"></div>
         <div class="btns"><button type="button" id="sCopy">Kopieer zandberekening</button></div>
       </div>
+        </div>
+      </details>
       <p class="hint">X is naar rechts, Y is naar boven op de tekening, gemeten vanaf het nulpunt. Controleer je ijking door met Afstand een tweede bekende maatlijn na te meten.</p>
       <p class="hint"><a href="installeren.html" style="color:inherit">Hulp bij installeren</a> · <a href="#" id="sendLink2" style="color:inherit">Meetmaat doorsturen</a></p>
     </aside>
@@ -1703,7 +1733,30 @@ function renderPileInfo() {
   el.innerHTML = `<span class="big">${piles.length} rondjes herkend</span>
     <span class="hint">${pilesOn ? "Meestal palen, op een riolerings- of inrichtingstekening ook putten. Tik je vlak bij een rondje, dan klikt je punt vast op het hart. Bij een uitzetmaat zie je ook de maat vanaf het dichtstbijzijnde rondje. Zit het in de weg? Zet <b>Palen</b> uit." : "Palen staan uit: punten klikken niet vast."}</span>`;
 }
-function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); updateHint(); renderTools(); }
+function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); updateHint(); renderTools(); renderSums(); }
+// Korte stand per onderdeel in de kop, zodat je het niet hoeft open te klappen
+function renderSums() {
+  const set = (k, t, warn) => { const e = $("sum-" + k); if (e) { e.textContent = t; e.classList.toggle("warn", !!warn); } };
+  if (!img.w) set("cal", "");
+  else if (!st.mmPerPx) set("cal", "niet geijkt", true);
+  else {
+    const sc = st.calib && st.calib.scale, N = pdfVp ? st.mmPerPx * 72 * pdfVp.scale / 25.4 : null;
+    set("cal", `${sc ? "1:" + sc : N ? "±1:" + nl0(N) : "geijkt"}${N ? " · ±" + fmtMM(Math.max(0.25 * N, unit === "mm" ? 1 : 10)) : ""}`);
+  }
+  set("pal", piles.length ? `${piles.length} rondjes` : "geen");
+  set("list", st.items.length ? `${st.items.length} meting${st.items.length === 1 ? "" : "en"}` : "");
+  set("peil", st.pp && st.pp.length ? `${st.pp.length} peilpunt${st.pp.length === 1 ? "" : "en"}` : "");
+  set("sand", st.sand && st.sand.pts.length ? `${st.sand.pts.length} peilmaten` : "");
+}
+const SEC_KEY = "meetmaat:open";
+try {
+  const o = JSON.parse(localStorage.getItem(SEC_KEY) || "null");
+  if (o) document.querySelectorAll(".sec").forEach(d => { if (o[d.dataset.sec] != null) d.open = o[d.dataset.sec]; });
+} catch (e) {}
+document.querySelectorAll(".sec").forEach(d => d.addEventListener("toggle", () => {
+  const o = {}; document.querySelectorAll(".sec").forEach(x => { o[x.dataset.sec] = x.open; });
+  try { localStorage.setItem(SEC_KEY, JSON.stringify(o)); } catch (e) {}
+}));
 
 /* ---------- Peilpunten: baak op peil zetten, hulppeilen vastleggen, controleren en uitzetten ---------- */
 let ppPending = null, ppPrevTool = "pan", ppFromVal = "0", ppSignV = 1, ppSign2V = -1;
