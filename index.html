@@ -1344,6 +1344,27 @@ function innerPoint(pts) {
   }
   return best || { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
 }
+const _candCache = new Map();
+function labelCands(pts) {
+  const key = pts.length + ":" + pts[0].x.toFixed(2) + ":" + pts[0].y.toFixed(2) + ":" + pts[pts.length - 1].x.toFixed(2) + ":" + polyArea(pts).toFixed(1);
+  if (_candCache.has(key)) return _candCache.get(key);
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const segD = (p, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L)); return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy); };
+  const edgeD = p => { let m = Infinity; for (let i = 0; i < pts.length; i++) m = Math.min(m, segD(p, pts[i], pts[(i + 1) % pts.length])); return m; };
+  const N = 40, all = [];
+  for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
+    const p = { x: x0 + (x1 - x0) * (i + 0.5) / (N + 1), y: y0 + (y1 - y0) * (j + 0.5) / (N + 1) };
+    if (inPoly(p, pts)) all.push({ x: p.x, y: p.y, d: edgeD(p) });
+  }
+  all.sort((a, b) => b.d - a.d);
+  const out = [], sp = Math.hypot(x1 - x0, y1 - y0) * 0.08;
+  for (const c of all) { if (out.every(o => Math.hypot(o.x - c.x, o.y - c.y) > sp)) out.push(c); if (out.length >= 10) break; }
+  if (!out.length) out.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, d: 0 });
+  if (_candCache.size > 300) _candCache.clear();
+  _candCache.set(key, out);
+  return out;
+}
 const fmtLen = px => st.mmPerPx ? fmtMM(px * st.mmPerPx) : `${nl0(px)} px`;
 const fmtArea = px2 => { if (!st.mmPerPx) return `${nl0(px2)} px²`; const m2 = px2 * st.mmPerPx ** 2 / 1e6; return `${nl(m2, m2 >= 100 ? 1 : 2)} m²`; };
 const sgn = v => v < -1e-9 ? "−" : "";
@@ -1531,6 +1552,7 @@ function drawOverlay() {
     s += label(q.x + 12 * k * zm, q.y - 6 * k * zm, `${q.name}${q.h != null ? " " + fmtPeil(q.h).replace(" cm", "") : ""}`, "", "start");
   });
 
+  const labs = [];            // labels pas na alle vlakken tekenen: bovenop, en zonder overlap
   st.items.forEach((it, i) => {
     const on = it.id === sel, n = i + 1, d = describe(it);
     if (it.type === "set") {
@@ -1541,7 +1563,7 @@ function drawOverlay() {
       s += `<path class="halo dot${on ? " on" : ""}" d="M${p.x} ${p.y}h0.01"/>`;
       s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/>`;
       s += `<circle class="hit" data-sel="${it.id}" cx="${p.x}" cy="${p.y}" r="${14 * k}" style="cursor:pointer"/>`;
-      s += tagLabel(p.x + 10 * k, p.y - 10 * k, n, d.short, "start");
+      labs.push({ x: p.x + 10 * k, y: p.y - 10 * k, n, t: d.short, anc: "start" });
     } else {
       const closed = it.type === "area";
       const dd = P(it.pts) + (closed ? " Z" : "");
@@ -1551,14 +1573,32 @@ function drawOverlay() {
       s += `<path class="halo${on ? " on" : ""}" d="${dd}"/><path class="mk" d="${dd}"/>`;
       s += `<path class="selhit" data-sel="${it.id}" d="${dd}"/>`;
       if (it.pts.length <= 40) it.pts.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${3.5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.2 * k}"/>`; });
-      let lx, ly, anc = "middle";
-      if (it.type === "dist") { lx = (it.pts[0].x + it.pts[1].x) / 2; ly = (it.pts[0].y + it.pts[1].y) / 2 - 9 * k; }
-      else if (it.type === "area") { const c = innerPoint(it.pts); lx = c.x; ly = c.y + fs * 0.35; }
-      else { const l = it.pts[it.pts.length - 1]; lx = l.x + 10 * k; ly = l.y - 10 * k; anc = "start"; }
-      s += tagLabel(lx, ly, n, d.short, anc);
+      if (it.type === "dist") labs.push({ x: (it.pts[0].x + it.pts[1].x) / 2, y: (it.pts[0].y + it.pts[1].y) / 2 - 9 * k, n, t: d.short, anc: "middle" });
+      else if (it.type === "area") labs.push({ area: it, n, t: d.short });
+      else { const l = it.pts[it.pts.length - 1]; labs.push({ x: l.x + 10 * k, y: l.y - 10 * k, n, t: d.short, anc: "start" }); }
     }
     if (on && it.pts.length <= 40) it.pts.forEach((p, j) => { s += handle(p, `i:${it.id}:${j}`); });
   });
+  // Labels plaatsen: eerst de vaste, dan de vlakken van klein naar groot; per vlak de beste plek waar het label
+  // helemaal binnen het vlak past en niets anders raakt
+  const boxOf = (x, y, t, anc) => { const w = 2 * fs * 0.72 + fs * 0.35 + String(t).length * fs * 0.6, x0 = anc === "middle" ? x - w / 2 : x; return [x0, y - fs * 1.06, x0 + w, y + fs * 0.3]; };
+  const hitBox = (b, list) => list.some(o => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]);
+  const placed = [];
+  labs.filter(l => !l.area).forEach(l => placed.push(boxOf(l.x, l.y, l.t, l.anc)));
+  labs.filter(l => l.area).sort((a, b) => polyArea(a.area.pts) - polyArea(b.area.pts)).forEach(l => {
+    const cands = labelCands(l.area.pts);
+    // per plek: hoeveel van het label binnen het vlak valt (9 meetpunten); vrij van andere labels gaat voor
+    let pick = null, bestScore = -1;
+    for (const c of cands) {
+      const y = c.y + fs * 0.35, b = boxOf(c.x, y, l.t, "middle"), mx = (b[0] + b[2]) / 2, my = (b[1] + b[3]) / 2;
+      const inN = [[b[0], b[1]], [mx, b[1]], [b[2], b[1]], [b[0], my], [mx, my], [b[2], my], [b[0], b[3]], [mx, b[3]], [b[2], b[3]]].filter(([x, yy]) => inPoly({ x, y: yy }, l.area.pts)).length;
+      const score = (hitBox(b, placed) ? 0 : 100) + inN * 10 + Math.min(9, c.d / k / 10);
+      if (score > bestScore) { bestScore = score; pick = { c, b, y }; }
+      if (score >= 190) break;
+    }
+    placed.push(pick.b); l.x = pick.c.x; l.y = pick.y; l.anc = "middle";
+  });
+  labs.forEach(l => { s += tagLabel(l.x, l.y, l.n, l.t, l.anc); });
   if (st.sand && st.sand.pts.length) {
     const S = st.sand, build = (+S.conc || 0) + (+S.ins || 0);
     const cc = piles.length ? cellCenters() : { s: 0 };
