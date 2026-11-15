@@ -228,6 +228,9 @@ input[type="number"], input[type="text"], .nm {
 .pplist .ppm { font-size: 12px; color: var(--muted); }
 .pplist .btns button { padding: 6px 10px; font-size: 13px; }
 .ppres:empty { display: none; }
+.rkseg { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; margin-top: 4px; }
+.rkseg button { padding: 7px 6px; font-size: 13px; }
+.rkseg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 #list .cmp { font-size: 13px; margin-top: 4px; padding: 3px 8px; border-left: 3px solid var(--ok); background: var(--bg); border-radius: 0 4px 4px 0; }
 #list .cmp.warn { border-left-color: var(--accent); } #list .cmp.bad { border-left-color: var(--warn); }
 #list .cmp b { font-family: var(--mono); }
@@ -372,7 +375,7 @@ input[type="number"], input[type="text"], .nm {
         </div>
       </details>
       <details class="sec" data-sec="pal">
-        <summary><h2>Palen</h2><span class="secsum" id="sum-pal"></span></summary>
+        <summary><h2 id="palH">Palen</h2><span class="secsum" id="sum-pal"></span></summary>
         <div class="secbody">
       <div class="calinfo" id="pileinfo"></div>
         </div>
@@ -1476,8 +1479,8 @@ function describe(it) {
     const pp = nearestPile(p);
     if (pp) {
       const ex = p.x - pp.x, ey = pp.y - p.y;
-      sub += Math.hypot(ex, ey) < 0.5 ? " · precies op een paal"
-        : ` · vanaf dichtstbijzijnde paal: X ${sgn(ex)}${fmtLen(Math.abs(ex))} · Y ${sgn(ey)}${fmtLen(Math.abs(ey))}`;
+      sub += Math.hypot(ex, ey) < 0.5 ? ` · precies op een ${rk().ev}`
+        : ` · vanaf dichtstbijzijnde ${rk().ev}: X ${sgn(ex)}${fmtLen(Math.abs(ex))} · Y ${sgn(ey)}${fmtLen(Math.abs(ey))}`;
     }
     return { main: txt, sub, short: txt };
   }
@@ -1793,6 +1796,7 @@ function updateHint() {
   if (loepOn() && !(tool === "calib" && draft.length >= 2)) t += " Houd je vinger vast voor een loep.";
   if (tool === "set" && !st.origin) t = "Zet eerst een nulpunt met het gereedschap Nulpunt.";
   if (MEASURE_TOOLS.includes(tool) && !st.mmPerPx) t += " Let op: nog niet geijkt, maten staan in pixels.";
+  if (tool === "set") t = t.replace(/\bpaal\b/g, rk().ev);
   h.textContent = t;
   if (pdfPage && !draft.length) {
     const add = (id, txt) => { const b = document.createElement("button"); b.type = "button"; b.className = "ghost hintbtn"; b.id = id; b.textContent = txt; h.appendChild(b); };
@@ -1835,18 +1839,44 @@ function renderTools() {
   $("vzBack").disabled = !draft.length && !st.items.length;
   document.querySelectorAll("#units button").forEach(b => b.setAttribute("aria-pressed", b.dataset.unit === unit));
 }
+// Wat zijn de rondjes op deze tekening: palen of putten? Zelf gekozen per tekening, anders een gok
+// (veel rondjes = palen in een raster, weinig = putten)
+const RK = { palen: { ev: "paal", mv: "palen", Mv: "Palen" }, putten: { ev: "put", mv: "putten", Mv: "Putten" } };
+let rkGuess = null, rkGuessFor = null;
+function guessRk() {
+  if (rkGuessFor === piles) return rkGuess;
+  rkGuessFor = piles; rkGuess = "putten";
+  if (piles.length >= 12) {
+    const [sx, sy] = gridSteps();
+    if (sx && sy) {
+      const near = (p, dx, dy) => piles.some(q => Math.abs(q.x - p.x - dx) < Math.max(2, sx * 0.08) && Math.abs(q.y - p.y - dy) < Math.max(2, sy * 0.08));
+      const inGrid = piles.filter(p => (near(p, sx, 0) || near(p, -sx, 0)) && (near(p, 0, sy) || near(p, 0, -sy))).length;
+      if (inGrid / piles.length >= 0.5) rkGuess = "palen";
+    }
+  }
+  return rkGuess;
+}
+const rkKey = () => RK[st.rk] ? st.rk : guessRk();
+const rk = () => RK[rkKey()];
 function renderPileInfo() {
-  const el = $("pileinfo"), b = $("pilesbtn");
+  const el = $("pileinfo"), b = $("pilesbtn"), w = rk();
   b.hidden = !piles.length;
   b.setAttribute("aria-pressed", pilesOn);
+  b.textContent = w.Mv; $("palH").textContent = piles.length ? w.Mv : "Palen en putten";
   if (!img.w) { el.innerHTML = ""; return; }
   if (!piles.length) {
-    el.innerHTML = `<span class="hint">Geen palen gevonden. Palen worden alleen herkend in een PDF-tekening waarin ze als rondjes getekend zijn, niet in een foto of screenshot.</span>`;
+    el.innerHTML = `<span class="hint">Geen palen of putten gevonden. Ze worden alleen herkend in een PDF-tekening waarin ze als rondjes getekend zijn, niet in een foto of screenshot.</span>`;
     return;
   }
-  el.innerHTML = `<span class="big">${piles.length} rondjes herkend</span>
-    <span class="hint">${pilesOn ? "Meestal palen, op een riolerings- of inrichtingstekening ook putten. Tik je vlak bij een rondje, dan klikt je punt vast op het hart. Bij een uitzetmaat zie je ook de maat vanaf het dichtstbijzijnde rondje. Zit het in de weg? Zet <b>Palen</b> uit." : "Palen staan uit: punten klikken niet vast."}</span>`;
+  el.innerHTML = `<span class="big">${piles.length} ${w.mv} herkend</span>
+    <div class="seg rkseg" role="group" aria-label="Wat zijn de rondjes"><button type="button" data-rk="palen" aria-pressed="${rkKey() === "palen"}">Palen</button><button type="button" data-rk="putten" aria-pressed="${rkKey() === "putten"}">Putten</button></div>
+    ${RK[st.rk] ? "" : `<span class="hint">Gegokt op het aantal rondjes. Klopt het niet, kies dan hierboven.</span>`}
+    <span class="hint">${pilesOn ? `Tik je vlak bij een ${w.ev}, dan klikt je punt vast op het hart. Bij een uitzetmaat zie je ook de maat vanaf de dichtstbijzijnde ${w.ev}. Zit het in de weg? Zet <b>${w.Mv}</b> uit.` : `${w.Mv} staan uit: punten klikken niet vast.`}</span>`;
 }
+$("pileinfo").addEventListener("click", e => {
+  const b = e.target.closest("[data-rk]"); if (!b) return;
+  st.rk = b.dataset.rk; save(); renderAll();
+});
 // Netto oppervlak (min wat ervan wordt afgetrokken) en lengte van een meting, in px² / px
 const netArea = it => areaOf(it) - st.items.filter(o => o.minus === it.id && o.type === "area").reduce((a, o) => a + areaOf(o), 0);
 const lenOf = it => it.type === "dist" ? d2(it.pts[0], it.pts[1]) : it.type === "poly" ? polyLen(it.pts) : 0;
@@ -1878,7 +1908,7 @@ function renderSums() {
     const sc = st.calib && st.calib.scale, N = pdfVp ? st.mmPerPx * 72 * pdfVp.scale / 25.4 : null;
     set("cal", `${sc ? "1:" + sc : N ? "±1:" + nl0(N) : "geijkt"}${N ? " · ±" + fmtMM(Math.max(0.25 * N, unit === "mm" ? 1 : 10)) : ""}`);
   }
-  set("pal", piles.length ? `${piles.length} rondjes` : "geen");
+  set("pal", piles.length ? `${piles.length} ${rk().mv}` : "geen");
   set("list", st.items.length ? `${st.items.length} meting${st.items.length === 1 ? "" : "en"}` : "");
   set("peil", st.pp && st.pp.length ? `${st.pp.length} peilpunt${st.pp.length === 1 ? "" : "en"}` : "");
   set("sand", st.sand && st.sand.pts.length ? `${st.sand.pts.length} peilmaten` : "");
@@ -2327,10 +2357,10 @@ function setImage(key, name, sample, auto) {
   // Automatische ijking, of een eerdere automatische ijking verversen (telefoon kan op een andere resolutie tekenen)
   if (!sample && auto && !st.noAuto && (!st.mmPerPx || (st.calib && st.calib.auto))) { applyAuto(auto); autoUsed = true; }
   if (sample) showBanner("<b>Voorbeeldtekening.</b> De ijking en metingen zijn voorbeelden. Open je eigen tekening met <b>Tekening openen</b>.");
-  else if (autoUsed && auto.scale) showBanner(`<b>${esc(name)}</b> geopend en <b>geijkt op schaal 1:${auto.scale}</b> (staat op de tekening). Meet ter controle een maat na die je kent.${piles.length ? ` ${piles.length} rondjes (palen of putten) herkend.` : ""}`, false, 8000);
-  else if (autoUsed) showBanner(`<b>${esc(name)}</b> geopend en <b>automatisch geijkt</b> op ${auto.n} maatlijnen (${auto.vals.slice(0, 5).join(", ")}${auto.vals.length > 5 ? ", …" : ""}).${piles.length ? ` ${piles.length} palen herkend.` : ""}`, false, 7000);
+  else if (autoUsed && auto.scale) showBanner(`<b>${esc(name)}</b> geopend en <b>geijkt op schaal 1:${auto.scale}</b> (staat op de tekening). Meet ter controle een maat na die je kent.${piles.length ? ` ${piles.length} ${rk().mv} herkend (palen of putten kies je bij ${rk().Mv}).` : ""}`, false, 8000);
+  else if (autoUsed) showBanner(`<b>${esc(name)}</b> geopend en <b>automatisch geijkt</b> op ${auto.n} maatlijnen (${auto.vals.slice(0, 5).join(", ")}${auto.vals.length > 5 ? ", …" : ""}).${piles.length ? ` ${piles.length} ${rk().mv} herkend.` : ""}`, false, 7000);
   else if (st.items.length || st.calib) showBanner(`<b>${esc(name)}</b> geopend. Eerdere ijking en metingen teruggezet.`, false, 5000);
-  else showBanner(`<b>${esc(name)}</b> geopend${piles.length ? `, ${piles.length} palen herkend` : ""}. Begin met <b>IJken</b>.`, false, 5000);
+  else showBanner(`<b>${esc(name)}</b> geopend${piles.length ? `, ${piles.length} ${rk().mv} herkend` : ""}. Begin met <b>IJken</b>.`, false, 5000);
   drawPiles();
   setTool(sample ? "pan" : (st.mmPerPx ? "dist" : "calib"));
   fit();
