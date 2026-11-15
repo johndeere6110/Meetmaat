@@ -842,33 +842,36 @@ function fillComponent(fc, i0) {
   }
   const byV = fc.byCol.get(col), seen = new Set([i0]), q = [i0];
   while (q.length) { const i = q.pop(); for (const k of F[i].k) for (const j of byV.get(k) || []) if (!seen.has(j)) { seen.add(j); q.push(j); } }
-  let apx = 0; const edges = new Map(), pt = new Map();
-  for (const i of seen) {
-    const f = F[i]; apx += polyArea(f.c);
-    f.k.forEach((k, j) => {
-      pt.set(k, f.c[j]);
-      const k2 = f.k[(j + 1) % f.k.length]; if (k === k2) return;
-      const e = k < k2 ? k + "|" + k2 : k2 + "|" + k;
-      edges.set(e, (edges.get(e) || 0) + 1);
-    });
-  }
-  // randen die maar bij één vulling horen vormen de omtrek; die aan elkaar knopen tot lussen
-  const adj = new Map();
-  // oneven aantal: rand (dubbel getekende driehoekjes heffen elkaar op)
-  for (const [e, n] of edges) if (n % 2 === 1) { const [a, b] = e.split("|"); (adj.get(a) || adj.set(a, []).get(a)).push(b); (adj.get(b) || adj.set(b, []).get(b)).push(a); }
-  const used = new Set(), loops = [];
-  for (const start of adj.keys()) {
-    if (used.has(start)) continue;
-    const loop = [start]; used.add(start); let prev = null, cur = start;
-    for (let n = 0; n < 200000; n++) {
-      const nxt = (adj.get(cur) || []).find(v => v !== prev && (!used.has(v) || (v === start && loop.length > 2)));
-      if (!nxt || nxt === start) break;
-      loop.push(nxt); used.add(nxt); prev = cur; cur = nxt;
+  // Oppervlak exact uit de vlakjes; de buitenrand via een onzichtbaar plaatje (werkt ook als vlakjes elkaar
+  // midden op een zijde raken), daarna langs de rand lopen (Moore-buren) en vereenvoudigen.
+  let apx = 0, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const i of seen) { const f = F[i]; apx += polyArea(f.c); x0 = Math.min(x0, f.bb[0]); y0 = Math.min(y0, f.bb[1]); x1 = Math.max(x1, f.bb[2]); y1 = Math.max(y1, f.bb[3]); }
+  const S = Math.min(4, 1600 / Math.max(1, x1 - x0, y1 - y0)), W = Math.ceil((x1 - x0) * S) + 4, H = Math.ceil((y1 - y0) * S) + 4;
+  const rc = document.createElement("canvas"); rc.width = W; rc.height = H;
+  const g = rc.getContext("2d"); g.fillStyle = g.strokeStyle = "#000"; g.lineWidth = 1; g.lineJoin = "round";
+  g.beginPath();
+  for (const i of seen) F[i].c.forEach((q, j) => { const X = (q.x - x0) * S + 2, Y = (q.y - y0) * S + 2; j ? g.lineTo(X, Y) : g.moveTo(X, Y); if (j === F[i].c.length - 1) g.closePath(); });
+  g.fill("nonzero"); g.stroke();
+  const px = g.getImageData(0, 0, W, H).data, on = (x, y) => x >= 0 && y >= 0 && x < W && y < H && px[(y * W + x) * 4 + 3] > 127;
+  let sx = -1, sy = -1;
+  for (let y = 0; y < H && sx < 0; y++) for (let x = 0; x < W; x++) if (on(x, y)) { sx = x; sy = y; break; }
+  let outer = null;
+  if (sx >= 0) {
+    const D = [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1]];
+    const ring = [[sx, sy]]; let cx = sx, cy = sy, bx = sx - 1, by = sy;
+    for (let n = 0; n < W * H * 4; n++) {
+      let k0 = Math.max(0, D.findIndex(d => cx + d[0] === bx && cy + d[1] === by)), found = false;
+      for (let k = 1; k <= 8; k++) {
+        const d = D[(k0 + k) % 8], nx = cx + d[0], ny = cy + d[1];
+        if (on(nx, ny)) { const pd = D[(k0 + k - 1) % 8]; bx = cx + pd[0]; by = cy + pd[1]; cx = nx; cy = ny; found = true; break; }
+      }
+      if (!found || (cx === sx && cy === sy)) break;
+      ring.push([cx, cy]);
     }
-    if (loop.length > 2) loops.push(loop.map(k => pt.get(k)));
+    if (ring.length > 3) outer = simplify(ring.map(([x, y]) => ({ x: x0 + (x + 0.5 - 2) / S, y: y0 + (y + 0.5 - 2) / S })), Math.max(0.2, 0.8 / S));
   }
-  loops.sort((a, b) => polyArea(b) - polyArea(a));
-  return { col, apx, outer: loops[0] || null, holes: loops.length - 1, n: seen.size };
+  const outerA = outer ? polyArea(outer) : 0;
+  return { col, apx, outer, holes: outerA - apx > Math.max(50, apx * 0.01) ? 1 : 0, n: seen.size, outerA };
 }
 function simplify(pts, tol) {          // Douglas-Peucker op een gesloten lus
   if (pts.length < 4) return pts;
@@ -1009,9 +1012,10 @@ async function pickFill(p) {
       const pts = simplify(comp.outer, 0.3);
       const count = st.items.filter(x => x.type === "area").length + 1;
       const it = { id: st.seq++, type: "area", pts, name: `Vlak ${count}`, apx: comp.apx };
+      if (comp.holes && comp.outerA - comp.apx > minPx) it.apxOuter = comp.outerA;
       autoName(it);
       st.items.push(it); sel = it.id; save(); renderAll();
-      toast(`Vlak overgenomen: ${fmtArea(comp.apx)}${comp.holes ? ` (${comp.holes} gat${comp.holes > 1 ? "en" : ""} niet meegeteld)` : ""}`);
+      toast(`Vlak overgenomen: ${fmtArea(comp.apx)}${it.apxOuter ? `, met de vlakken erin ${fmtArea(it.apxOuter)}` : ""}`);
       return;
     }
     flashHint("Geen gekleurd vlak gevonden op die plek. Tik midden in een gekleurd vlak, niet op een lijn of tekst.");
@@ -1295,7 +1299,7 @@ function describe(it) {
   }
   if (it.type === "area") {
     const A = it.apx != null ? it.apx : polyArea(it.pts);
-    const r = { main: fmtArea(A), sub: `${it.apx != null ? "uit de tekening · " : ""}omtrek ${fmtLen(polyLen(it.pts, true))}`, short: fmtArea(A) };
+    const r = { main: fmtArea(A), sub: `${it.apx != null ? "uit de tekening · " : ""}${it.apxOuter ? `met de vlakken erin (andere kleur) ${fmtArea(it.apxOuter)} · ` : ""}omtrek ${fmtLen(polyLen(it.pts, true))}`, short: fmtArea(A) };
     const ref = pdfAreas[normCode(it.name)];
     if (ref != null && st.mmPerPx) {
       const m2 = A * st.mmPerPx ** 2 / 1e6, dv = m2 - ref, pct = dv / ref * 100;
@@ -1825,7 +1829,7 @@ function moveHandle(h, p0, shift) {
     const it = st.items.find(x => x.id === +id); if (!it) return;
     const kk = +j, ref = it.pts[kk - 1] || it.pts[kk + 1];
     it.pts[kk] = o && ref && p === p0 ? constrain(p, ref) : p;
-    delete it.apx;
+    delete it.apx; delete it.apxOuter;
   }
   scheduleOverlay();
 }
