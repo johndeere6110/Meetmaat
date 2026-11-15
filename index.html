@@ -1032,6 +1032,10 @@ async function pickFill(p) {
         const ic = fillComponent(fc, j); ic.members.forEach(m => done.add(m));
         if (ic.apx < minInner || !ic.outer) continue;
         if (![...ic.members].every(m => F[m].c.every(v => inPoly(v, ob)))) continue;
+        // raakt het de rand (band, strook, kantopsluiting langs de rand)? Dan hoort het bij de rand en blijft het erbij
+        const edgeTol = st.mmPerPx ? Math.max(1.5, 300 / st.mmPerPx) : 2;
+        const segD = (q, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((q.x - a.x) * dx + (q.y - a.y) * dy) / L)); return Math.hypot(q.x - a.x - t * dx, q.y - a.y - t * dy); };
+        if (ic.outer.some(q => ob.some((a, k) => segD(q, a, ob[(k + 1) % ob.length]) < edgeTol))) continue;
         // erop (aftrekken) als het basisvlak onder dit vlak doorloopt; anders is het een gat dat al niet meetelt
         const ip = innerPoint(ic.outer);
         const under = [...comp.members].some(m => { const b = F[m].bb; return ip.x >= b[0] && ip.x <= b[2] && ip.y >= b[1] && ip.y <= b[3] && inPoly(ip, F[m].c); });
