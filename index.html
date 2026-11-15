@@ -881,6 +881,120 @@ function simplify(pts, tol) {          // Douglas-Peucker op een gesloten lus
   let far = 1, fd = 0; for (let i = 1; i < pts.length; i++) { const d = d2(pts[0], pts[i]); if (d > fd) { fd = d; far = i; } }
   return [...dps(0, far).slice(0, -1), ...dps(far, ring.length - 1).slice(0, -1)];
 }
+// Lijnen (CAD-vectoren) uit de PDF, compact opgeslagen; pas bij de eerste keer volgen ingelezen
+let strokeCache = null;
+async function loadStrokes() {
+  if (strokeCache && strokeCache.page === pdfPage) return strokeCache;
+  const page = pdfPage, O = pdfjsLib.OPS, list = await page.getOperatorList();
+  const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+  const xy = [], start = [], sty = [], styles = new Map(), grid = new Map(), G = 2;
+  let ctm = [1, 0, 0, 1, 0, 0], col = "", lw = 1, pending = null; const stack = [];
+  const styleId = () => { const k = col + "/" + lw; if (!styles.has(k)) styles.set(k, styles.size); return styles.get(k); };
+  const gkey = (x, y) => Math.floor(x / G) * 100000 + Math.floor(y / G);
+  for (let i = 0; i < list.fnArray.length; i++) {
+    const fn = list.fnArray[i], a = list.argsArray[i];
+    if (fn === O.save) stack.push([ctm, col, lw]);
+    else if (fn === O.restore) { const q = stack.pop(); if (q) [ctm, col, lw] = q; }
+    else if (fn === O.transform) ctm = mul(ctm, a);
+    else if (fn === O.setStrokeRGBColor || fn === O.setStrokeColor || fn === O.setStrokeGray || fn === O.setStrokeCMYKColor) col = Array.from(a || []).join(",");
+    else if (fn === O.setLineWidth) lw = a[0];
+    else if (fn === O.setGState) { for (const [k, v] of a[0] || []) if (k === "LW") lw = v; }
+    else if (fn === O.paintFormXObjectBegin) { stack.push([ctm, col, lw]); if (a && a[0]) ctm = mul(ctm, a[0]); }
+    else if (fn === O.paintFormXObjectEnd) { const q = stack.pop(); if (q) [ctm, col, lw] = q; }
+    else if (fn === O.constructPath) {
+      const ops = a[0], c = a[1]; let ci = 0, cur = null; const subs = [];
+      const P = (x, y) => [ctm[0] * x + ctm[2] * y + ctm[4], ctm[1] * x + ctm[3] * y + ctm[5]];
+      const bez = (p0, p1, p2, p3) => { for (let t = 1; t <= 8; t++) { const u = t / 8, v = 1 - u; cur.push([v * v * v * p0[0] + 3 * v * v * u * p1[0] + 3 * v * u * u * p2[0] + u * u * u * p3[0], v * v * v * p0[1] + 3 * v * v * u * p1[1] + 3 * v * u * u * p2[1] + u * u * u * p3[1]]); } };
+      for (const op of ops) {
+        if (op === O.moveTo) { cur = [P(c[ci], c[ci + 1])]; subs.push(cur); ci += 2; }
+        else if (op === O.lineTo) { if (cur) cur.push(P(c[ci], c[ci + 1])); ci += 2; }
+        else if (op === O.curveTo) { if (cur) bez(cur[cur.length - 1], P(c[ci], c[ci + 1]), P(c[ci + 2], c[ci + 3]), P(c[ci + 4], c[ci + 5])); ci += 6; }
+        else if (op === O.curveTo2) { if (cur) { const p0 = cur[cur.length - 1]; bez(p0, p0, P(c[ci], c[ci + 1]), P(c[ci + 2], c[ci + 3])); } ci += 4; }
+        else if (op === O.curveTo3) { if (cur) { const p0 = cur[cur.length - 1], p3 = P(c[ci + 2], c[ci + 3]); bez(p0, P(c[ci], c[ci + 1]), p3, p3); } ci += 4; }
+        else if (op === O.closePath) { if (cur && cur.length > 1) cur.push(cur[0]); }
+        else if (op === O.rectangle) { const [x, y, w, h] = [c[ci], c[ci + 1], c[ci + 2], c[ci + 3]]; subs.push([P(x, y), P(x + w, y), P(x + w, y + h), P(x, y + h), P(x, y)]); ci += 4; cur = null; }
+      }
+      pending = subs;
+    } else if ((fn === O.stroke || fn === O.closeStroke) && pending) {       // alleen echte lijnen, geen randjes van vulvlakken
+      const sid = styleId();
+      for (const sp of pending) {
+        if (sp.length < 2) continue;
+        const si = start.length; start.push(xy.length); sty.push(sid);
+        for (const q of sp) xy.push(q[0], q[1]);
+        for (const q of [sp[0], sp[sp.length - 1]]) { const k = gkey(q[0], q[1]); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(si); }
+      }
+      pending = null;
+    } else if (fn === O.endPath || fn === O.fill || fn === O.eoFill || fn === O.fillStroke || fn === O.eoFillStroke || fn === O.closeFillStroke || fn === O.closeEOFillStroke) pending = null;
+  }
+  start.push(xy.length);
+  strokeCache = { page, xy: Float64Array.from(xy), start: Int32Array.from(start), sty: Int32Array.from(sty), grid, G };
+  return strokeCache;
+}
+// Op een lijn tikken: de lijn volgen over aansluitende stukken (zelfde stijl, rechtdoor), dubbele stukken overslaan
+function followLine(sc, p, maxD) {
+  const { xy, start, sty, grid, G } = sc, nS = start.length - 1;
+  const segPts = i => { const out = []; for (let j = start[i]; j < start[i + 1]; j += 2) out.push([xy[j], xy[j + 1]]); return out; };
+  const sd = (q, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L)); return Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy); };
+  let best = -1, bd = maxD;
+  for (let i = 0; i < nS; i++) {
+    for (let j = start[i] + 2; j < start[i + 1]; j += 2) {
+      const ax = xy[j - 2], ay = xy[j - 1], bx = xy[j], by = xy[j + 1];
+      if (p[0] < Math.min(ax, bx) - bd || p[0] > Math.max(ax, bx) + bd || p[1] < Math.min(ay, by) - bd || p[1] > Math.max(ay, by) + bd) continue;
+      const d = sd(p, [ax, ay], [bx, by]); if (d < bd) { bd = d; best = i; }
+    }
+  }
+  if (best < 0) return null;
+  const tol = 0.7, dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const around = q => { const out = new Set(), cx = Math.floor(q[0] / G), cy = Math.floor(q[1] / G); for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const i of grid.get((cx + dx) * 100000 + cy + dy) || []) out.add(i); return out; };
+  // handtekening van een stuk, los van de tekenrichting: beide eindpunten + gemiddelde van alle punten
+  const sig = v => { const a = v[0], b = v[v.length - 1]; let mx = 0, my = 0; v.forEach(q => { mx += q[0]; my += q[1]; }); return [a, b].map(q => Math.round(q[0] * 5) + "," + Math.round(q[1] * 5)).sort().join("|") + "|" + Math.round(mx / v.length * 2) + "," + Math.round(my / v.length * 2); };
+  const v0 = segPts(best), st0 = sty[best], used = new Set([best]), usedSig = new Set([sig(v0)]);
+  let pts = v0;
+  const dirAt = (arr, atEnd) => { const n = arr.length; const a = atEnd ? arr[n - 1] : arr[0]; let j = atEnd ? n - 2 : 1, b = arr[j]; while (dist(a, b) < 0.3 && j > 0 && j < n - 1) { j += atEnd ? -1 : 1; b = arr[j]; } return [a[0] - b[0], a[1] - b[1]]; };
+  const isClosed = () => pts.length > 3 && dist(pts[0], pts[pts.length - 1]) < tol;
+  for (const dir of [1, -1]) {
+    for (let n = 0; n < 5000 && !isClosed(); n++) {
+      const end = dir > 0 ? pts[pts.length - 1] : pts[0], d0 = dirAt(pts, dir > 0);
+      let pick = null, bs = 1e9;
+      for (const i of around(end)) {
+        if (used.has(i)) continue;
+        let v = segPts(i); const sg = sig(v);              // handtekening vóór het omdraaien
+        if (usedSig.has(sg)) continue;
+        if (dist(v[0], end) < tol) {} else if (dist(v[v.length - 1], end) < tol) v = v.reverse(); else continue;
+        const k = Math.min(1, v.length - 1), d1 = [v[k][0] - v[0][0], v[k][1] - v[0][1]];
+        const cos = (d0[0] * d1[0] + d0[1] * d1[1]) / ((Math.hypot(...d0) * Math.hypot(...d1)) || 1);
+        const turn = Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
+        const score = turn + (sty[i] === st0 ? 0 : 40) + dist(v[0], end) * 10;
+        if (turn < 60 && score < bs) { bs = score; pick = { i, v, sg }; }
+      }
+      if (!pick) break;
+      used.add(pick.i); usedSig.add(pick.sg);
+      pts = dir > 0 ? pts.concat(pick.v.slice(1)) : pick.v.slice(1).reverse().concat(pts);
+    }
+  }
+  return { pts, closed: isClosed(), pieces: used.size };
+}
+async function pickLine(p, asArea) {
+  if (!pdfPage) { flashHint("Lijn uit tekening werkt alleen bij een PDF."); return; }
+  $("loading").hidden = false;
+  try {
+    const sc = await loadStrokes(), pp = pdfVp.convertToPdfPoint(p.x, p.y);
+    const r = followLine(sc, pp, 10 / T.s / pdfVp.scale);
+    if (!r) { flashHint("Geen lijn gevonden op die plek. Tik precies op een lijn (zoom flink in)."); return; }
+    let pts = r.pts.map(q => { const v = pdfVp.convertToViewportPoint(q[0], q[1]); return { x: v[0], y: v[1] }; });
+    if (r.closed) pts.pop();
+    const exactA = r.closed ? polyArea(pts) : null, exactL = polyLen(pts, r.closed);
+    pts = r.closed ? simplify(pts, 0.2) : pts.filter((q, i) => i === 0 || i === pts.length - 1 || d2(q, pts[i - 1]) > 0.2);
+    const type = asArea && r.closed ? "area" : "poly";
+    const count = st.items.filter(x => x.type === type).length + 1;
+    const it = { id: st.seq++, type, pts, name: `${type === "area" ? "Vlak" : "Lijn"} ${count}` };
+    if (type === "area") it.apx = exactA;
+    autoName(it);
+    st.items.push(it); sel = it.id; save(); renderAll();
+    toast(type === "area" ? `Lijn rond gevolgd: ${fmtArea(exactA)}, omtrek ${fmtLen(exactL)}`
+      : `${asArea ? "Lijn is niet rond, daarom als lengte: " : "Lijn gevolgd: "}${fmtLen(exactL)} (${r.pieces} stukken). Klopt de lijn niet? Wis hem met ✕.`);
+  } finally { $("loading").hidden = true; }
+}
 async function pickFill(p) {
   if (!pdfPage) { flashHint("Vlak uit tekening werkt alleen bij een PDF."); return; }
   $("loading").hidden = false;
@@ -1462,6 +1576,7 @@ const HINTS = {
   set: "Uitzetmaat: tik een punt. Je krijgt de maat in X (naar rechts) en Y (naar boven) vanaf het nulpunt, en vanaf de dichtstbijzijnde paal.",
   ppick: "Tik de plek van het peilpunt, bijvoorbeeld de balk of kolom.",
   fpick: "Vlak uit tekening: tik midden in een gekleurd vlak, dan neemt de app dat vlak exact over uit de PDF.",
+  lpick: "Lijn uit tekening: tik precies op een lijn (zoom flink in). De app volgt de lijn; is hij rond, dan krijg je ook het oppervlak.",
   peil: "Peilmaat: tik een vakje en vul de diepte onder 0-peil in (cm). Bij palen springt het punt naar het midden van 4 palen. Tik een bestaand punt om het te wijzigen."
 };
 const VZ_HINTS = {
@@ -1473,6 +1588,7 @@ const VZ_HINTS = {
   set: "Kruisje op het punt dat je wilt uitzetten, druk op + Punt. Je krijgt X en Y vanaf het nulpunt en de dichtstbijzijnde paal.",
   ppick: "Kruisje op de plek van het peilpunt, druk op + Punt.",
   fpick: "Kruisje midden in een gekleurd vlak, druk op + Punt. De app neemt dat vlak exact over uit de PDF.",
+  lpick: "Kruisje precies op een lijn (zoom flink in), druk op + Punt. De app volgt de lijn.",
   peil: "Kruisje in een vakje, druk op + Punt en vul de diepte onder 0-peil in (cm). Bij palen springt het punt naar het midden van 4 palen."
 };
 function updateHint() {
@@ -1485,12 +1601,22 @@ function updateHint() {
   if (tool === "set" && !st.origin) t = "Zet eerst een nulpunt met het gereedschap Nulpunt.";
   if (MEASURE_TOOLS.includes(tool) && !st.mmPerPx) t += " Let op: nog niet geijkt, maten staan in pixels.";
   h.textContent = t;
-  if ((tool === "area" && !draft.length || tool === "fpick") && pdfPage) {
-    const b = document.createElement("button"); b.type = "button"; b.className = "ghost hintbtn"; b.id = "fillPick";
-    b.textContent = tool === "fpick" ? "Annuleren" : "Vlak uit tekening"; h.appendChild(b);
+  if (pdfPage && !draft.length) {
+    const add = (id, txt) => { const b = document.createElement("button"); b.type = "button"; b.className = "ghost hintbtn"; b.id = id; b.textContent = txt; h.appendChild(b); };
+    if (tool === "fpick" || tool === "lpick") add("pickCancel", "Annuleren");
+    else {
+      if (tool === "poly" || tool === "area") add("linePick", "Lijn uit tekening");
+      if (tool === "area") add("fillPick", "Vlak uit tekening");
+    }
   }
 }
-$("hint").addEventListener("click", e => { if (e.target.id === "fillPick") setTool(tool === "fpick" ? "area" : "fpick"); });
+let lpickBack = "poly";
+$("hint").addEventListener("click", e => {
+  const id = e.target.id;
+  if (id === "fillPick") setTool("fpick");
+  else if (id === "linePick") { lpickBack = tool; setTool("lpick"); }
+  else if (id === "pickCancel") setTool(tool === "lpick" ? lpickBack : "area");
+});
 function flashHint(t) { const h = $("hint"); h.textContent = t; h.classList.add("flash"); }
 // Melding bovenin de tekening, zodat hij ook op een telefoon zonder scrollen te zien is
 function showBanner(html, err, hideMs) {
@@ -1665,6 +1791,7 @@ function onTap(p0, g, shift) {
     save(); openPeil(st.sand.pts.length - 1); return;
   }
   if (tool === "fpick") { setTool("area"); pickFill(p0); return; }
+  if (tool === "lpick") { setTool(lpickBack); pickLine(p0, lpickBack === "area"); return; }
   if (tool === "ppick") {
     ppPending = snap(p0); setTool(ppPrevTool || "pan"); renderPeil(); drawOverlay();
     toast("Plek gekozen"); $("ppSave").scrollIntoView({ block: "center", behavior: "smooth" }); return;
@@ -1962,7 +2089,7 @@ async function renderPdfPage() {
     try { const r = await extractPiles(page, vp); setPiles(r.list, r.r); } catch (e) { setPiles([], 0); }
     let auto = null;
     try { auto = await autoScale(page, vp); } catch (e) { auto = null; }
-    pdfVp = vp; pdfPage = page; fillCache = null;
+    pdfVp = vp; pdfPage = page; fillCache = null; strokeCache = null;
     try { await readPdfTable(page, vp); } catch (e) { pdfAreas = {}; codeLabels = []; }
     if (!auto) { try { const sc = await scaleFromText(page); if (sc) auto = scaleCal(sc.scale, vp, sc.others); } catch (e) {} }
     setImage(`${fileMeta.name}|${fileMeta.size}|p${pageNo}`, fileMeta.name + (pdfDoc.numPages > 1 ? ` · blad ${pageNo}` : ""), false, auto);
@@ -1985,7 +2112,7 @@ async function openFile(f, fromStore) {
       sel.hidden = pdfDoc.numPages < 2;
       await renderPdfPage();
     } else {
-      pdfDoc = null; pdfVp = null; pdfPage = null; fillCache = null; pdfAreas = {}; codeLabels = []; hideSharp(); $("page").hidden = true;
+      pdfDoc = null; pdfVp = null; pdfPage = null; fillCache = null; strokeCache = null; pdfAreas = {}; codeLabels = []; hideSharp(); $("page").hidden = true;
       const url = URL.createObjectURL(f);
       const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("Dit bestand kan niet als afbeelding worden geopend.")); i.src = url; });
       const s = Math.min(1, canvasLimits(im.naturalWidth, im.naturalHeight));

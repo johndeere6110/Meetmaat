@@ -12,6 +12,7 @@ Bouwtekening openen, ijken en maten aflezen voor uitzetten in het werk. Werkt op
 - **Palen en putten:** in een PDF worden de rondjes herkend (palen, op een rioleringsplan ook putten). Punten klikken vast op het hart.
 - **Meten:** Afstand (2 punten), Lengte (route met bochten, bijv. een sleuf), Oppervlak.
 - **Vlak uit tekening** (bij Oppervlak, PDF): tik midden in een gekleurd vlak en de app neemt dat vlak exact over uit de PDF (de vulling zelf, met omtrek).
+- **Lijn uit tekening** (bij Lengte en Oppervlak, PDF): tik precies op een CAD-lijn; de app volgt de lijn over aansluitende stukken en bogen. Loopt hij rond, dan krijg je bij Oppervlak ook het oppervlak. Bij splitsingen of onderbroken lijnen kan hij te vroeg stoppen of een zijpad in gaan: je ziet het resultaat op de tekening.
 - **Oppervlaktetabel:** staat er op de tekening een tabel als "BOS-02-B … 5671 m2", dan krijgt een gemeten vlak rond zo'n label vanzelf die naam en zie je hoeveel je meting afwijkt van de tekening. Een naam uit de tabel kun je ook zelf kiezen.
 - **Uitzetten:** zet een nulpunt (bijv. op een paal) en tik punten aan. Je krijgt X (naar rechts) en Y (naar boven) vanaf het nulpunt én vanaf de dichtstbijzijnde paal.
 - **Zand:** kies een vloerveld (een Oppervlak), zet peilmaten in de paalvakken (één tik per vak, of in één keer "Vakjes tussen palen maken" en je rij metingen invullen of inspreken). Met beton, isolatie, goot en inklinken krijg je m³, tonnen en vrachten, plus een hoogtekaart op de tekening. Elk stukje vloer telt met de dichtstbijzijnde peilmaat.
