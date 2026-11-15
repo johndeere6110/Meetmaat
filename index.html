@@ -216,6 +216,10 @@ input[type="number"], input[type="text"], .nm {
 .pplist .ppm { font-size: 12px; color: var(--muted); }
 .pplist .btns button { padding: 6px 10px; font-size: 13px; }
 .ppres:empty { display: none; }
+#list .cmp { font-size: 13px; margin-top: 4px; padding: 3px 8px; border-left: 3px solid var(--ok); background: var(--bg); border-radius: 0 4px 4px 0; }
+#list .cmp.warn { border-left-color: var(--accent); } #list .cmp.bad { border-left-color: var(--warn); }
+#list .cmp b { font-family: var(--mono); }
+.hintbar .hintbtn { margin-left: 8px; padding: 4px 10px; font-size: 13px; vertical-align: baseline; }
 .ppres.bad { border-left-color: var(--warn); } .ppres.warn { border-left-color: var(--accent); }
 .ppres .hint, .ppset .hint { display: block; margin-top: 2px; }
 .ppset { font-size: 16px; line-height: 1.4; background: var(--bg); border: 2px solid var(--accent); border-radius: 6px; padding: 10px 12px; }
@@ -343,6 +347,7 @@ input[type="number"], input[type="text"], .nm {
       <div class="calinfo" id="pileinfo"></div>
       <h2>Metingen</h2>
       <ol id="list"></ol>
+      <datalist id="codelist"></datalist>
       <div class="btns">
         <button type="button" id="copy">Kopieer lijst</button>
         <button type="button" class="ghost" id="clearall">Alles wissen</button>
@@ -757,6 +762,148 @@ function inPoly(p, poly) {
   }
   return ins;
 }
+/* ---------- Gegevens uit de PDF: oppervlaktetabel en gekleurde vlakken ---------- */
+let pdfAreas = {}, codeLabels = [], fillCache = null;
+const CODE_RE = /^[A-Z]{2,6}[- ]?\d{1,3}(?:[-.][A-Z0-9]{1,3})?$/;          // BOS-02-B, VAK-3, P-12.A
+const normCode = s => String(s || "").trim().toUpperCase();
+// Tabel "BOS-02-B ... 5671 m2": elk oppervlak koppelen aan de code die er recht naast/boven staat
+async function readPdfTable(page, vp) {
+  pdfAreas = {}; codeLabels = [];
+  const tc = await page.getTextContent();
+  const items = tc.items.map(t => {
+    const [a, b] = t.transform, n = Math.hypot(a, b) || 1;
+    return { s: (t.str || "").trim(), x: t.transform[4], y: t.transform[5], cx: t.transform[4] + a / n * t.width / 2, cy: t.transform[5] + b / n * t.width / 2 };
+  });
+  const codes = items.filter(t => CODE_RE.test(normCode(t.s)));
+  const areas = items.map(t => { const m = /^(\d+(?:[.,]\d+)?)\s*m(?:2|²)$/i.exec(t.s); return m ? { ...t, v: +m[1].replace(",", ".") } : null; }).filter(Boolean);
+  for (const a of areas) {
+    let best = null, bd = 160;
+    for (const c of codes) {
+      const dx = Math.abs(c.x - a.x), dy = Math.abs(c.y - a.y), d = Math.min(dx, dy) < 2 ? Math.max(dx, dy) : Infinity;
+      if (d < bd) { bd = d; best = c; }
+    }
+    if (best && pdfAreas[normCode(best.s)] == null) pdfAreas[normCode(best.s)] = a.v;
+  }
+  codeLabels = codes.filter(c => pdfAreas[normCode(c.s)] != null).map(c => { const q = vp.convertToViewportPoint(c.cx, c.cy); return { code: normCode(c.s), x: q[0], y: q[1] }; });
+  $("codelist").innerHTML = Object.keys(pdfAreas).sort().map(c => `<option value="${esc(c)}">${nl0(pdfAreas[c])} m²</option>`).join("");
+}
+// Een getekend vlak met een standaardnaam krijgt de code van het label dat erin ligt
+function autoName(it) {
+  if (it.type !== "area" || !/^(Oppervlak|Vlak) \d+$/.test(it.name)) return;
+  const c = codeLabels.find(l => inPoly(l, it.pts));
+  if (c) it.name = c.code;
+}
+// Gekleurde vlakken (vullingen) uit de PDF, in canvascoördinaten; pas bij de eerste keer kiezen ingelezen
+async function loadFills() {
+  if (fillCache && fillCache.page === pdfPage) return fillCache;
+  const page = pdfPage, vp = pdfVp, O = pdfjsLib.OPS, list = await page.getOperatorList();
+  const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+  const FILL = new Set([O.fill, O.eoFill, O.fillStroke, O.eoFillStroke, O.closeFillStroke, O.closeEOFillStroke]);
+  let ctm = [1, 0, 0, 1, 0, 0], col = "", pending = null; const stack = [], fills = [];
+  for (let i = 0; i < list.fnArray.length; i++) {
+    const fn = list.fnArray[i], a = list.argsArray[i];
+    if (fn === O.save) stack.push([ctm, col]);
+    else if (fn === O.restore) { const q = stack.pop(); if (q) [ctm, col] = q; }
+    else if (fn === O.transform) ctm = mul(ctm, a);
+    else if (fn === O.setFillRGBColor || fn === O.setFillColor || fn === O.setFillGray || fn === O.setFillCMYKColor) col = Array.from(a || []).join(",");
+    else if (fn === O.paintFormXObjectBegin) { stack.push([ctm, col]); if (a && a[0]) ctm = mul(ctm, a[0]); }
+    else if (fn === O.paintFormXObjectEnd) { const q = stack.pop(); if (q) [ctm, col] = q; }
+    else if (fn === O.constructPath) {
+      const ops = a[0], c = a[1]; let ci = 0, cur = null; const subs = [];
+      const P = (x, y) => [ctm[0] * x + ctm[2] * y + ctm[4], ctm[1] * x + ctm[3] * y + ctm[5]];
+      for (const op of ops) {
+        if (op === O.moveTo) { cur = [P(c[ci], c[ci + 1])]; subs.push(cur); ci += 2; }
+        else if (op === O.lineTo) { if (cur) cur.push(P(c[ci], c[ci + 1])); ci += 2; }
+        else if (op === O.curveTo) { if (cur) cur.push(P(c[ci + 4], c[ci + 5])); ci += 6; }
+        else if (op === O.curveTo2 || op === O.curveTo3) { if (cur) cur.push(P(c[ci + 2], c[ci + 3])); ci += 4; }
+        else if (op === O.rectangle) { const [x, y, w, h] = [c[ci], c[ci + 1], c[ci + 2], c[ci + 3]]; subs.push([P(x, y), P(x + w, y), P(x + w, y + h), P(x, y + h)]); ci += 4; cur = null; }
+      }
+      pending = subs;
+    } else if (FILL.has(fn) && pending) {
+      for (const sp of pending) {
+        if (sp.length < 3) continue;
+        const cv = sp.map(q => { const v = vp.convertToViewportPoint(q[0], q[1]); return { x: v[0], y: v[1] }; });
+        const xs = cv.map(q => q.x), ys = cv.map(q => q.y);
+        fills.push({ col, k: sp.map(q => Math.round(q[0] * 20) + "," + Math.round(q[1] * 20)), c: cv, bb: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] });
+      }
+      pending = null;
+    } else if (fn === O.stroke || fn === O.closeStroke || fn === O.endPath) pending = null;
+  }
+  fillCache = { page, fills, byCol: new Map() };
+  return fillCache;
+}
+// Aaneengesloten vlak van dezelfde kleur (vullingen die hoekpunten delen) met buitenrand en oppervlak
+function fillComponent(fc, i0) {
+  const F = fc.fills, col = F[i0].col;
+  if (!fc.byCol.has(col)) {
+    const m = new Map();
+    F.forEach((f, i) => { if (f.col === col) f.k.forEach(k => { if (!m.has(k)) m.set(k, []); m.get(k).push(i); }); });
+    fc.byCol.set(col, m);
+  }
+  const byV = fc.byCol.get(col), seen = new Set([i0]), q = [i0];
+  while (q.length) { const i = q.pop(); for (const k of F[i].k) for (const j of byV.get(k) || []) if (!seen.has(j)) { seen.add(j); q.push(j); } }
+  let apx = 0; const edges = new Map(), pt = new Map();
+  for (const i of seen) {
+    const f = F[i]; apx += polyArea(f.c);
+    f.k.forEach((k, j) => {
+      pt.set(k, f.c[j]);
+      const k2 = f.k[(j + 1) % f.k.length]; if (k === k2) return;
+      const e = k < k2 ? k + "|" + k2 : k2 + "|" + k;
+      edges.set(e, (edges.get(e) || 0) + 1);
+    });
+  }
+  // randen die maar bij één vulling horen vormen de omtrek; die aan elkaar knopen tot lussen
+  const adj = new Map();
+  // oneven aantal: rand (dubbel getekende driehoekjes heffen elkaar op)
+  for (const [e, n] of edges) if (n % 2 === 1) { const [a, b] = e.split("|"); (adj.get(a) || adj.set(a, []).get(a)).push(b); (adj.get(b) || adj.set(b, []).get(b)).push(a); }
+  const used = new Set(), loops = [];
+  for (const start of adj.keys()) {
+    if (used.has(start)) continue;
+    const loop = [start]; used.add(start); let prev = null, cur = start;
+    for (let n = 0; n < 200000; n++) {
+      const nxt = (adj.get(cur) || []).find(v => v !== prev && (!used.has(v) || (v === start && loop.length > 2)));
+      if (!nxt || nxt === start) break;
+      loop.push(nxt); used.add(nxt); prev = cur; cur = nxt;
+    }
+    if (loop.length > 2) loops.push(loop.map(k => pt.get(k)));
+  }
+  loops.sort((a, b) => polyArea(b) - polyArea(a));
+  return { col, apx, outer: loops[0] || null, holes: loops.length - 1, n: seen.size };
+}
+function simplify(pts, tol) {          // Douglas-Peucker op een gesloten lus
+  if (pts.length < 4) return pts;
+  const ring = [...pts, pts[0]];
+  const dps = (a, b) => {
+    let md = 0, mi = -1; const A = ring[a], B = ring[b], dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1;
+    for (let i = a + 1; i < b; i++) { const d = Math.abs((ring[i].x - A.x) * dy - (ring[i].y - A.y) * dx) / L; if (d > md) { md = d; mi = i; } }
+    return md > tol ? [...dps(a, mi).slice(0, -1), ...dps(mi, b)] : [A, B];
+  };
+  let far = 1, fd = 0; for (let i = 1; i < pts.length; i++) { const d = d2(pts[0], pts[i]); if (d > fd) { fd = d; far = i; } }
+  return [...dps(0, far).slice(0, -1), ...dps(far, ring.length - 1).slice(0, -1)];
+}
+async function pickFill(p) {
+  if (!pdfPage) { flashHint("Vlak uit tekening werkt alleen bij een PDF."); return; }
+  $("loading").hidden = false;
+  try {
+    const fc = await loadFills(), F = fc.fills, minPx = 300;
+    for (let i = F.length - 1; i >= 0; i--) {
+      const f = F[i];
+      if (p.x < f.bb[0] || p.x > f.bb[2] || p.y < f.bb[1] || p.y > f.bb[3] || !inPoly(p, f.c)) continue;
+      if (/^255,255,255$|^1$/.test(f.col)) continue;                     // wit is achtergrond
+      const comp = fillComponent(fc, i);
+      if (comp.apx < minPx || !comp.outer) continue;
+      const pts = simplify(comp.outer, 0.3);
+      const count = st.items.filter(x => x.type === "area").length + 1;
+      const it = { id: st.seq++, type: "area", pts, name: `Vlak ${count}`, apx: comp.apx };
+      autoName(it);
+      st.items.push(it); sel = it.id; save(); renderAll();
+      toast(`Vlak overgenomen: ${fmtArea(comp.apx)}${comp.holes ? ` (${comp.holes} gat${comp.holes > 1 ? "en" : ""} niet meegeteld)` : ""}`);
+      return;
+    }
+    flashHint("Geen gekleurd vlak gevonden op die plek. Tik midden in een gekleurd vlak, niet op een lijn of tekst.");
+  } finally { $("loading").hidden = true; }
+}
+
 const sandArea = () => st.sand && st.items.find(i => i.id === st.sand.area && i.type === "area");
 function ptSpacing(pts) {
   const cc = piles.length ? cellCenters() : null;
@@ -1033,7 +1180,15 @@ function describe(it) {
     return { main: fmtLen(L), sub: `${it.pts.length - 1} ${it.pts.length === 2 ? "stuk" : "stukken"}${st.mmPerPx && unit !== "m" ? ` · ${nl(L * st.mmPerPx / 1000, 2)} m` : ""}`, short: fmtLen(L) };
   }
   if (it.type === "area") {
-    return { main: fmtArea(polyArea(it.pts)), sub: `omtrek ${fmtLen(polyLen(it.pts, true))}`, short: fmtArea(polyArea(it.pts)) };
+    const A = it.apx != null ? it.apx : polyArea(it.pts);
+    const r = { main: fmtArea(A), sub: `${it.apx != null ? "uit de tekening · " : ""}omtrek ${fmtLen(polyLen(it.pts, true))}`, short: fmtArea(A) };
+    const ref = pdfAreas[normCode(it.name)];
+    if (ref != null && st.mmPerPx) {
+      const m2 = A * st.mmPerPx ** 2 / 1e6, dv = m2 - ref, pct = dv / ref * 100;
+      r.cmp = `Volgens tekening: <b>${nl0(ref)} m²</b> · jouw meting ${nl(Math.abs(dv), 1)} m² ${dv >= 0 ? "meer" : "minder"} (${dv >= 0 ? "+" : "−"}${nl(Math.abs(pct), 1)}%)`;
+      r.cmpCls = Math.abs(pct) <= 2 ? "ok" : Math.abs(pct) <= 5 ? "warn" : "bad";
+    }
+    return r;
   }
   if (it.type === "set") {
     const o = st.origin, p = it.pts[0];
@@ -1202,14 +1357,14 @@ function drawOverlay() {
       if (closed) s += `<path class="fill" d="${dd}"/>`;
       s += `<path class="halo${on ? " on" : ""}" d="${dd}"/><path class="mk" d="${dd}"/>`;
       s += `<path class="selhit" data-sel="${it.id}" d="${dd}"/>`;
-      it.pts.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${3.5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.2 * k}"/>`; });
+      if (it.pts.length <= 40) it.pts.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${3.5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.2 * k}"/>`; });
       let lx, ly, anc = "middle";
       if (it.type === "dist") { lx = (it.pts[0].x + it.pts[1].x) / 2; ly = (it.pts[0].y + it.pts[1].y) / 2 - 9 * k; }
       else if (it.type === "area") { const c = innerPoint(it.pts); lx = c.x; ly = c.y + fs * 0.35; }
       else { const l = it.pts[it.pts.length - 1]; lx = l.x + 10 * k; ly = l.y - 10 * k; anc = "start"; }
       s += tagLabel(lx, ly, n, d.short, anc);
     }
-    if (on) it.pts.forEach((p, j) => { s += handle(p, `i:${it.id}:${j}`); });
+    if (on && it.pts.length <= 40) it.pts.forEach((p, j) => { s += handle(p, `i:${it.id}:${j}`); });
   });
   if (st.sand && st.sand.pts.length) {
     const S = st.sand, build = (+S.conc || 0) + (+S.ins || 0);
@@ -1267,8 +1422,8 @@ function renderList() {
     return `<li class="m${it.id === sel ? " on" : ""}" data-id="${it.id}">
       <div class="mh"><span class="num">${i + 1}</span><span class="tag">${TYPE_NAME[it.type]}</span>
         <button type="button" data-act="show">Toon</button><button type="button" data-act="del" aria-label="Meting ${i + 1} verwijderen">✕</button></div>
-      <input class="nm" type="text" data-act="name" value="${esc(it.name)}" aria-label="Naam van meting ${i + 1}">
-      <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div></li>`;
+      <input class="nm" type="text" data-act="name" list="codelist" value="${esc(it.name)}" aria-label="Naam van meting ${i + 1}">
+      <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div>${d.cmp ? `<div class="cmp ${d.cmpCls}">${d.cmp}</div>` : ""}</li>`;
   }).join("");
 }
 function renderCal() {
@@ -1306,6 +1461,7 @@ const HINTS = {
   origin: "Nulpunt: tik het punt waar je in het werk vanaf meet, bijvoorbeeld de kruising van twee assen.",
   set: "Uitzetmaat: tik een punt. Je krijgt de maat in X (naar rechts) en Y (naar boven) vanaf het nulpunt, en vanaf de dichtstbijzijnde paal.",
   ppick: "Tik de plek van het peilpunt, bijvoorbeeld de balk of kolom.",
+  fpick: "Vlak uit tekening: tik midden in een gekleurd vlak, dan neemt de app dat vlak exact over uit de PDF.",
   peil: "Peilmaat: tik een vakje en vul de diepte onder 0-peil in (cm). Bij palen springt het punt naar het midden van 4 palen. Tik een bestaand punt om het te wijzigen."
 };
 const VZ_HINTS = {
@@ -1316,6 +1472,7 @@ const VZ_HINTS = {
   origin: "Kruisje op het punt waar je in het werk vanaf meet, druk op + Punt.",
   set: "Kruisje op het punt dat je wilt uitzetten, druk op + Punt. Je krijgt X en Y vanaf het nulpunt en de dichtstbijzijnde paal.",
   ppick: "Kruisje op de plek van het peilpunt, druk op + Punt.",
+  fpick: "Kruisje midden in een gekleurd vlak, druk op + Punt. De app neemt dat vlak exact over uit de PDF.",
   peil: "Kruisje in een vakje, druk op + Punt en vul de diepte onder 0-peil in (cm). Bij palen springt het punt naar het midden van 4 palen."
 };
 function updateHint() {
@@ -1328,7 +1485,12 @@ function updateHint() {
   if (tool === "set" && !st.origin) t = "Zet eerst een nulpunt met het gereedschap Nulpunt.";
   if (MEASURE_TOOLS.includes(tool) && !st.mmPerPx) t += " Let op: nog niet geijkt, maten staan in pixels.";
   h.textContent = t;
+  if ((tool === "area" && !draft.length || tool === "fpick") && pdfPage) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "ghost hintbtn"; b.id = "fillPick";
+    b.textContent = tool === "fpick" ? "Annuleren" : "Vlak uit tekening"; h.appendChild(b);
+  }
 }
+$("hint").addEventListener("click", e => { if (e.target.id === "fillPick") setTool(tool === "fpick" ? "area" : "fpick"); });
 function flashHint(t) { const h = $("hint"); h.textContent = t; h.classList.add("flash"); }
 // Melding bovenin de tekening, zodat hij ook op een telefoon zonder scrollen te zien is
 function showBanner(html, err, hideMs) {
@@ -1475,6 +1637,7 @@ function setTool(t) {
 function addItem(type, pts) {
   const count = st.items.filter(x => x.type === type).length + 1;
   const it = { id: st.seq++, type, pts: pts.map(p => ({ x: p.x, y: p.y })), name: `${TYPE_NAME[type]} ${count}` };
+  autoName(it);
   st.items.push(it);
   sel = it.id; draft = []; hover = null; vzUpdate();
   save(); renderAll();
@@ -1501,6 +1664,7 @@ function onTap(p0, g, shift) {
     st.sand.pts.push({ x: q.x, y: q.y, v: null });
     save(); openPeil(st.sand.pts.length - 1); return;
   }
+  if (tool === "fpick") { setTool("area"); pickFill(p0); return; }
   if (tool === "ppick") {
     ppPending = snap(p0); setTool(ppPrevTool || "pan"); renderPeil(); drawOverlay();
     toast("Plek gekozen"); $("ppSave").scrollIntoView({ block: "center", behavior: "smooth" }); return;
@@ -1534,6 +1698,7 @@ function moveHandle(h, p0, shift) {
     const it = st.items.find(x => x.id === +id); if (!it) return;
     const kk = +j, ref = it.pts[kk - 1] || it.pts[kk + 1];
     it.pts[kk] = o && ref && p === p0 ? constrain(p, ref) : p;
+    delete it.apx;
   }
   scheduleOverlay();
 }
@@ -1695,7 +1860,11 @@ $("list").addEventListener("click", e => {
 $("list").addEventListener("input", e => {
   if (e.target.dataset.act !== "name") return;
   const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id);
-  if (it) { it.name = e.target.value; save(); }
+  if (it) {
+    it.name = e.target.value; save();
+    const li = e.target.closest("li.m"), d = describe(it); let c = li.querySelector(".cmp");
+    if (d.cmp) { if (!c) { c = document.createElement("div"); li.appendChild(c); } c.className = "cmp " + d.cmpCls; c.innerHTML = d.cmp; } else if (c) c.remove();
+  }
 });
 $("copy").addEventListener("click", () => {
   const head = `${img.name || "Tekening"}${st.calib ? ` — geijkt op ${fmtMM(st.calib.mm)}` : " — niet geijkt"}`;
@@ -1793,7 +1962,8 @@ async function renderPdfPage() {
     try { const r = await extractPiles(page, vp); setPiles(r.list, r.r); } catch (e) { setPiles([], 0); }
     let auto = null;
     try { auto = await autoScale(page, vp); } catch (e) { auto = null; }
-    pdfVp = vp; pdfPage = page;
+    pdfVp = vp; pdfPage = page; fillCache = null;
+    try { await readPdfTable(page, vp); } catch (e) { pdfAreas = {}; codeLabels = []; }
     if (!auto) { try { const sc = await scaleFromText(page); if (sc) auto = scaleCal(sc.scale, vp, sc.others); } catch (e) {} }
     setImage(`${fileMeta.name}|${fileMeta.size}|p${pageNo}`, fileMeta.name + (pdfDoc.numPages > 1 ? ` · blad ${pageNo}` : ""), false, auto);
   } finally { $("loading").hidden = true; }
@@ -1815,7 +1985,7 @@ async function openFile(f, fromStore) {
       sel.hidden = pdfDoc.numPages < 2;
       await renderPdfPage();
     } else {
-      pdfDoc = null; pdfVp = null; pdfPage = null; hideSharp(); $("page").hidden = true;
+      pdfDoc = null; pdfVp = null; pdfPage = null; fillCache = null; pdfAreas = {}; codeLabels = []; hideSharp(); $("page").hidden = true;
       const url = URL.createObjectURL(f);
       const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("Dit bestand kan niet als afbeelding worden geopend.")); i.src = url; });
       const s = Math.min(1, canvasLimits(im.naturalWidth, im.naturalHeight));
