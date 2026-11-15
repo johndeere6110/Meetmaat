@@ -147,6 +147,7 @@ button .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke
 #ov .lb { fill: var(--paper-ink); stroke: var(--paper); paint-order: stroke; stroke-linejoin: round; font-family: var(--mono); font-weight: 600; pointer-events: none; }
 #ov .lb.cal { fill: var(--cal); }
 #ov .lb.mkc { fill: #b34700; }
+#ov .hole { fill: var(--paper); fill-opacity: .35; stroke: var(--mark); stroke-width: calc(2px * var(--k)); stroke-dasharray: calc(5px * var(--k)) calc(4px * var(--k)); }
 #ov .tagc { fill: var(--mark); stroke: var(--paper); }
 #ov .tagn { fill: #fff; font-family: var(--mono); font-weight: 700; pointer-events: none; }
 #ov .pl { fill: none; stroke: var(--pile); stroke-width: calc(1.8px * var(--k)); opacity: .75; }
@@ -219,6 +220,8 @@ input[type="number"], input[type="text"], .nm {
 #list .cmp { font-size: 13px; margin-top: 4px; padding: 3px 8px; border-left: 3px solid var(--ok); background: var(--bg); border-radius: 0 4px 4px 0; }
 #list .cmp.warn { border-left-color: var(--accent); } #list .cmp.bad { border-left-color: var(--warn); }
 #list .cmp b { font-family: var(--mono); }
+#list .minus { margin-top: 6px; padding: 5px 10px; font-size: 13px; }
+#list .minus[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .hintbar .hintbtn { margin-left: 8px; padding: 4px 10px; font-size: 13px; vertical-align: baseline; }
 .ppres.bad { border-left-color: var(--warn); } .ppres.warn { border-left-color: var(--accent); }
 .ppres .hint, .ppset .hint { display: block; margin-top: 2px; }
@@ -811,11 +814,13 @@ async function loadFills() {
     else if (fn === O.constructPath) {
       const ops = a[0], c = a[1]; let ci = 0, cur = null; const subs = [];
       const P = (x, y) => [ctm[0] * x + ctm[2] * y + ctm[4], ctm[1] * x + ctm[3] * y + ctm[5]];
+      const bez = (p0, p1, p2, p3) => { for (let t = 1; t <= 8; t++) { const u = t / 8, v = 1 - u; cur.push([v * v * v * p0[0] + 3 * v * v * u * p1[0] + 3 * v * u * u * p2[0] + u * u * u * p3[0], v * v * v * p0[1] + 3 * v * v * u * p1[1] + 3 * v * u * u * p2[1] + u * u * u * p3[1]]); } };
       for (const op of ops) {
         if (op === O.moveTo) { cur = [P(c[ci], c[ci + 1])]; subs.push(cur); ci += 2; }
         else if (op === O.lineTo) { if (cur) cur.push(P(c[ci], c[ci + 1])); ci += 2; }
-        else if (op === O.curveTo) { if (cur) cur.push(P(c[ci + 4], c[ci + 5])); ci += 6; }
-        else if (op === O.curveTo2 || op === O.curveTo3) { if (cur) cur.push(P(c[ci + 2], c[ci + 3])); ci += 4; }
+        else if (op === O.curveTo) { if (cur) bez(cur[cur.length - 1], P(c[ci], c[ci + 1]), P(c[ci + 2], c[ci + 3]), P(c[ci + 4], c[ci + 5])); ci += 6; }
+        else if (op === O.curveTo2) { if (cur) { const p0 = cur[cur.length - 1]; bez(p0, p0, P(c[ci], c[ci + 1]), P(c[ci + 2], c[ci + 3])); } ci += 4; }
+        else if (op === O.curveTo3) { if (cur) { const p0 = cur[cur.length - 1], p3 = P(c[ci + 2], c[ci + 3]); bez(p0, P(c[ci], c[ci + 1]), p3, p3); } ci += 4; }
         else if (op === O.rectangle) { const [x, y, w, h] = [c[ci], c[ci + 1], c[ci + 2], c[ci + 3]]; subs.push([P(x, y), P(x + w, y), P(x + w, y + h), P(x, y + h)]); ci += 4; cur = null; }
       }
       pending = subs;
@@ -871,7 +876,7 @@ function fillComponent(fc, i0) {
     if (ring.length > 3) outer = simplify(ring.map(([x, y]) => ({ x: x0 + (x + 0.5 - 2) / S, y: y0 + (y + 0.5 - 2) / S })), Math.max(0.2, 0.8 / S));
   }
   const outerA = outer ? polyArea(outer) : 0;
-  return { col, apx, outer, holes: outerA - apx > Math.max(50, apx * 0.01) ? 1 : 0, n: seen.size, outerA };
+  return { col, apx, outer, holes: outerA - apx > Math.max(50, apx * 0.01) ? 1 : 0, n: seen.size, outerA, members: seen };
 }
 function simplify(pts, tol) {          // Douglas-Peucker op een gesloten lus
   if (pts.length < 4) return pts;
@@ -938,13 +943,19 @@ function followLine(sc, p, maxD) {
   const { xy, start, sty, grid, G } = sc, nS = start.length - 1;
   const segPts = i => { const out = []; for (let j = start[i]; j < start[i + 1]; j += 2) out.push([xy[j], xy[j + 1]]); return out; };
   const sd = (q, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L)); return Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy); };
-  let best = -1, bd = maxD;
+  // dichtstbijzijnde lijn; stukjes korter dan ±1 mm op papier (arcering, stippen) tellen pas als er niks anders is
+  let best = -1, bd = Infinity;
   for (let i = 0; i < nS; i++) {
+    let L = 0, dmin = Infinity;
     for (let j = start[i] + 2; j < start[i + 1]; j += 2) {
       const ax = xy[j - 2], ay = xy[j - 1], bx = xy[j], by = xy[j + 1];
-      if (p[0] < Math.min(ax, bx) - bd || p[0] > Math.max(ax, bx) + bd || p[1] < Math.min(ay, by) - bd || p[1] > Math.max(ay, by) + bd) continue;
-      const d = sd(p, [ax, ay], [bx, by]); if (d < bd) { bd = d; best = i; }
+      L += Math.hypot(bx - ax, by - ay);
+      if (p[0] < Math.min(ax, bx) - maxD || p[0] > Math.max(ax, bx) + maxD || p[1] < Math.min(ay, by) - maxD || p[1] > Math.max(ay, by) + maxD) continue;
+      dmin = Math.min(dmin, sd(p, [ax, ay], [bx, by]));
     }
+    if (dmin > maxD) continue;
+    const score = dmin + (L < 3 ? maxD : 0);
+    if (score < bd) { bd = score; best = i; }
   }
   if (best < 0) return null;
   const tol = 0.7, dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -1010,12 +1021,31 @@ async function pickFill(p) {
       const comp = fillComponent(fc, i);
       if (comp.apx < minPx || !comp.outer) continue;
       const pts = simplify(comp.outer, 0.3);
+      // Vlakken van een andere kleur die helemaal binnen de rand liggen: een gat in dit vlak, of er bovenop getekend
+      const ob = comp.outer, oxs = ob.map(q => q.x), oys = ob.map(q => q.y), obb = [Math.min(...oxs), Math.min(...oys), Math.max(...oxs), Math.max(...oys)];
+      const done = new Set(comp.members), inner = [];
+      const minInner = st.mmPerPx ? 1e6 / st.mmPerPx ** 2 : 100;          // 1 m² (of 100 px² zonder ijking)
+      for (let j = 0; j < F.length; j++) {
+        const f = F[j];
+        if (done.has(j) || f.col === comp.col || /^255,255,255$|^1$/.test(f.col)) continue;
+        if (f.bb[0] < obb[0] || f.bb[2] > obb[2] || f.bb[1] < obb[1] || f.bb[3] > obb[3]) continue;
+        const ic = fillComponent(fc, j); ic.members.forEach(m => done.add(m));
+        if (ic.apx < minInner || !ic.outer) continue;
+        if (![...ic.members].every(m => F[m].c.every(v => inPoly(v, ob)))) continue;
+        // erop (aftrekken) als het basisvlak onder dit vlak doorloopt; anders is het een gat dat al niet meetelt
+        const ip = innerPoint(ic.outer);
+        const under = [...comp.members].some(m => { const b = F[m].bb; return ip.x >= b[0] && ip.x <= b[2] && ip.y >= b[1] && ip.y <= b[3] && inPoly(ip, F[m].c); });
+        inner.push({ apx: ic.apx, onTop: under, outline: simplify(ic.outer, 0.3) });
+      }
+      const onTopA = inner.filter(x => x.onTop).reduce((a, x) => a + x.apx, 0);
+      const net = comp.apx - onTopA, gross = Math.max(comp.outerA, comp.apx);
       const count = st.items.filter(x => x.type === "area").length + 1;
-      const it = { id: st.seq++, type: "area", pts, name: `Vlak ${count}`, apx: comp.apx };
-      if (comp.holes && comp.outerA - comp.apx > minPx) it.apxOuter = comp.outerA;
+      const it = { id: st.seq++, type: "area", pts, name: `Vlak ${count}`, apx: net };
+      if (gross - net > minInner) it.apxOuter = gross;
+      if (inner.length) it.holes = inner.map(x => x.outline.map(q => ({ x: +q.x.toFixed(2), y: +q.y.toFixed(2) })));
       autoName(it);
       st.items.push(it); sel = it.id; save(); renderAll();
-      toast(`Vlak overgenomen: ${fmtArea(comp.apx)}${it.apxOuter ? `, met de vlakken erin ${fmtArea(it.apxOuter)}` : ""}`);
+      toast(`Vlak overgenomen: ${fmtArea(net)}${it.apxOuter ? ` zonder de ${inner.length || ""} vlak${inner.length === 1 ? "" : "ken"} erin (gestippeld), met: ${fmtArea(it.apxOuter)}` : ""}`);
       return;
     }
     flashHint("Geen gekleurd vlak gevonden op die plek. Tik midden in een gekleurd vlak, niet op een lijn of tekst.");
@@ -1288,6 +1318,18 @@ const fmtLen = px => st.mmPerPx ? fmtMM(px * st.mmPerPx) : `${nl0(px)} px`;
 const fmtArea = px2 => { if (!st.mmPerPx) return `${nl0(px2)} px²`; const m2 = px2 * st.mmPerPx ** 2 / 1e6; return `${nl(m2, m2 >= 100 ? 1 : 2)} m²`; };
 const sgn = v => v < -1e-9 ? "−" : "";
 
+// Omringend vlak: het kleinste andere oppervlak waar dit vlak helemaal in ligt
+function parentArea(it) {
+  if (it.type !== "area") return null;
+  let best = null, ba = Infinity;
+  for (const o of st.items) {
+    if (o === it || o.type !== "area") continue;
+    const a = polyArea(o.pts); if (a >= ba || a <= polyArea(it.pts)) continue;
+    if (it.pts.every(q => inPoly(q, o.pts))) { best = o; ba = a; }
+  }
+  return best;
+}
+const areaOf = it => it.apx != null ? it.apx : polyArea(it.pts);
 function describe(it) {
   if (it.type === "dist") {
     const [a, b] = it.pts;
@@ -1298,8 +1340,9 @@ function describe(it) {
     return { main: fmtLen(L), sub: `${it.pts.length - 1} ${it.pts.length === 2 ? "stuk" : "stukken"}${st.mmPerPx && unit !== "m" ? ` · ${nl(L * st.mmPerPx / 1000, 2)} m` : ""}`, short: fmtLen(L) };
   }
   if (it.type === "area") {
-    const A = it.apx != null ? it.apx : polyArea(it.pts);
-    const r = { main: fmtArea(A), sub: `${it.apx != null ? "uit de tekening · " : ""}${it.apxOuter ? `met de vlakken erin (andere kleur) ${fmtArea(it.apxOuter)} · ` : ""}omtrek ${fmtLen(polyLen(it.pts, true))}`, short: fmtArea(A) };
+    const kids = st.items.filter(o => o.minus === it.id && o.type === "area");
+    const A = areaOf(it) - kids.reduce((a, o) => a + areaOf(o), 0);
+    const r = { main: fmtArea(A), sub: `${it.apx != null ? "uit de tekening · " : ""}${kids.length ? `min ${kids.map(o => o.name).join(", ")} · bruto ${fmtArea(areaOf(it))} · ` : ""}${it.apxOuter ? `zonder de gestippelde vlakken erin · met: ${fmtArea(it.apxOuter)} · ` : ""}omtrek ${fmtLen(polyLen(it.pts, true))}`, short: fmtArea(A) };
     const ref = pdfAreas[normCode(it.name)];
     if (ref != null && st.mmPerPx) {
       const m2 = A * st.mmPerPx ** 2 / 1e6, dv = m2 - ref, pct = dv / ref * 100;
@@ -1472,7 +1515,9 @@ function drawOverlay() {
     } else {
       const closed = it.type === "area";
       const dd = P(it.pts) + (closed ? " Z" : "");
-      if (closed) s += `<path class="fill" d="${dd}"/>`;
+      if (closed && it.minus != null) s += `<path class="hole" d="${dd}"/>`;
+      else if (closed) s += `<path class="fill" d="${dd}"/>`;
+      if (it.holes) it.holes.forEach(h => { s += `<path class="hole" d="${P(h)} Z"/>`; });
       s += `<path class="halo${on ? " on" : ""}" d="${dd}"/><path class="mk" d="${dd}"/>`;
       s += `<path class="selhit" data-sel="${it.id}" d="${dd}"/>`;
       if (it.pts.length <= 40) it.pts.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${3.5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.2 * k}"/>`; });
@@ -1541,7 +1586,10 @@ function renderList() {
       <div class="mh"><span class="num">${i + 1}</span><span class="tag">${TYPE_NAME[it.type]}</span>
         <button type="button" data-act="show">Toon</button><button type="button" data-act="del" aria-label="Meting ${i + 1} verwijderen">✕</button></div>
       <input class="nm" type="text" data-act="name" list="codelist" value="${esc(it.name)}" aria-label="Naam van meting ${i + 1}">
-      <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div>${d.cmp ? `<div class="cmp ${d.cmpCls}">${d.cmp}</div>` : ""}</li>`;
+      <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div>${d.cmp ? `<div class="cmp ${d.cmpCls}">${d.cmp}</div>` : ""}${(() => {
+        const par = it.minus != null ? st.items.find(o => o.id === it.minus) : parentArea(it);
+        return par ? `<button type="button" class="ghost minus" data-act="minus" data-par="${par.id}" aria-pressed="${it.minus === par.id}">${it.minus === par.id ? `Wordt afgetrokken van ${esc(par.name)}` : `Aftrekken van ${esc(par.name)}`}</button>` : "";
+      })()}</li>`;
   }).join("");
 }
 function renderCal() {
@@ -1829,7 +1877,7 @@ function moveHandle(h, p0, shift) {
     const it = st.items.find(x => x.id === +id); if (!it) return;
     const kk = +j, ref = it.pts[kk - 1] || it.pts[kk + 1];
     it.pts[kk] = o && ref && p === p0 ? constrain(p, ref) : p;
-    delete it.apx; delete it.apxOuter;
+    delete it.apx; delete it.apxOuter; delete it.holes;
   }
   scheduleOverlay();
 }
@@ -1982,7 +2030,8 @@ $("list").addEventListener("click", e => {
   const li = e.target.closest("li.m"); if (!li) return;
   const id = +li.dataset.id, it = st.items.find(x => x.id === id);
   const act = e.target.closest("[data-act]")?.dataset.act;
-  if (act === "del") { st.items = st.items.filter(x => x.id !== id); if (sel === id) sel = null; save(); renderAll(); return; }
+  if (act === "del") { st.items = st.items.filter(x => x.id !== id); st.items.forEach(o => { if (o.minus === id) delete o.minus; }); if (sel === id) sel = null; save(); renderAll(); return; }
+  if (act === "minus" && it) { const pid = +e.target.closest("[data-par]").dataset.par; if (it.minus === pid) delete it.minus; else it.minus = pid; save(); renderAll(); return; }
   if (act === "name") { if (sel !== id) { sel = id; drawOverlay(); document.querySelectorAll("#list li.m").forEach(x => x.classList.toggle("on", +x.dataset.id === id)); } return; }
   sel = id;
   if (act === "show" && it) showPts(it.type === "set" && st.origin ? [it.pts[0], st.origin] : it.pts);
