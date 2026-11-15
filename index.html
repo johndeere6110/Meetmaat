@@ -231,6 +231,12 @@ input[type="number"], input[type="text"], .nm {
 #list .cmp.warn { border-left-color: var(--accent); } #list .cmp.bad { border-left-color: var(--warn); }
 #list .cmp b { font-family: var(--mono); }
 #list .minus { margin-top: 6px; padding: 5px 10px; font-size: 13px; }
+#list .grp { margin-top: 6px; width: 100%; min-width: 0; font: 500 13px var(--body); color: var(--ink); background: var(--panel); border: 1px dashed var(--line); border-radius: 4px; padding: 5px 8px; }
+.totals { border: 2px solid var(--accent); border-radius: 6px; padding: 8px 10px; display: grid; gap: 4px; background: var(--bg); }
+.totals .tth { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.totals .tt { display: grid; grid-template-columns: 1fr auto; gap: 0 10px; align-items: baseline; }
+.totals .ttn { font-weight: 600; } .totals .ttc { font-size: 12px; color: var(--muted); grid-row: 2; }
+.totals .ttv { font: 600 15px var(--mono); grid-row: span 2; text-align: right; }
 #list .minus[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .hintbar .hintbtn { margin-left: 8px; padding: 4px 10px; font-size: 13px; vertical-align: baseline; }
 .ppres.bad { border-left-color: var(--warn); } .ppres.warn { border-left-color: var(--accent); }
@@ -369,7 +375,9 @@ input[type="number"], input[type="text"], .nm {
       <details class="sec" data-sec="list" open>
         <summary><h2>Metingen</h2><span class="secsum" id="sum-list"></span></summary>
         <div class="secbody">
+      <div class="totals" id="totals" hidden></div>
       <ol id="list"></ol>
+      <datalist id="grplist"></datalist>
       <datalist id="codelist"></datalist>
       <div class="btns">
         <button type="button" id="copy">Kopieer lijst</button>
@@ -1070,12 +1078,14 @@ async function pickFill(p) {
       const onTopA = inner.filter(x => x.onTop).reduce((a, x) => a + x.apx, 0);
       const net = comp.apx - onTopA, gross = Math.max(comp.outerA, comp.apx);
       const count = st.items.filter(x => x.type === "area").length + 1;
-      const it = { id: st.seq++, type: "area", pts, name: `Vlak ${count}`, apx: net };
+      const it = { id: st.seq++, type: "area", pts, name: `Vlak ${count}`, apx: net, col: comp.col };
+      const same = st.items.find(o => o.col === comp.col && o.grp);
+      if (same) it.grp = same.grp;
       if (gross - net > minInner) it.apxOuter = gross;
       if (inner.length) it.holes = inner.map(x => x.outline.map(q => ({ x: +q.x.toFixed(2), y: +q.y.toFixed(2) })));
       autoName(it);
       st.items.push(it); sel = it.id; save(); renderAll();
-      toast(`Vlak overgenomen: ${fmtArea(net)}${it.apxOuter ? ` zonder de ${inner.length || ""} vlak${inner.length === 1 ? "" : "ken"} erin (gestippeld), met: ${fmtArea(it.apxOuter)}` : ""}`);
+      toast(`${it.grp ? `Groep ${it.grp}: ` : ""}Vlak overgenomen: ${fmtArea(net)}${it.apxOuter ? ` zonder de ${inner.length || ""} vlak${inner.length === 1 ? "" : "ken"} erin (gestippeld), met: ${fmtArea(it.apxOuter)}` : ""}`);
       return;
     }
     flashHint("Geen gekleurd vlak gevonden op die plek. Tik midden in een gekleurd vlak, niet op een lijn of tekst.");
@@ -1656,6 +1666,7 @@ function renderList() {
       <div class="mh"><span class="num">${i + 1}</span><span class="tag">${TYPE_NAME[it.type]}</span>
         <button type="button" data-act="show">Toon</button><button type="button" data-act="del" aria-label="Meting ${i + 1} verwijderen">✕</button></div>
       <input class="nm" type="text" data-act="name" list="codelist" value="${esc(it.name)}" aria-label="Naam van meting ${i + 1}">
+      ${it.type !== "set" ? `<input class="grp" type="text" data-act="grp" list="grplist" value="${esc(it.grp || "")}" placeholder="Groep, bijv. gras" aria-label="Groep van meting ${i + 1}">` : ""}
       <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div>${d.cmp ? `<div class="cmp ${d.cmpCls}">${d.cmp}</div>` : ""}${(() => {
         const par = it.minus != null ? st.items.find(o => o.id === it.minus) : parentArea(it);
         return par ? `<button type="button" class="ghost minus" data-act="minus" data-par="${par.id}" aria-pressed="${it.minus === par.id}">${it.minus === par.id ? `Wordt afgetrokken van ${esc(par.name)}` : `Aftrekken van ${esc(par.name)}`}</button>` : "";
@@ -1773,7 +1784,28 @@ function renderPileInfo() {
   el.innerHTML = `<span class="big">${piles.length} rondjes herkend</span>
     <span class="hint">${pilesOn ? "Meestal palen, op een riolerings- of inrichtingstekening ook putten. Tik je vlak bij een rondje, dan klikt je punt vast op het hart. Bij een uitzetmaat zie je ook de maat vanaf het dichtstbijzijnde rondje. Zit het in de weg? Zet <b>Palen</b> uit." : "Palen staan uit: punten klikken niet vast."}</span>`;
 }
-function renderAll() { drawOverlay(); renderList(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); updateHint(); renderTools(); renderSums(); }
+// Netto oppervlak (min wat ervan wordt afgetrokken) en lengte van een meting, in px² / px
+const netArea = it => areaOf(it) - st.items.filter(o => o.minus === it.id && o.type === "area").reduce((a, o) => a + areaOf(o), 0);
+const lenOf = it => it.type === "dist" ? d2(it.pts[0], it.pts[1]) : it.type === "poly" ? polyLen(it.pts) : 0;
+function groupTotals() {
+  const G = new Map();
+  for (const it of st.items) {
+    if (!it.grp || it.type === "set") continue;
+    const k = it.grp.trim(), key = k.toLowerCase();
+    if (!G.has(key)) G.set(key, { name: k, n: 0, a: 0, na: 0, l: 0, nl: 0 });
+    const g = G.get(key); g.n++;
+    if (it.type === "area") { if (it.minus == null) { g.a += netArea(it); g.na++; } } else { g.l += lenOf(it); g.nl++; }
+  }
+  return [...G.values()];
+}
+function renderTotals() {
+  const el = $("totals"), G = groupTotals();
+  $("grplist").innerHTML = G.map(g => `<option value="${esc(g.name)}"></option>`).join("");
+  if (!G.length) { el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  el.innerHTML = `<div class="tth">Totalen per groep</div>` + G.map(g => `<div class="tt"><span class="ttn">${esc(g.name)}</span><span class="ttc">${g.n} meting${g.n === 1 ? "" : "en"}</span><span class="ttv">${[g.na ? fmtArea(g.a) : "", g.nl ? fmtLen(g.l) : ""].filter(Boolean).join(" · ")}</span></div>`).join("");
+}
+function renderAll() { drawOverlay(); renderList(); renderTotals(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); updateHint(); renderTools(); renderSums(); }
 // Korte stand per onderdeel in de kop, zodat je het niet hoeft open te klappen
 function renderSums() {
   const set = (k, t, warn) => { const e = $("sum-" + k); if (e) { e.textContent = t; e.classList.toggle("warn", !!warn); } };
@@ -2124,6 +2156,7 @@ $("list").addEventListener("click", e => {
   const id = +li.dataset.id, it = st.items.find(x => x.id === id);
   const act = e.target.closest("[data-act]")?.dataset.act;
   if (act === "del") { st.items = st.items.filter(x => x.id !== id); st.items.forEach(o => { if (o.minus === id) delete o.minus; }); if (sel === id) sel = null; save(); renderAll(); return; }
+  if (act === "grp") return;
   if (act === "minus" && it) { const pid = +e.target.closest("[data-par]").dataset.par; if (it.minus === pid) delete it.minus; else it.minus = pid; save(); renderAll(); return; }
   if (act === "name") { if (sel !== id) { sel = id; drawOverlay(); document.querySelectorAll("#list li.m").forEach(x => x.classList.toggle("on", +x.dataset.id === id)); } return; }
   sel = id;
@@ -2131,6 +2164,11 @@ $("list").addEventListener("click", e => {
   renderAll();
 });
 $("list").addEventListener("input", e => {
+  if (e.target.dataset.act === "grp") {
+    const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id);
+    if (it) { const v = e.target.value.trim(); if (v) it.grp = v; else delete it.grp; save(); renderTotals(); }
+    return;
+  }
   if (e.target.dataset.act !== "name") return;
   const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id);
   if (it) {
@@ -2142,6 +2180,8 @@ $("list").addEventListener("input", e => {
 $("copy").addEventListener("click", () => {
   const head = `${img.name || "Tekening"}${st.calib ? ` — geijkt op ${fmtMM(st.calib.mm)}` : " — niet geijkt"}`;
   const lines = st.items.map((it, i) => { const d = describe(it); return `${i + 1}. ${it.name}: ${d.main}`; });
+  const G = groupTotals();
+  if (G.length) lines.push("", "Totalen per groep:", ...G.map(g => `- ${g.name} (${g.n}): ${[g.na ? fmtArea(g.a) : "", g.nl ? fmtLen(g.l) : ""].filter(Boolean).join(" · ")}`));
   if (st.pp && st.pp.length) lines.push("", "Peilpunten (t.o.v. 0-peil):", ...st.pp.map(q => `- ${q.name}: ${fmtPeil(q.h)}${q.from ? ` (vanaf ${q.from})` : ""}`));
   const txt = [head, ...lines].join("\n");
   const fail = () => toast("Kopiëren lukte niet. Selecteer de waardes in de lijst handmatig.");
