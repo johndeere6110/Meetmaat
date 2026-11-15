@@ -1285,7 +1285,11 @@ function renderCal() {
   c.innerHTML = `<span class="big">${sc ? `Geijkt op schaal 1:${sc}` : st.calib && st.calib.auto ? `Automatisch geijkt op ${st.calib.n} maatlijnen` : `IJkmaat ${st.calib ? fmtMM(st.calib.mm) : "–"}`}</span>
     ${sc ? `<span class="hint">${st.calib.auto ? "Deze schaal staat op de tekening." : "Zelf ingevuld."} Klopt alleen als de PDF op ware grootte is. Meet daarom één maat na die je kent; wijkt hij af, ijk dan met <b>IJken</b>.${st.calib.others && st.calib.others.length ? ` Er staat ook ${st.calib.others.map(n => "1:" + n).join(", ")} op (bijv. een overzichtskaartje).` : ""}</span>` : ""}
     ${st.calib && st.calib.auto && !sc ? `<span class="hint">Gevonden maten: ${st.calib.vals.join(", ")} mm · onderling ${nl(st.calib.spread, 2)}% verschil. Zelf ijken met <b>IJken</b> mag altijd.</span>` : ""}
-    ${pdfPage ? `<span>Ver inzoomen maakt de tekening scherp, zodat je precies op een lijn kunt tikken. Een maat die op de tekening staat gaat altijd voor.</span>` : `<span>1 pixel = ${nl(st.mmPerPx, 1)} mm · nauwkeurigheid ±${fmtMM(Math.max(st.mmPerPx, unit === "mm" ? 1 : 10))} per punt</span>`}
+    ${pdfPage && pdfVp ? (() => {
+      // Effectieve schaal van het papier (1 PDF-punt = 25,4/72 mm) en wat een lijndikte van ±0,25 mm dan in het echt is
+      const N = st.mmPerPx * 72 * pdfVp.scale / 25.4, est = 0.25 * N;
+      return `<span>Schaal ±1:${nl0(N)} · nauwkeurigheid ±${fmtMM(Math.max(est, unit === "mm" ? 1 : 10))} per punt</span><span class="hint">Dat is de dikte van een lijn op de tekening (±0,25 mm op papier). Zoom ver in, dan wordt de tekening scherp en tik je precies op de lijn. Een maat die op de tekening staat gaat altijd voor.</span>`;
+    })() : `<span>1 pixel = ${nl(st.mmPerPx, 1)} mm · nauwkeurigheid ±${fmtMM(Math.max(st.mmPerPx, unit === "mm" ? 1 : 10))} per punt</span>`}
     <span class="hint">Zoom flink in bij het aantikken. Elke klik naast de lijn telt mee in de maat.</span>
     <div class="btns"><button type="button" class="ghost" data-cal="clear">IJking verwijderen</button>${lastAuto && !(st.calib && st.calib.auto) ? `<button type="button" class="ghost" data-cal="auto">Automatisch ijken</button>` : ""}</div>${scaleForm()}`;
 }
