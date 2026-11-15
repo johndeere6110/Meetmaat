@@ -228,6 +228,10 @@ input[type="number"], input[type="text"], .nm {
 .pplist .ppm { font-size: 12px; color: var(--muted); }
 .pplist .btns button { padding: 6px 10px; font-size: 13px; }
 .ppres:empty { display: none; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
+.keys dt { font: 600 12.5px var(--mono); white-space: nowrap; }
+.keys dd { margin: 0; color: var(--muted); }
+@media (pointer: coarse) { .keyhelp { display: none; } }
 .rkseg { display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; margin-top: 4px; }
 .rkseg button { padding: 7px 6px; font-size: 13px; }
 .rkseg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
@@ -298,14 +302,14 @@ input[type="number"], input[type="text"], .nm {
 
   <div class="toolbar">
     <div class="tools" id="tools" role="group" aria-label="Gereedschap">
-      <button type="button" data-tool="pan"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Schuiven</span></button>
-      <button type="button" data-tool="dist"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg><span>Afstand</span></button>
-      <button type="button" data-tool="poly"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18l6-9 6 6 6-10"/><circle cx="3" cy="18" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="15" cy="15" r="1.6"/><circle cx="21" cy="5" r="1.6"/></svg><span>Lengte</span></button>
-      <button type="button" data-tool="area"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M4 7l9-3 7 7-4 9H5z"/></svg><span>Oppervlak</span></button>
-      <button type="button" data-tool="calib"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="8" width="20" height="8" rx="1"/><path d="M6 8v3M10 8v4M14 8v3M18 8v4"/></svg><span>IJken</span></button>
-      <button type="button" data-tool="origin"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><span>Nulpunt</span></button>
-      <button type="button" data-tool="set"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h16"/><circle cx="16" cy="8" r="2"/><path d="M16 10v7M7 8h7" stroke-dasharray="2 2"/></svg><span>Uitzetmaat</span></button>
-      <button type="button" data-tool="peil"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M12 3v13M8 12l4 4 4-4"/></svg><span>Peilmaat</span></button>
+      <button type="button" data-tool="pan" title="Schuiven (toets S)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>Schuiven</span></button>
+      <button type="button" data-tool="dist" title="Afstand (toets A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg><span>Afstand</span></button>
+      <button type="button" data-tool="poly" title="Lengte (toets L)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18l6-9 6 6 6-10"/><circle cx="3" cy="18" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="15" cy="15" r="1.6"/><circle cx="21" cy="5" r="1.6"/></svg><span>Lengte</span></button>
+      <button type="button" data-tool="area" title="Oppervlak (toets O)"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M4 7l9-3 7 7-4 9H5z"/></svg><span>Oppervlak</span></button>
+      <button type="button" data-tool="calib" title="IJken (toets I)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="8" width="20" height="8" rx="1"/><path d="M6 8v3M10 8v4M14 8v3M18 8v4"/></svg><span>IJken</span></button>
+      <button type="button" data-tool="origin" title="Nulpunt (toets N)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><span>Nulpunt</span></button>
+      <button type="button" data-tool="set" title="Uitzetmaat (toets U)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h16"/><circle cx="16" cy="8" r="2"/><path d="M16 10v7M7 8h7" stroke-dasharray="2 2"/></svg><span>Uitzetmaat</span></button>
+      <button type="button" data-tool="peil" title="Peilmaat (toets P)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M12 3v13M8 12l4 4 4-4"/></svg><span>Peilmaat</span></button>
     </div>
     <div class="btns">
       <div class="seg" id="units" role="group" aria-label="Eenheid">
@@ -517,6 +521,25 @@ input[type="number"], input[type="text"], .nm {
         <div class="flags" id="sFlags" style="display:grid;gap:6px"></div>
         <div class="btns"><button type="button" id="sCopy">Kopieer berekening</button></div>
       </div>
+        </div>
+      </details>
+      <details class="sec keyhelp" data-sec="keys">
+        <summary><h2>Sneltoetsen</h2><span class="secsum">pc</span></summary>
+        <div class="secbody">
+          <dl class="keys">
+            <dt>S A L O</dt><dd>Schuiven, Afstand, Lengte, Oppervlak</dd>
+            <dt>I N U P</dt><dd>IJken, Nulpunt, Uitzetmaat, Peilmaat (of 1 t/m 8)</dd>
+            <dt>Shift+L</dt><dd>Lijn uit tekening</dd>
+            <dt>Shift+O</dt><dd>Vlak uit tekening</dd>
+            <dt>Enter</dt><dd>Lijn of vlak afmaken</dd>
+            <dt>Backspace</dt><dd>Laatste punt terug (tijdens het meten)</dd>
+            <dt>Ctrl+Z</dt><dd>Ongedaan</dd>
+            <dt>Esc</dt><dd>Stoppen met de huidige meting</dd>
+            <dt>Delete</dt><dd>Gekozen punt of meting wissen</dd>
+            <dt>H</dt><dd>Haaks aan/uit (of Shift ingedrukt houden)</dd>
+            <dt>Spatie + slepen</dt><dd>Schuiven, ook tijdens het meten</dd>
+            <dt>+ − 0</dt><dd>Inzoomen, uitzoomen, hele tekening</dd>
+          </dl>
         </div>
       </details>
       <p class="hint">X is naar rechts, Y is naar boven op de tekening, gemeten vanaf het nulpunt. Controleer je ijking door met Afstand een tweede bekende maatlijn na te meten.</p>
@@ -2144,6 +2167,7 @@ view.addEventListener("pointerdown", e => {
   // pas als je sleept, verschuif je het bolletje. Bij Schuiven pak je het bolletje meteen.
   const grabNow = h && (tool === "pan" || h.dataset.h.startsWith("c:") || h.dataset.h === "o");
   G = { kind: grabNow ? "handle" : "tap", h: h && h.dataset.h, sel: sl && sl.dataset.sel, sx: e.clientX, sy: e.clientY, tx: T.x, ty: T.y };
+  if (spaceHeld && G.kind === "tap") G.kind = "spacepan";
   if (G.kind === "tap" && loepOn()) {
     const g0 = G;
     G.timer = setTimeout(() => {
@@ -2180,7 +2204,7 @@ view.addEventListener("pointermove", e => {
     if (G.h) { G.kind = "handle"; moveHandle(G.h, toImg(e.clientX, e.clientY), e.shiftKey); return; }
     G.kind = "pan"; view.classList.add("panning");
   }
-  if (G.kind === "pan") { T.x = G.tx + dx; T.y = G.ty + dy; applyT(false); }
+  if (G.kind === "pan" || G.kind === "spacepan") { T.x = G.tx + dx; T.y = G.ty + dy; applyT(false); }
 });
 function endPtr(e) {
   ptrs.delete(e.pointerId);
@@ -2253,12 +2277,38 @@ $("undo").addEventListener("click", () => {
   else if (st.items.length) { const it = st.items.pop(); if (sel === it.id) sel = null; save(); }
   renderAll();
 });
+// Sneltoetsen (pc). Niet als je in een veld typt.
+const KEY_TOOLS = { s: "pan", a: "dist", l: "poly", o: "area", i: "calib", n: "origin", u: "set", p: "peil" };
+let spaceHeld = false;
 document.addEventListener("keydown", e => {
   if (e.target.closest("input, select, textarea")) return;
-  if (e.key === "Escape") { draft = []; $("calibbox").hidden = true; $("peilbox").hidden = true; peilCur = null; renderAll(); }
+  const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
+  if (mod && k === "z") { e.preventDefault(); $("undo").click(); return; }
+  if (mod || e.altKey) return;
+  if (e.key === " ") { spaceHeld = true; view.classList.add("panning"); e.preventDefault(); return; }
+  if (e.key === "Escape") {
+    if (tool === "fpick" || tool === "ppick") setTool("area");
+    else if (tool === "lpick") setTool(lpickBack);
+    else { draft = []; selPt = null; $("calibbox").hidden = true; $("peilbox").hidden = true; peilCur = null; renderAll(); }
+  }
   else if (e.key === "Enter") finish();
-  else if ((e.key === "Delete" || e.key === "Backspace") && sel != null) { st.items = st.items.filter(x => x.id !== sel); sel = null; save(); renderAll(); }
+  else if (e.key === "Backspace") { if (draft.length) { e.preventDefault(); draft.pop(); renderAll(); } }
+  else if (e.key === "Delete") {
+    if (selPt) $("ptDel").click();
+    else if (sel != null) { st.items = st.items.filter(x => x.id !== sel); st.items.forEach(o => { if (o.minus === sel) delete o.minus; }); sel = null; save(); renderAll(); toast("Meting gewist (Ctrl+Z zet hem niet terug)"); }
+  }
+  else if (!img.w) return;
+  else if (e.shiftKey && k === "o") { if (pdfPage) setTool("fpick"); }
+  else if (e.shiftKey && k === "l") { if (pdfPage) { lpickBack = tool === "area" ? "area" : "poly"; setTool("lpick"); } }
+  else if (KEY_TOOLS[k] && !e.shiftKey) setTool(KEY_TOOLS[k]);
+  else if (/^[1-8]$/.test(e.key)) setTool(["pan", "dist", "poly", "area", "calib", "origin", "set", "peil"][+e.key - 1]);
+  else if (k === "h") { ortho = !ortho; renderTools(); toast(ortho ? "Haaks aan" : "Haaks uit"); }
+  else if (e.key === "+" || e.key === "=") zoomCenter(1.5);
+  else if (e.key === "-" || e.key === "_") zoomCenter(1 / 1.5);
+  else if (e.key === "0") fit();
+  else return;
 });
+document.addEventListener("keyup", e => { if (e.key === " ") { spaceHeld = false; if (!G || G.kind !== "pan") view.classList.remove("panning"); } });
 
 $("list").addEventListener("click", e => {
   const li = e.target.closest("li.m"); if (!li) return;
