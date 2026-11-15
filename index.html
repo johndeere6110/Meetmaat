@@ -147,8 +147,9 @@ button .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke
 #ov .lb { fill: var(--paper-ink); stroke: var(--paper); paint-order: stroke; stroke-linejoin: round; font-family: var(--mono); font-weight: 600; pointer-events: none; }
 #ov .lb.cal { fill: var(--cal); }
 #ov .lb.mkc { fill: #b34700; }
+#ov .ptsel { fill: none; stroke: var(--warn); stroke-width: calc(3px * var(--k)); }
 #ov .hole { fill: var(--paper); fill-opacity: .35; stroke: var(--mark); stroke-width: calc(2px * var(--k)); stroke-dasharray: calc(5px * var(--k)) calc(4px * var(--k)); }
-#ov .tagc { fill: var(--mark); stroke: var(--paper); }
+#ov .tagc { fill: var(--mark); stroke: var(--paper); pointer-events: none; }
 #ov .tagn { fill: #fff; font-family: var(--mono); font-weight: 700; pointer-events: none; }
 #ov .pl { fill: none; stroke: var(--pile); stroke-width: calc(1.8px * var(--k)); opacity: .75; }
 #ov .plink { stroke: var(--pile); stroke-width: calc(2px * var(--k)); stroke-dasharray: calc(4px * var(--k)) calc(4px * var(--k)); }
@@ -345,6 +346,10 @@ input[type="number"], input[type="text"], .nm {
         </form>
         <div class="vz" id="vz" hidden aria-hidden="true"><svg viewBox="-32 -32 64 64"><circle r="14" class="vzh"/><path class="vzh" d="M0 -30v18M0 12v18M-30 0h18M12 0h18"/><circle r="14" class="vzl"/><path class="vzl" d="M0 -30v18M0 12v18M-30 0h18M12 0h18"/><circle r="1.8" class="vzd"/></svg></div>
         <div class="loupe" id="loupe" hidden aria-hidden="true"><canvas id="loupecv" width="140" height="140"></canvas></div>
+        <div class="vzbar ptbar" id="ptbar" hidden>
+          <button type="button" class="big" id="ptDel">Punt wissen</button>
+          <button type="button" class="ghost" id="ptClose">Klaar</button>
+        </div>
         <div class="vzbar" id="vzbar" hidden>
           <button type="button" class="ghost" id="vzBack">Terug</button>
           <button type="button" class="big" id="vzAdd">+ Punt</button>
@@ -1588,6 +1593,7 @@ function drawOverlay() {
   });
 
   const labs = [];            // labels pas na alle vlakken tekenen: bovenop, en zonder overlap
+  let hds = "";               // sleepbolletjes van de geselecteerde meting: helemaal bovenop
   st.items.forEach((it, i) => {
     const on = it.id === sel, n = i + 1, d = describe(it);
     if (it.type === "set") {
@@ -1612,7 +1618,10 @@ function drawOverlay() {
       else if (it.type === "area") labs.push({ area: it, n, t: d.short });
       else { const l = it.pts[it.pts.length - 1]; labs.push({ x: l.x + 10 * k, y: l.y - 10 * k, n, t: d.short, anc: "start" }); }
     }
-    if (on && it.pts.length <= 40) it.pts.forEach((p, j) => { s += handle(p, `i:${it.id}:${j}`); });
+    if (on && it.pts.length <= 40) it.pts.forEach((p, j) => {
+      if (selPt && selPt.id === it.id && selPt.j === j) hds += `<circle class="ptsel" cx="${p.x}" cy="${p.y}" r="${12 * k}"/>`;
+      hds += handle(p, `i:${it.id}:${j}`);
+    });
   });
   // Labels plaatsen: eerst de vaste, dan de vlakken van klein naar groot; per vlak de beste plek waar het label
   // helemaal binnen het vlak past en niets anders raakt
@@ -1634,6 +1643,7 @@ function drawOverlay() {
     placed.push(pick.b); l.x = pick.c.x; l.y = pick.y; l.anc = "middle";
   });
   labs.forEach(l => { s += tagLabel(l.x, l.y, l.n, l.t, l.anc); });
+  s += hds;
   if (st.sand && st.sand.pts.length) {
     const S = st.sand, build = (+S.conc || 0) + (+S.ins || 0);
     const cc = piles.length ? cellCenters() : { s: 0 };
@@ -1725,7 +1735,7 @@ function scaleForm() {
   return `<form class="scaleform" data-scaleform><label for="calScale">Of ijk op schaal: 1 :</label><input id="calScale" type="text" inputmode="numeric" autocomplete="off" placeholder="bijv. 300" value="${st.calib && st.calib.scale ? st.calib.scale : ""}"><button type="submit" class="ghost">Gebruik schaal</button></form>`;
 }
 const HINTS = {
-  pan: "Sleep om te schuiven, knijp of scroll om te zoomen. Tik een meting aan om hem te selecteren en versleep de bolletjes om bij te stellen.",
+  pan: "Sleep om te schuiven, knijp of scroll om te zoomen. Tik een meting aan om hem te selecteren: versleep een bolletje om bij te stellen, of tik een bolletje aan om het punt te wissen.",
   calib: ["IJken: tik het begin van een maatlijn waarvan je de maat weet.", "Tik nu het eind van die maatlijn.", "Vul de echte maat in."],
   dist: ["Afstand: tik het eerste punt.", "Tik het tweede punt."],
   poly: ["Lengte: tik de punten langs de lijn, bijvoorbeeld een sleuf.", "Tik het volgende punt. Tik het laatste punt nog een keer of druk Klaar om af te ronden."],
@@ -1792,7 +1802,10 @@ function renderTools() {
   $("ortho").setAttribute("aria-pressed", ortho);
   const va = !!vzActive();
   document.querySelectorAll("#invoer [data-inv]").forEach(b => b.setAttribute("aria-pressed", b.dataset.inv === invoer));
-  $("vz").hidden = !va; $("vzbar").hidden = !va;
+  const ptIt = selPt && st.items.find(o => o.id === selPt.id);
+  if (selPt && (!ptIt || sel !== selPt.id || tool !== "pan" || selPt.j >= ptIt.pts.length)) selPt = null;
+  $("ptbar").hidden = !selPt;
+  $("vz").hidden = !va; $("vzbar").hidden = !va || !!selPt;
   $("vzDone").hidden = $("finish").hidden;
   $("vzBack").disabled = !draft.length && !st.items.length;
   document.querySelectorAll("#units button").forEach(b => b.setAttribute("aria-pressed", b.dataset.unit === unit));
@@ -2057,9 +2070,9 @@ $("calcancel").addEventListener("click", () => { draft = []; $("calibbox").hidde
 
 /* ---------- Aanwijzer: schuiven, knijpen, tikken, slepen ---------- */
 const ptrs = new Map();
-let G = null;
+let G = null, selPt = null;        // selPt: aangetikt punt van een meting ({ id, j }), om te wissen
 view.addEventListener("pointerdown", e => {
-  if (e.target.closest(".zoom, .calibbox, .banner, .vzbar")) return;
+  if (e.target.closest(".zoom, .calibbox, .banner, .vzbar")) return;   // .ptbar is ook een .vzbar
   if (!img.w) return;
   view.setPointerCapture(e.pointerId);
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2100,7 +2113,10 @@ view.addEventListener("pointermove", e => {
     T.y = (a.y + b.y) / 2 - r.top - G.c0.y * T.s;
     applyT(true); return;
   }
-  if (G.kind === "handle") { moveHandle(G.h, toImg(e.clientX, e.clientY), e.shiftKey); return; }
+  if (G.kind === "handle") {
+    if (!G.moved && Math.hypot(e.clientX - G.sx, e.clientY - G.sy) < 5) return;
+    G.moved = true; moveHandle(G.h, toImg(e.clientX, e.clientY), e.shiftKey); return;
+  }
   if (G.kind === "hold") { holdPt = { x: e.clientX, y: e.clientY }; hover = toImg(e.clientX, e.clientY); drawLoupe(); scheduleOverlay(); return; }
   if (G.kind === "done") return;
   const dx = e.clientX - G.sx, dy = e.clientY - G.sy;
@@ -2125,7 +2141,11 @@ function endPtr(e) {
     if (vzActive()) flashHint("Vizier staat aan: schuif de tekening tot het kruisje goed staat en druk op + Punt.");
     else onTap(toImg(e.clientX, e.clientY), G, e.shiftKey);
   }
-  if (G.kind === "handle") { save(); renderAll(); }
+  if (G.kind === "handle") {
+    if (!G.moved && /^i:/.test(G.h) && e.type === "pointerup") { const [, id, j] = G.h.split(":"); selPt = { id: +id, j: +j }; }
+    else if (G.moved) selPt = null;
+    save(); renderAll();
+  }
   view.classList.remove("panning");
   G = null;
 }
@@ -2163,6 +2183,15 @@ $("invoer").addEventListener("click", e => {
 });
 $("vzAdd").addEventListener("click", () => { if (vzActive()) { onTap(vzCenter(), {}, false); vzUpdate(); scheduleOverlay(); } });
 $("vzDone").addEventListener("click", finish);
+$("ptClose").addEventListener("click", () => { selPt = null; renderAll(); });
+$("ptDel").addEventListener("click", () => {
+  if (!selPt) return;
+  const it = st.items.find(o => o.id === selPt.id); if (!it) { selPt = null; renderAll(); return; }
+  const min = { dist: 2, poly: 2, area: 3, set: 1 }[it.type] || 2;
+  if (it.pts.length <= min) { toast(it.type === "dist" ? "Een afstand heeft altijd 2 punten. Wis de hele meting met ✕ in de lijst." : `Minder dan ${min} punten kan niet. Wis de hele meting met ✕ in de lijst.`); return; }
+  it.pts.splice(selPt.j, 1); delete it.apx; delete it.apxOuter; delete it.holes;
+  selPt = null; save(); renderAll(); toast("Punt gewist");
+});
 $("vzBack").addEventListener("click", () => $("undo").click());
 $("undo").addEventListener("click", () => {
   if (draft.length) { draft.pop(); $("calibbox").hidden = true; }
