@@ -444,9 +444,12 @@ input[type="number"], input[type="text"], .nm {
       </details>
 
       <details class="sec" data-sec="sand">
-        <summary><h2>Zand</h2><span class="secsum" id="sum-sand"></span></summary>
+        <summary><h2>Grondwerk</h2><span class="secsum" id="sum-sand"></span></summary>
         <div class="secbody">
       <div class="sand" id="sand">
+        <label for="sMat">Materiaal
+          <select id="sMat"></select>
+        </label>
         <label for="sArea">Vloerveld
           <select id="sArea"></select>
         </label>
@@ -486,21 +489,21 @@ input[type="number"], input[type="text"], .nm {
           <label for="sDens">Ton/m³<input id="sDens" type="number" inputmode="decimal" step="0.05" min="0"></label>
           <label for="sTruck">Vracht m³<input id="sTruck" type="number" inputmode="decimal" step="1" min="0"></label>
         </div>
-        <label for="sMin">Waarschuw bij zand dunner dan (cm)<input id="sMin" type="number" inputmode="decimal" step="0.5" min="0"></label>
+        <label for="sMin">Waarschuw bij laag <span class="mw">zand</span> dunner dan (cm)<input id="sMin" type="number" inputmode="decimal" step="0.5" min="0"></label>
 
         <div class="sres" id="sRes"></div>
 
         <h3>Stand nu (afwerken)</h3>
-        <p class="hint" style="margin:0">Ligt het zand er al in? Vul in hoe hoog het nu ligt. Je ziet hoeveel er nog af moet, of bij, en hoeveel zand vrijkomt bij het vrijmaken van de paalkoppen en de goot.</p>
+        <p class="hint" style="margin:0">Ligt het <span class="mw">zand</span> er al in? Vul in hoe hoog het nu ligt. Je ziet hoeveel er nog af moet, of bij, en hoeveel <span class="mw">zand</span> vrijkomt bij het vrijmaken van de paalkoppen en de goot.</p>
         <div class="row3">
-          <label for="sNow">Zand ligt op (cm onder 0-peil)<input id="sNow" type="number" inputmode="decimal" step="0.5" placeholder="bijv. 17"></label>
-          <label for="sPd">Paalkop onder zand (cm)<input id="sPd" type="number" inputmode="decimal" step="1" min="0"></label>
+          <label for="sNow"><span class="Mw">Zand</span> ligt op (cm onder 0-peil)<input id="sNow" type="number" inputmode="decimal" step="0.5" placeholder="bijv. 17"></label>
+          <label for="sPd">Paalkop onder <span class="mw">zand</span> (cm)<input id="sPd" type="number" inputmode="decimal" step="1" min="0"></label>
           <label for="sPw">Maat paalkop (cm)<input id="sPw" type="number" inputmode="decimal" step="1" min="0"></label>
         </div>
         <div class="sres" id="sRes2"></div>
         <div class="flags" id="sFlags2" style="display:grid;gap:6px"></div>
         <div class="flags" id="sFlags" style="display:grid;gap:6px"></div>
-        <div class="btns"><button type="button" id="sCopy">Kopieer zandberekening</button></div>
+        <div class="btns"><button type="button" id="sCopy">Kopieer berekening</button></div>
       </div>
         </div>
       </details>
@@ -725,7 +728,7 @@ async function extractPiles(page, vp) {
 function blank() { return { mmPerPx: null, calib: null, origin: null, items: [], seq: 1, sand: sandDefaults() }; }
 
 /* ---------- Zand: peilmaten en volume ---------- */
-function sandDefaults() { return { area: null, conc: 18, ins: 0, gl: 0, gw: 100, gd: 40, comp: 15, dens: 1.6, truck: 18, min: 5, now: null, pd: 20, pw: null, start: "tl", dir: "col", snake: "1", list: "", pts: [] }; }
+function sandDefaults() { return { area: null, conc: 18, ins: 0, gl: 0, gw: 100, gd: 40, comp: 15, dens: 1.6, truck: 18, min: 5, now: null, pd: 20, pw: null, start: "tl", dir: "col", snake: "1", list: "", pts: [], mat: "zand" }; }
 let peilCur = null, cellCache = null;
 
 // Nederlandse telwoorden, zodat ingesproken metingen ("negenendertig") ook werken
@@ -1156,7 +1159,27 @@ function sandCalc() {
   };
 }
 const SAND_FIELDS = { sConc: "conc", sIns: "ins", sGl: "gl", sGw: "gw", sGd: "gd", sComp: "comp", sDens: "dens", sTruck: "truck", sMin: "min", sPd: "pd" };
+// Materiaal voor grondwerk; inklinken en gewicht zijn richtwaarden (los gestort), de leverancier weet het precies
+const MATS = {
+  zand: { name: "Ophoogzand (grijs zeezand)", w: "zand", comp: 15, dens: 1.6 },
+  drain: { name: "Drainzand", w: "drainzand", comp: 10, dens: 1.6 },
+  grond: { name: "Grond (zavel, klei)", w: "grond", comp: 15, dens: 1.7 },
+  teel: { name: "Teelaarde, zwarte grond", w: "teelaarde", comp: 20, dens: 1.4 },
+  gran: { name: "Menggranulaat, puin", w: "granulaat", comp: 25, dens: 1.5 },
+  anders: { name: "Anders (zelf invullen)", w: "materiaal", comp: null, dens: null }
+};
+const mw = () => (MATS[st.sand && st.sand.mat] || MATS.zand).w;
+const Mw = () => { const w = mw(); return w[0].toUpperCase() + w.slice(1); };
+$("sMat").innerHTML = Object.entries(MATS).map(([k, m]) => `<option value="${k}">${m.name}${m.comp != null ? ` · ${m.comp}% · ${String(m.dens).replace(".", ",")} t/m³` : ""}</option>`).join("");
+$("sMat").addEventListener("change", e => {
+  const S = st.sand, m = MATS[e.target.value]; if (!S || !m) return;
+  S.mat = e.target.value;
+  if (m.comp != null) { S.comp = m.comp; S.dens = m.dens; }
+  save(); syncSandInputs(); renderAll();
+  toast(m.comp != null ? `${m.name}: ${m.comp}% inklinken, ${String(m.dens).replace(".", ",")} ton/m³. Richtwaarden, je leverancier weet het precies.` : "Vul inklinken en ton/m³ zelf in.");
+});
 function syncSandInputs() {
+  $("sMat").value = MATS[st.sand.mat] ? st.sand.mat : "zand";
   const S = st.sand;
   $("sNow").value = S.now == null ? "" : S.now;
   $("sPw").value = S.pw == null ? "" : S.pw;
@@ -1165,6 +1188,8 @@ function syncSandInputs() {
 }
 function renderSand() {
   const S = st.sand; if (!S) return;
+  document.querySelectorAll("#sand .mw").forEach(e => { e.textContent = mw(); });
+  document.querySelectorAll("#sand .Mw").forEach(e => { e.textContent = Mw(); });
   const areas = st.items.filter(i => i.type === "area");
   if ((S.area == null || !areas.some(a => a.id === S.area)) && areas.length) S.area = areas[areas.length - 1].id;
   const sel = $("sArea");
@@ -1184,15 +1209,15 @@ function renderSand() {
       cell("Bestellen", nl(r.order, 1), "m³", true) +
       cell("Vrachten", r.trucks ? nl(r.trucks, 1) : "–", r.trucks ? `× ${nl0(S.truck)} m³` : "") +
       cell("Netto", nl(r.net, 1), "m³") + cell("Gewicht", "±" + nl0(r.tons), "ton") +
-      cell("Gem. zandlaag", nl(r.avgSand, 1), "cm") + cell("Gem. diepte", nl(r.avgD, 1), "cm") +
+      cell(`Gem. laag ${mw()}`, nl(r.avgSand, 1), "cm") + cell("Gem. diepte", nl(r.avgD, 1), "cm") +
       cell("Vloerveld", nl(r.areaM2, 1), "m²") + cell("Peilmaten", r.n + (r.total > r.n ? ` / ${r.total}` : ""), "");
     if (r.neg) fl.push(`<div class="sflag"><b>Afgraven:</b> op ${r.neg} ${r.neg === 1 ? "plek" : "plekken"} ligt de bodem hoger dan onderkant ${r.build > (+S.conc || 0) ? "isolatie" : "beton"}. Samen met de goot ±${nl(r.dig, 1)} m³ grond eruit.</div>`);
     else if (r.dig > 0.05) fl.push(`<div class="sflag"><b>Afgraven:</b> ±${nl(r.dig, 1)} m³ (goot).</div>`);
-    if (r.thin) fl.push(`<div class="sflag"><b>Dunne zandlaag:</b> ${r.thin} ${r.thin === 1 ? "plek" : "plekken"} met minder dan ${nl0(+S.min || 0)} cm zand. Een kleine meetfout betekent daar al te weinig ruimte voor het beton.</div>`);
+    if (r.thin) fl.push(`<div class="sflag"><b>Dunne laag ${mw()}:</b> ${r.thin} ${r.thin === 1 ? "plek" : "plekken"} met minder dan ${nl0(+S.min || 0)} cm ${mw()}. Een kleine meetfout betekent daar al te weinig ruimte voor het beton.</div>`);
     if (r.total > r.n) fl.push(`<div class="sflag ok">${r.total - r.n} ${r.total - r.n === 1 ? "vakje" : "vakjes"} zonder meting. Daar telt de dichtstbijzijnde meting.</div>`);
     if (r.outside) fl.push(`<div class="sflag">${r.outside} ${r.outside === 1 ? "peilmaat ligt" : "peilmaten liggen"} buiten het vloerveld.</div>`);
     if (r.gArea) fl.push(`<div class="sflag ok">Goot: ${nl(+S.gl, 1)} m¹ × ${nl((+S.gw || 0) / 100, 2)} m, beton tot ${nl0(+S.gd || 0)} cm diep.</div>`);
-    fl.push(`<div class="sflag ok">Elke centimeter die de gemiddelde hoogte afwijkt, scheelt ${nl(r.areaM2 / 100, 2)} m³ zand.</div>`);
+    fl.push(`<div class="sflag ok">Elke centimeter die de gemiddelde hoogte afwijkt, scheelt ${nl(r.areaM2 / 100, 2)} m³ ${mw()}.</div>`);
   }
   if (S.over > 0) fl.push(`<div class="sflag">Er waren ${S.over} ${S.over === 1 ? "meting" : "metingen"} meer dan vakjes. Die zijn niet gebruikt.</div>`);
   $("sFlags").innerHTML = fl.join("");
@@ -1232,14 +1257,14 @@ function renderStand() {
   const lay = r.layer > 0 ? cell(`${nl(r.layer, 1)} cm eraf`, nl(r.off, 1), "m³")
     : r.layer < 0 ? cell(`${nl(-r.layer, 1)} cm erbij`, nl(-r.off, 1), "m³") : cell("Laag", "op hoogte", "");
   box.innerHTML =
-    cell(r.free >= 0 ? "Zand over" : "Zand tekort", nl(Math.abs(r.free), 1), "m³ verdicht", true) +
+    cell(r.free >= 0 ? `${Mw()} over` : `${Mw()} tekort`, nl(Math.abs(r.free), 1), "m³ verdicht", true) +
     cell(r.free >= 0 ? "Los op de hoop" : "Los bestellen", "±" + nl(Math.abs(r.loose), 1), "m³") +
     lay +
     cell(`Paalkoppen (${r.nPiles})`, nl(r.pits, 1), "m³") +
     (r.goot ? cell("Goot uitgraven", nl(r.goot, 1), "m³") : "");
   if (!r.nPiles && piles.length) fl.push(`<div class="sflag">Er staan geen palen binnen dit vloerveld.</div>`);
   if (!piles.length) fl.push(`<div class="sflag">Geen palen herkend in de tekening, dus de paalkoppen tellen niet mee.</div>`);
-  fl.push(`<div class="sflag ok">Doel: zand op ${nl(r.target, 1)} cm onder 0-peil (onderkant ${+st.sand.ins ? "isolatie" : "beton"}). Per paal een gat zo groot als de kop: ${nl0(r.pw)} × ${nl0(r.pw)} cm${r.pwAuto ? " (maat uit de tekening)" : ""}${r.layer > 0 ? `, ${nl(Math.max(0, (+st.sand.pd || 0) - r.layer), 1)} cm dieper dan na het afhalen` : ""}. Losgegraven zand neemt ±${nl0(+st.sand.comp || 0)}% meer ruimte in.</div>`);
+  fl.push(`<div class="sflag ok">Doel: ${mw()} op ${nl(r.target, 1)} cm onder 0-peil (onderkant ${+st.sand.ins ? "isolatie" : "beton"}). Per paal een gat zo groot als de kop: ${nl0(r.pw)} × ${nl0(r.pw)} cm${r.pwAuto ? " (maat uit de tekening)" : ""}${r.layer > 0 ? `, ${nl(Math.max(0, (+st.sand.pd || 0) - r.layer), 1)} cm dieper dan na het afhalen` : ""}. Losgegraven ${mw()} neemt ±${nl0(+st.sand.comp || 0)}% meer ruimte in.</div>`);
   $("sFlags2").innerHTML = fl.join("");
 }
 function openPeil(i) {
@@ -2481,14 +2506,14 @@ $("sCopy").addEventListener("click", () => {
   const r = sandCalc(), S = st.sand, A = sandArea();
   if (r.err) { toast(r.err); return; }
   const lines = [
-    `Zand ${A ? A.name : "vloerveld"}: ${nl(r.areaM2, 1)} m², ${r.n} peilmaten, gem. ${nl(r.avgD, 1)} cm onder 0-peil`,
-    `Opbouw ${nl0(+S.conc || 0)} cm beton${+S.ins ? ` + ${nl0(+S.ins)} cm isolatie` : ""}${+S.gl ? `, goot ${nl(+S.gl, 1)} m¹` : ""} → gem. ${nl(r.avgSand, 1)} cm zand`,
+    `${(MATS[S.mat] || MATS.zand).name} — ${A ? A.name : "vloerveld"}: ${nl(r.areaM2, 1)} m², ${r.n} peilmaten, gem. ${nl(r.avgD, 1)} cm onder 0-peil`,
+    `Opbouw ${nl0(+S.conc || 0)} cm beton${+S.ins ? ` + ${nl0(+S.ins)} cm isolatie` : ""}${+S.gl ? `, goot ${nl(+S.gl, 1)} m¹` : ""} → gem. ${nl(r.avgSand, 1)} cm ${mw()}`,
     `Netto ${nl(r.net, 1)} m³, met ${nl0(+S.comp || 0)}% inklinken ${nl(r.order, 1)} m³ (±${nl0(r.tons)} ton${r.trucks ? `, ${nl(r.trucks, 1)} vracht à ${nl0(S.truck)} m³` : ""})`
   ];
   if (r.dig > 0.05) lines.push(`Uitgraven ±${nl(r.dig, 1)} m³`);
   const txt = lines.join("\n");
   const fail = () => toast("Kopiëren lukte niet.");
-  try { navigator.clipboard.writeText(txt).then(() => toast("Zandberekening gekopieerd"), fail); } catch (err) { fail(); }
+  try { navigator.clipboard.writeText(txt).then(() => toast("Berekening gekopieerd"), fail); } catch (err) { fail(); }
 });
 
 async function boot() {
