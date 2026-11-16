@@ -3,7 +3,7 @@
 //
 // Let op: alle apps op johndeere6110.github.io (Zaaihulp, Perceelkaart, Meetmaat) delen één
 // cache-opslag. Ruim daarom alleen caches op die met "meetmaat-" beginnen.
-const VERSION = "meetmaat-v47";
+const VERSION = "meetmaat-v48";
 const PREFIX = "meetmaat-";
 const CORE = [
   "./",
@@ -64,10 +64,12 @@ self.addEventListener("fetch", e => {
     e.respondWith((async () => {
       try {
         const form = await req.formData();
-        const f = form.get("file");
-        if (f && typeof f !== "string") {
-          await idbPut("shared", { name: f.name || "gedeeld.pdf", type: f.type, size: f.size, blob: f });
-        }
+        // WhatsApp e.d. sturen soms ook het begeleidende tekstje mee (als shared.txt): neem het echte bestand,
+        // dat is het grootste en niet "shared.txt"
+        const files = form.getAll("file").filter(f => f && typeof f !== "string");
+        const real = files.filter(f => f.name !== "shared.txt");
+        const f = (real.length ? real : files).sort((a, b) => b.size - a.size)[0];
+        if (f) await idbPut("shared", { name: f.name || "gedeeld.pdf", type: f.type, size: f.size, blob: f });
       } catch (err) { /* lege share: gewoon de app openen */ }
       return Response.redirect(new URL("./?shared=1", self.registration.scope).href, 303);
     })());

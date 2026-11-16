@@ -51,7 +51,10 @@
             "application/x-meetmaat"
           ]
         }
-      ]
+      ],
+      "title": "title",
+      "text": "text",
+      "url": "url"
     }
   },
   "file_handlers": [
