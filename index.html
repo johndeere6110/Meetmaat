@@ -404,8 +404,10 @@ input[type="number"], input[type="text"], .nm {
         <summary><h2>Versturen</h2><span class="secsum" id="sum-send"></span></summary>
         <div class="secbody">
           <div class="sand" id="grpSetup">
-            <p class="hint" style="margin:0">Stuur een tekening met alle metingen naar een collega of naar iedereen in je groep, zonder WhatsApp. Eenmalig instellen met een Google-script (zie de <a href="https://github.com/johndeere6110/Meetmaat/blob/main/groep/HANDLEIDING.md" target="_blank" rel="noopener" style="color:inherit">handleiding</a>), of open de groepslink die je van een collega kreeg.</p>
-            <label for="grpUrl">Web-app-link (eindigt op /exec)<input id="grpUrl" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec"></label>
+            <p class="hint" style="margin:0">Stuur een tekening met alle metingen naar een collega of naar iedereen in je groep, zonder WhatsApp. Vul de groepscode en je naam in, of open de groepslink die je van een collega kreeg: dan hoef je alleen je naam nog in te vullen.</p>
+            <details class="ppold"><summary>Andere groep (eigen web-app-link)</summary>
+              <label for="grpUrl" style="margin-top:8px">Web-app-link (eindigt op /exec)<input id="grpUrl" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec"></label>
+            </details>
             <div class="row2">
               <label for="grpCode">Groepscode<input id="grpCode" type="text" autocomplete="off"></label>
               <label for="grpNaam">Je naam<input id="grpNaam" type="text" autocomplete="off" placeholder="bijv. Andy"></label>
@@ -2499,9 +2501,12 @@ async function renderPdfPage() {
 }
 /* ---------- Groep: versturen en ophalen via het eigen Google-script ---------- */
 const GRP_KEY = "meetmaat:groep", GRP_SEEN = "meetmaat:gezien";
+// Vaste web-app van de groep (Google-script van de eigenaar); een andere link kan bij Instellingen
+const GRP_URL_VAST = "https://script.google.com/macros/s/AKfycbyHYtGu2AOAR28jzpUDGD1N4uS1oQglB_MZerpbbTP26gK3MWSnJQRagNC2LC4qXczR/exec";
 let grp = {}, grpList = [], grpBusy = false, grpErr = "";
 const grpNotified = new Set();      // per keer openen één melding per nieuwe tekening
 try { grp = JSON.parse(localStorage.getItem(GRP_KEY) || "{}") || {}; } catch (e) { grp = {}; }
+if (!grp.url) grp.url = GRP_URL_VAST;
 const grpOk = () => !!(grp.url && grp.code && grp.naam);
 const grpSaveCfg = () => { try { localStorage.setItem(GRP_KEY, JSON.stringify(grp)); } catch (e) {} };
 const grpSeen = () => { try { return JSON.parse(localStorage.getItem(GRP_SEEN) || "[]"); } catch (e) { return []; } };
@@ -2536,7 +2541,7 @@ const ago = t => { const d = (Date.now() - t) / 864e5; return d < 1 ? "vandaag" 
 function renderGrp() {
   const ok = grpOk();
   $("grpSetup").hidden = ok; $("grpMain").hidden = !ok;
-  if (!ok) { $("grpUrl").value = grp.url || ""; $("grpCode").value = grp.code || ""; $("grpNaam").value = grp.naam || ""; $("sum-send").textContent = "niet ingesteld"; return; }
+  if (!ok) { $("grpUrl").value = grp.url && grp.url !== GRP_URL_VAST ? grp.url : ""; $("grpCode").value = grp.code || ""; $("grpNaam").value = grp.naam || ""; $("sum-send").textContent = "niet ingesteld"; return; }
   $("grpWho").innerHTML = `Jij bent <b>${esc(grp.naam)}</b>.${grpBusy ? " Bezig…" : ""}${grpErr ? ` <span style="color:var(--warn)">${esc(grpErr)}</span>` : ""}`;
   const names = [...new Set(grpList.flatMap(x => [x.van, x.naar]).filter(n => n && !/^iedereen$/i.test(n) && n.toLowerCase() !== grp.naam.toLowerCase()))];
   $("grpNames").innerHTML = ["iedereen", ...names].map(n => `<option value="${esc(n)}"></option>`).join("");
@@ -2551,13 +2556,13 @@ function renderGrp() {
   $("sum-send").classList.toggle("warn", !!n);
 }
 $("grpSave").addEventListener("click", async () => {
-  const url = $("grpUrl").value.trim(), code = $("grpCode").value.trim(), naam = $("grpNaam").value.trim();
+  const url = $("grpUrl").value.trim() || GRP_URL_VAST, code = $("grpCode").value.trim(), naam = $("grpNaam").value.trim();
   if (!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(url)) { $("grpSetupMsg").textContent = "Plak de web-app-link van het Google-script (begint met https://script.google.com/…)."; return; }
   if (!code || !naam) { $("grpSetupMsg").textContent = "Vul de groepscode en je naam in."; return; }
   grp = { url, code, naam }; grpSaveCfg(); $("grpSetupMsg").textContent = "";
   await grpRefresh(); toast(grpErr ? grpErr : "Groep ingesteld");
 });
-$("grpEdit").addEventListener("click", () => { $("grpSetup").hidden = false; $("grpMain").hidden = true; $("grpUrl").value = grp.url || ""; $("grpCode").value = grp.code || ""; $("grpNaam").value = grp.naam || ""; });
+$("grpEdit").addEventListener("click", () => { $("grpSetup").hidden = false; $("grpMain").hidden = true; $("grpUrl").value = grp.url && grp.url !== GRP_URL_VAST ? grp.url : ""; $("grpCode").value = grp.code || ""; $("grpNaam").value = grp.naam || ""; });
 $("grpRefresh").addEventListener("click", () => grpRefresh());
 $("grpSend").addEventListener("click", async () => {
   const msg = $("grpSendMsg"), naar = $("grpTo").value.trim() || "iedereen";

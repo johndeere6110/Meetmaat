@@ -26,7 +26,9 @@ regelt het sturen en ophalen. Eenmalig instellen, ongeveer een kwartier.
 4. **Implementeren** en kopieer de **URL van de web-app** (eindigt op `/exec`).
 
 ## 4. In Meetmaat
-1. Open Meetmaat → zijkolom **Versturen** → plak de web-app-URL, vul de groepscode en je naam in → **Opslaan**.
+De web-app van de eigen groep staat vast in de app. Iedereen vult alleen de **groepscode** en zijn **naam** in.
+1. Open Meetmaat → zijkolom **Versturen** → groepscode en je naam → **Opslaan**.
+   (Een andere groep met een eigen script: open *Andere groep* en plak daar de web-app-URL.)
 2. Tik op **Groepslink doorsturen** en stuur die naar je collega's (WhatsApp). Wie de link opent, hoeft alleen nog
    zijn naam in te vullen.
 
