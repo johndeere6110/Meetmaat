@@ -12,7 +12,7 @@ const BEWAAR_DAGEN = 30;
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (!codeOk_(p.code)) return json_({ ok: false, fout: "code" });
-  if (p.a === "lijst") return json_({ ok: true, lijst: lijst_() });
+  if (p.a === "lijst") { if (p.wie) lid_(p.wie); return json_({ ok: true, lijst: lijst_(), leden: leden_() }); }
   if (p.a === "haal") {
     const f = bestand_(p.id);
     if (!f) return json_({ ok: false, fout: "weg" });
@@ -27,6 +27,7 @@ function doPost(e) {
   if (!codeOk_(o.code)) return json_({ ok: false, fout: "code" });
   if (o.a === "stuur") {
     if (!o.data) return json_({ ok: false, fout: "leeg" });
+    if (o.van) lid_(o.van);
     const meta = { van: tekst_(o.van), naar: tekst_(o.naar) || "iedereen", naam: tekst_(o.naam), metingen: +o.metingen || 0, tijd: Date.now() };
     const naam = (meta.naam || "tekening").replace(/[\\/:*?"<>|]+/g, "_") + " (van " + (meta.van || "?") + ").meetmaat";
     const f = map_().createFile(Utilities.newBlob(o.data, "application/json", naam));
@@ -53,6 +54,27 @@ function lijst_() {
     uit.push({ id: f.getId(), van: m.van || "", naar: m.naar || "iedereen", naam: m.naam || f.getName(), metingen: m.metingen || 0, tijd: m.tijd, grootte: f.getSize() });
   }
   return uit.sort((a, b) => b.tijd - a.tijd);
+}
+
+// Leden van de groep: iedereen die de app met de groep opent (naam + laatst gezien), max. 1 jaar oud
+function lid_(naam) {
+  naam = tekst_(naam).trim(); if (!naam) return;
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(5000);
+    const p = PropertiesService.getScriptProperties();
+    let l = {}; try { l = JSON.parse(p.getProperty("LEDEN") || "{}"); } catch (err) {}
+    const sleutel = Object.keys(l).find(k => k.toLowerCase() === naam.toLowerCase()) || naam;
+    if (sleutel !== naam) delete l[sleutel];
+    l[naam] = Date.now();
+    const grens = Date.now() - 365 * 864e5;
+    Object.keys(l).forEach(k => { if (l[k] < grens) delete l[k]; });
+    p.setProperty("LEDEN", JSON.stringify(l));
+  } catch (err) {} finally { try { lock.releaseLock(); } catch (e) {} }
+}
+function leden_() {
+  let l = {}; try { l = JSON.parse(PropertiesService.getScriptProperties().getProperty("LEDEN") || "{}"); } catch (err) {}
+  return Object.keys(l).sort((a, b) => a.localeCompare(b, "nl"));
 }
 
 function opruimen_() {

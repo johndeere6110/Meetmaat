@@ -426,10 +426,9 @@ input[type="number"], input[type="text"], .nm {
             <p class="hint" style="margin:0" id="grpWho"></p>
             <h3>Deze tekening versturen</h3>
             <div class="row2">
-              <label for="grpTo">Naar<input id="grpTo" type="text" list="grpNames" autocomplete="off" value="iedereen"></label>
+              <label for="grpTo">Naar<select id="grpTo"><option value="iedereen">Iedereen</option></select></label>
               <div style="display:grid;align-content:end"><button type="button" id="grpSend">Versturen</button></div>
             </div>
-            <datalist id="grpNames"></datalist>
             <p class="hint" id="grpSendMsg" style="margin:0"></p>
             <h3>Voor jou</h3>
             <ul class="pplist" id="grpIn"></ul>
@@ -2527,7 +2526,7 @@ async function renderPdfPage() {
 const GRP_KEY = "meetmaat:groep", GRP_SEEN = "meetmaat:gezien";
 // Vaste web-app van de groep (Google-script van de eigenaar); een andere link kan bij Instellingen
 const GRP_URL_VAST = "https://script.google.com/macros/s/AKfycbyHYtGu2AOAR28jzpUDGD1N4uS1oQglB_MZerpbbTP26gK3MWSnJQRagNC2LC4qXczR/exec";
-let grp = {}, grpList = [], grpBusy = false, grpErr = "";
+let grp = {}, grpList = [], grpLeden = [], grpBusy = false, grpErr = "";
 const grpNotified = new Set();      // per keer openen één melding per nieuwe tekening
 try { grp = JSON.parse(localStorage.getItem(GRP_KEY) || "{}") || {}; } catch (e) { grp = {}; }
 if (!grp.url) grp.url = GRP_URL_VAST;
@@ -2550,10 +2549,11 @@ async function grpRefresh(quiet) {
   if (navigator.onLine === false) { grpErr = "Geen internet. Probeer het straks opnieuw."; return renderGrp(); }
   grpBusy = true; grpErr = ""; renderGrp();
   try {
-    const r = await grpFetch("a=lijst&code=" + encodeURIComponent(grp.code));
+    const r = await grpFetch("a=lijst&code=" + encodeURIComponent(grp.code) + "&wie=" + encodeURIComponent(grp.naam));
     if (!r.ok) grpErr = r.fout === "code" ? "De groepscode klopt niet." : "Ophalen lukte niet.";
     else {
       grpList = r.lijst || [];
+      if (Array.isArray(r.leden)) grpLeden = r.leden;
       const nieuw = grpList.filter(x => forMe(x) && !grpSeen().includes(x.id) && !grpNotified.has(x.id));
       nieuw.forEach(x => grpNotified.add(x.id));
       if (quiet && nieuw.length) showBanner(`<b>${nieuw.length === 1 ? "Nieuwe tekening" : nieuw.length + " nieuwe tekeningen"}</b> voor jou: ${nieuw.slice(0, 3).map(x => `${esc(x.naam)} (van ${esc(x.van)})`).join(", ")}. Open ze bij <b>Delen</b>.`, false, 9000);
@@ -2567,8 +2567,13 @@ function renderGrp() {
   $("grpSetup").hidden = ok; $("grpMain").hidden = !ok;
   if (!ok) { $("grpUrl").value = grp.url && grp.url !== GRP_URL_VAST ? grp.url : ""; $("grpCode").value = grp.code || ""; $("grpNaam").value = grp.naam || ""; $("sum-send").textContent = "niet ingesteld"; return; }
   $("grpWho").innerHTML = `Jij bent <b>${esc(grp.naam)}</b>.${grpBusy ? " Bezig…" : ""}${grpErr ? ` <span style="color:var(--warn)">${esc(grpErr)}</span>` : ""}`;
-  const names = [...new Set(grpList.flatMap(x => [x.van, x.naar]).filter(n => n && !/^iedereen$/i.test(n) && n.toLowerCase() !== grp.naam.toLowerCase()))];
-  $("grpNames").innerHTML = ["iedereen", ...names].map(n => `<option value="${esc(n)}"></option>`).join("");
+  // keuzelijst: iedereen + alle leden van de groep (en wie al eens iets stuurde, voor een oud script zonder ledenlijst)
+  const me = grp.naam.toLowerCase(), seenN = new Set(), names = [];
+  [...grpLeden, ...grpList.flatMap(x => [x.van, x.naar])].forEach(n => { const k = (n || "").toLowerCase(); if (n && k !== "iedereen" && k !== me && !seenN.has(k)) { seenN.add(k); names.push(n); } });
+  names.sort((a, b) => a.localeCompare(b, "nl"));
+  const cur = $("grpTo").value || "iedereen";
+  $("grpTo").innerHTML = `<option value="iedereen">Iedereen</option>` + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  $("grpTo").value = [...$("grpTo").options].some(o => o.value === cur) ? cur : "iedereen";
   const seen = grpSeen(), mine = grpList.filter(forMe), out = grpList.filter(isMine);
   const row = (x, own) => `<li data-gid="${esc(x.id)}"><div class="pph"><strong>${esc(x.naam)}</strong>${!own && !seen.includes(x.id) ? `<span class="ppv" style="color:var(--mark);font-size:13px">nieuw</span>` : ""}</div>
     <div class="ppm">${own ? `naar ${esc(x.naar)}` : `van ${esc(x.van)}${/^iedereen$/i.test(x.naar) ? " · voor iedereen" : ""}`} · ${x.metingen} meting${x.metingen === 1 ? "" : "en"} · ${ago(x.tijd)} · ${nl(x.grootte / 1048576, 1)} MB</div>
@@ -2601,7 +2606,7 @@ $("grpSave").addEventListener("click", async () => {
 $("grpEdit").addEventListener("click", () => { $("grpSetup").hidden = false; $("grpMain").hidden = true; $("grpUrl").value = grp.url && grp.url !== GRP_URL_VAST ? grp.url : ""; $("grpCode").value = grp.code || ""; $("grpNaam").value = grp.naam || ""; });
 $("grpRefresh").addEventListener("click", () => grpRefresh());
 $("grpSend").addEventListener("click", async () => {
-  const msg = $("grpSendMsg"), naar = $("grpTo").value.trim() || "iedereen";
+  const msg = $("grpSendMsg"), naar = $("grpTo").value || "iedereen";
   if (!img.w || img.sample) { msg.textContent = "Open eerst je eigen tekening."; return; }
   const b = $("grpSend"); b.disabled = true; msg.textContent = "Versturen…";
   try {
@@ -2610,7 +2615,8 @@ $("grpSend").addEventListener("click", async () => {
     msg.textContent = `Versturen… (${nl(file.size / 1048576, 1)} MB, dat kan even duren)`;
     const r = await grpFetch("", { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ code: grp.code, a: "stuur", van: grp.naam, naar, naam: dispName(), metingen: st.items.length, data: await file.text() }) });
     if (!r.ok) { msg.textContent = r.fout === "code" ? "De groepscode klopt niet." : "Versturen lukte niet."; return; }
-    msg.textContent = `Verstuurd naar ${naar}.`; toast(`Verstuurd naar ${naar}`);
+    const wie = /^iedereen$/i.test(naar) ? "iedereen" : naar;
+    msg.textContent = `Verstuurd naar ${wie}.`; toast(`Verstuurd naar ${wie}`);
     grpRefresh();
   } catch (e) { msg.textContent = "Versturen lukte niet. Is er internet? Probeer het nog eens."; }
   finally { b.disabled = false; }

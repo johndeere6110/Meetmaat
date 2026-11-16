@@ -38,6 +38,12 @@ De web-app van de eigen groep staat vast in de app. Iedereen vult alleen de **gr
   met alle metingen. Nieuwe tekeningen zie je ook in een melding als je Meetmaat opent.
 - Na 30 dagen gaan verstuurde tekeningen vanzelf naar de prullenbak van je Drive (aan te passen bovenin het script).
 
+## Script bijwerken (nieuwe versie van Meetmaat)
+Soms krijgt het script iets nieuws (bijvoorbeeld de ledenlijst bij *Naar*). Zo werk je het bij, de link blijft hetzelfde:
+1. Open het script op [script.google.com](https://script.google.com), selecteer alle tekst en plak de nieuwe inhoud van
+   [`apps-script.gs`](apps-script.gs). Opslaan.
+2. **Implementeren → Implementaties beheren** → potloodje → Versie: **Nieuwe versie** → **Implementeren**.
+
 ## Beheer
 - Alles staat in de map **Meetmaat verzonden** in je Drive. Weghalen mag gewoon.
 - **Script aangepast?** Implementeren → *Implementaties beheren* → potloodje → Versie: *Nieuwe versie* → Implementeren.
