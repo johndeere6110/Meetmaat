@@ -80,7 +80,9 @@ h1 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 4.5vw
 h2 { font-family: var(--display); font-weight: 600; font-size: 19px; text-transform: uppercase; letter-spacing: .04em; margin: 0; }
 
 .filebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
-.fname { font-family: var(--mono); font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.fname { font-family: var(--mono); font-size: 13px; color: var(--muted); overflow-wrap: anywhere; background: none; border: 0; padding: 4px 2px; text-align: left; cursor: pointer; }
+.fname:empty { display: none; }
+.fname:hover { color: var(--ink); text-decoration: underline dotted; }
 select { font: 500 14px var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px; }
 
 button, .btn {
@@ -228,6 +230,9 @@ input[type="number"], input[type="text"], .nm {
 .pplist .ppm { font-size: 12px; color: var(--muted); }
 .pplist .btns button { padding: 6px 10px; font-size: 13px; }
 .ppres:empty { display: none; }
+.titlelbl { display: grid; gap: 3px; font-size: 12.5px; font-weight: 500; }
+.titlelbl input { font: 500 15px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 7px 9px; min-width: 0; }
+.titlelbl .hint { font-weight: 400; }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
 .keys dt { font: 600 12.5px var(--mono); white-space: nowrap; }
 .keys dd { margin: 0; color: var(--muted); }
@@ -295,7 +300,7 @@ input[type="number"], input[type="text"], .nm {
       <select id="page" aria-label="Pagina" hidden></select>
       <button type="button" class="ghost" id="install" hidden>App installeren</button>
       <button type="button" class="ghost" id="sendLink" title="Stuur iemand de link om Meetmaat te installeren">App doorsturen</button>
-      <span class="fname" id="fname"></span>
+      <button type="button" class="fname" id="fname" title="Naam van de tekening aanpassen"></button>
     </div>
   </header>
   <div class="tape" aria-hidden="true"></div>
@@ -403,6 +408,7 @@ input[type="number"], input[type="text"], .nm {
       <details class="sec" data-sec="send">
         <summary><h2>Versturen</h2><span class="secsum" id="sum-send"></span></summary>
         <div class="secbody">
+          <label for="drawTitle" class="titlelbl">Naam van deze tekening<input id="drawTitle" type="text" autocomplete="off" maxlength="80" placeholder="bijv. Lelypark fase 2 – riool"><span class="hint" id="drawTitleHint"></span></label>
           <div class="sand" id="grpSetup">
             <p class="hint" style="margin:0">Stuur een tekening met alle metingen naar een collega of naar iedereen in je groep, zonder WhatsApp. Vul de groepscode en je naam in, of open de groepslink die je van een collega kreeg: dan hoef je alleen je naam nog in te vullen.</p>
             <details class="ppold"><summary>Andere groep (eigen web-app-link)</summary>
@@ -2395,7 +2401,7 @@ $("list").addEventListener("input", e => {
   }
 });
 $("copy").addEventListener("click", () => {
-  const head = `${img.name || "Tekening"}${st.calib ? ` — geijkt op ${fmtMM(st.calib.mm)}` : " — niet geijkt"}`;
+  const head = `${img.sample ? img.name : dispName()}${st.calib ? ` — geijkt op ${fmtMM(st.calib.mm)}` : " — niet geijkt"}`;
   const lines = st.items.map((it, i) => { const d = describe(it); return `${i + 1}. ${it.name}: ${d.main}`; });
   const G = groupTotals();
   if (G.length) lines.push("", "Totalen per groep:", ...G.map(g => `- ${g.name} (${g.n}): ${[g.na ? fmtArea(g.a) : "", g.nl ? fmtLen(g.l) : ""].filter(Boolean).join(" · ")}`));
@@ -2449,6 +2455,20 @@ function applyAuto(auto) {
   st.noAuto = false;
   save();
 }
+// Naam van de tekening: zelf gekozen (st.title), anders de bestandsnaam zonder extensie
+const fileBase = () => (fileMeta ? fileMeta.name : img.name || "tekening").replace(/\.[^.]+$/, "");
+const dispName = () => (st && st.title && st.title.trim()) || fileBase();
+function renderTitle() {
+  const f = $("fname"), page = pdfDoc && pdfDoc.numPages > 1 ? ` · blad ${pageNo}` : "";
+  if (!img.w) { f.textContent = ""; return; }
+  f.textContent = img.sample ? img.name : dispName() + page;
+  f.title = img.sample ? "" : `Bestand: ${fileMeta ? fileMeta.name : img.name}. Tik om de naam aan te passen.`;
+  const t = $("drawTitle");
+  if (document.activeElement !== t) t.value = img.sample ? "" : (st.title || "");
+  t.placeholder = img.sample ? "Open eerst je eigen tekening" : fileBase();
+  t.disabled = !!img.sample;
+  $("drawTitleHint").textContent = img.sample ? "" : "Zo heet hij bij versturen en bij de ontvanger. Leeg = bestandsnaam.";
+}
 function setImage(key, name, sample, auto) {
   img = { w: cv.width, h: cv.height, key, name, sample };
   stage.style.width = img.w + "px"; stage.style.height = img.h + "px";
@@ -2460,7 +2480,7 @@ function setImage(key, name, sample, auto) {
   ppPending = null; ppFromVal = "0";
   draft = []; sel = null; hover = null; peilCur = null; $("peilbox").hidden = true;
   syncSandInputs();
-  $("fname").textContent = name;
+  renderTitle();
   lastAuto = sample ? null : (auto || null);
   let autoUsed = false;
   // Automatische ijking, of een eerdere automatische ijking verversen (telefoon kan op een andere resolutie tekenen)
@@ -2555,6 +2575,18 @@ function renderGrp() {
   $("sum-send").textContent = n ? `${n} nieuw` : grp.naam;
   $("sum-send").classList.toggle("warn", !!n);
 }
+$("drawTitle").addEventListener("input", e => {
+  if (img.sample || !img.w) return;
+  const v = e.target.value.replace(/\s+/g, " ").trimStart();
+  if (v.trim()) st.title = v; else delete st.title;
+  save(); renderTitle();
+});
+$("fname").addEventListener("click", () => {
+  if (!img.w || img.sample) return;
+  const d = document.querySelector('.sec[data-sec="send"]'); if (d) d.open = true;
+  d && d.scrollIntoView({ block: "center", behavior: "smooth" });
+  setTimeout(() => { $("drawTitle").focus(); $("drawTitle").select(); }, 350);
+});
 $("grpSave").addEventListener("click", async () => {
   const url = $("grpUrl").value.trim() || GRP_URL_VAST, code = $("grpCode").value.trim(), naam = $("grpNaam").value.trim();
   if (!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(url)) { $("grpSetupMsg").textContent = "Plak de web-app-link van het Google-script (begint met https://script.google.com/…)."; return; }
@@ -2572,7 +2604,7 @@ $("grpSend").addEventListener("click", async () => {
     const file = await buildExport();
     if (!file) { msg.textContent = "De tekening zelf is niet meer bewaard. Open hem opnieuw en probeer het nog eens."; return; }
     msg.textContent = `Versturen… (${nl(file.size / 1048576, 1)} MB, dat kan even duren)`;
-    const r = await grpFetch("", { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ code: grp.code, a: "stuur", van: grp.naam, naar, naam: fileMeta.name.replace(/\.[^.]+$/, ""), metingen: st.items.length, data: await file.text() }) });
+    const r = await grpFetch("", { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ code: grp.code, a: "stuur", van: grp.naam, naar, naam: dispName(), metingen: st.items.length, data: await file.text() }) });
     if (!r.ok) { msg.textContent = r.fout === "code" ? "De groepscode klopt niet." : "Versturen lukte niet."; return; }
     msg.textContent = `Verstuurd naar ${naar}.`; toast(`Verstuurd naar ${naar}`);
     grpRefresh();
@@ -2630,7 +2662,7 @@ async function buildExport() {
   if (!rec || rec.name !== fileMeta.name || rec.size !== fileMeta.size) return null;
   save();
   const payload = { app: "meetmaat", v: 1, file: { name: rec.name, type: rec.type, size: rec.size }, page: pdfDoc ? pageNo : 1, w: img.w, made: new Date().toISOString(), state: st, data: await blobToB64(rec.blob) };
-  const fname = rec.name.replace(/\.[^.]+$/, "") + ".meetmaat";
+  const fname = dispName().replace(/[\\/:*?"<>|]+/g, "_") + ".meetmaat";
   return new File([JSON.stringify(payload)], fname, { type: "application/x-meetmaat" });
 }
 $("exportBtn").addEventListener("click", async () => {
@@ -2639,7 +2671,7 @@ $("exportBtn").addEventListener("click", async () => {
   try {
     const file = await buildExport();
     if (!file) { toast("De tekening zelf is niet meer bewaard. Open hem opnieuw en probeer het nog eens."); return; }
-    const text = `${fileMeta.name} met metingen. Openen in Meetmaat: Tekening openen, en kies dit bestand (of Delen → Meetmaat).`;
+    const text = `${dispName()} met metingen. Openen in Meetmaat: Tekening openen, en kies dit bestand (of Delen → Meetmaat).`;
     // deelmenu (telefoon): Chrome deelt geen .json, wel .txt; Meetmaat opent beide
     const txtFile = new File([file], file.name.replace(/\.meetmaat$/, " (meetmaat).txt"), { type: "text/plain" });
     for (const f of [file, txtFile]) {
@@ -2670,7 +2702,7 @@ async function importMeetmaat(f) {
   } catch (e) {}
   await openFile(file);
   if (pdfDoc && page > 1 && page <= pdfDoc.numPages) { pageNo = page; $("page").value = String(page); await renderPdfPage(); }
-  showBanner(`<b>${esc(file.name)}</b> overgenomen met ${S.items.length} meting${S.items.length === 1 ? "" : "en"}${(S.pp || []).length ? ` en ${S.pp.length} peilpunt${S.pp.length === 1 ? "" : "en"}` : ""}.${had ? " Wat hier al op deze tekening stond is vervangen." : ""}`, false, 8000);
+  showBanner(`<b>${esc((S.title && S.title.trim()) || file.name)}</b> overgenomen met ${S.items.length} meting${S.items.length === 1 ? "" : "en"}${(S.pp || []).length ? ` en ${S.pp.length} peilpunt${S.pp.length === 1 ? "" : "en"}` : ""}.${had ? " Wat hier al op deze tekening stond is vervangen." : ""}`, false, 8000);
 }
 async function openFile(f, fromStore) {
   // Op inhoud herkennen, niet op naam of type: WhatsApp en andere apps veranderen die soms
