@@ -46,7 +46,9 @@
             ".json",
             "text/plain",
             ".txt",
-            "application/octet-stream"
+            "application/octet-stream",
+            ".meetmaat",
+            "application/x-meetmaat"
           ]
         }
       ]
@@ -58,6 +60,14 @@
       "accept": {
         "application/pdf": [
           ".pdf"
+        ]
+      }
+    },
+    {
+      "action": "./",
+      "accept": {
+        "application/x-meetmaat": [
+          ".meetmaat"
         ]
       }
     }

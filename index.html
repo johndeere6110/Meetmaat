@@ -2475,8 +2475,8 @@ async function buildExport() {
   if (!rec || rec.name !== fileMeta.name || rec.size !== fileMeta.size) return null;
   save();
   const payload = { app: "meetmaat", v: 1, file: { name: rec.name, type: rec.type, size: rec.size }, page: pdfDoc ? pageNo : 1, w: img.w, made: new Date().toISOString(), state: st, data: await blobToB64(rec.blob) };
-  const fname = rec.name.replace(/\.[^.]+$/, "") + " - meetmaat.json";
-  return new File([JSON.stringify(payload)], fname, { type: "application/json" });
+  const fname = rec.name.replace(/\.[^.]+$/, "") + ".meetmaat";
+  return new File([JSON.stringify(payload)], fname, { type: "application/x-meetmaat" });
 }
 $("exportBtn").addEventListener("click", async () => {
   if (!img.w || img.sample) { toast("Open eerst je eigen tekening."); return; }
@@ -2484,9 +2484,9 @@ $("exportBtn").addEventListener("click", async () => {
   try {
     const file = await buildExport();
     if (!file) { toast("De tekening zelf is niet meer bewaard. Open hem opnieuw en probeer het nog eens."); return; }
-    const text = `${fileMeta.name} met metingen. Openen in Meetmaat: Tekening openen, en kies dit bestand.`;
+    const text = `${fileMeta.name} met metingen. Openen in Meetmaat: Tekening openen, en kies dit bestand (of Delen → Meetmaat).`;
     // deelmenu (telefoon): Chrome deelt geen .json, wel .txt; Meetmaat opent beide
-    const txtFile = new File([file], file.name.replace(/\.json$/, ".txt"), { type: "text/plain" });
+    const txtFile = new File([file], file.name.replace(/\.meetmaat$/, " (meetmaat).txt"), { type: "text/plain" });
     for (const f of [file, txtFile]) {
       if (!(navigator.canShare && navigator.canShare({ files: [f] }))) continue;
       try { await navigator.share({ files: [f], title: "Meetmaat", text }); return; }
