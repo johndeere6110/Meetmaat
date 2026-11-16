@@ -27,14 +27,14 @@ regelt het sturen en ophalen. Eenmalig instellen, ongeveer een kwartier.
 
 ## 4. In Meetmaat
 De web-app van de eigen groep staat vast in de app. Iedereen vult alleen de **groepscode** en zijn **naam** in.
-1. Open Meetmaat → zijkolom **Versturen** → groepscode en je naam → **Opslaan**.
+1. Open Meetmaat → zijkolom **Delen** → groepscode en je naam → **Opslaan**.
    (Een andere groep met een eigen script: open *Andere groep* en plak daar de web-app-URL.)
 2. Tik op **Groepslink doorsturen** en stuur die naar je collega's (WhatsApp). Wie de link opent, hoeft alleen nog
    zijn naam in te vullen.
 
 ## Gebruik
-- **Versturen:** tekening open, zijkolom **Versturen** → kies naar wie (of *iedereen*) → **Versturen**.
-- **Ophalen:** bij de ander staat in **Versturen** de tekening onder *Voor jou*. Tik **Openen**: de tekening staat er
+- **Versturen:** tekening open, zijkolom **Delen** → kies naar wie (of *iedereen*) → **Versturen**.
+- **Ophalen:** bij de ander staat in **Delen** de tekening onder *Voor jou*. Tik **Openen**: de tekening staat er
   met alle metingen. Nieuwe tekeningen zie je ook in een melding als je Meetmaat opent.
 - Na 30 dagen gaan verstuurde tekeningen vanzelf naar de prullenbak van je Drive (aan te passen bovenin het script).
 

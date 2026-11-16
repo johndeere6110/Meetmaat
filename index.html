@@ -230,6 +230,7 @@ input[type="number"], input[type="text"], .nm {
 .pplist .ppm { font-size: 12px; color: var(--muted); }
 .pplist .btns button { padding: 6px 10px; font-size: 13px; }
 .ppres:empty { display: none; }
+.dh { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 6px 0 -4px; font-weight: 600; }
 .titlelbl { display: grid; gap: 3px; font-size: 12.5px; font-weight: 500; }
 .titlelbl input { font: 500 15px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 7px 9px; min-width: 0; }
 .titlelbl .hint { font-weight: 400; }
@@ -299,7 +300,7 @@ input[type="number"], input[type="text"], .nm {
       <label class="btn filebtn">Tekening openen<input id="file" type="file" aria-label="Tekening openen"></label>
       <select id="page" aria-label="Pagina" hidden></select>
       <button type="button" class="ghost" id="install" hidden>App installeren</button>
-      <button type="button" class="ghost" id="sendLink" title="Stuur iemand de link om Meetmaat te installeren">App doorsturen</button>
+      <button type="button" class="ghost" id="shareBtn" title="Deze tekening met metingen delen met iemand">Delen</button>
       <button type="button" class="fname" id="fname" title="Naam van de tekening aanpassen"></button>
     </div>
   </header>
@@ -397,8 +398,7 @@ input[type="number"], input[type="text"], .nm {
       <datalist id="grplist"></datalist>
       <datalist id="codelist"></datalist>
       <div class="btns">
-        <button type="button" id="exportBtn">Delen met metingen</button>
-        <button type="button" class="ghost" id="copy">Kopieer lijst</button>
+        <button type="button" id="copy">Kopieer lijst</button>
         <button type="button" class="ghost" id="clearall">Alles wissen</button>
       </div>
         </div>
@@ -406,9 +406,10 @@ input[type="number"], input[type="text"], .nm {
       <div class="toast" id="toast"></div>
 
       <details class="sec" data-sec="send">
-        <summary><h2>Versturen</h2><span class="secsum" id="sum-send"></span></summary>
+        <summary><h2>Delen</h2><span class="secsum" id="sum-send"></span></summary>
         <div class="secbody">
           <label for="drawTitle" class="titlelbl">Naam van deze tekening<input id="drawTitle" type="text" autocomplete="off" maxlength="80" placeholder="bijv. Lelypark fase 2 – riool"><span class="hint" id="drawTitleHint"></span></label>
+          <h3 class="dh">Naar collega's in Meetmaat</h3>
           <div class="sand" id="grpSetup">
             <p class="hint" style="margin:0">Stuur een tekening met alle metingen naar een collega of naar iedereen in je groep, zonder WhatsApp. Vul de groepscode en je naam in, of open de groepslink die je van een collega kreeg: dan hoef je alleen je naam nog in te vullen.</p>
             <details class="ppold"><summary>Andere groep (eigen web-app-link)</summary>
@@ -435,6 +436,9 @@ input[type="number"], input[type="text"], .nm {
             <details class="ppold" id="grpOutBox"><summary>Door jou verstuurd</summary><ul class="pplist" id="grpOut" style="margin-top:8px"></ul></details>
             <div class="btns"><button type="button" class="ghost" id="grpRefresh">Bijwerken</button><button type="button" class="ghost" id="grpLink">Groepslink doorsturen</button><button type="button" class="ghost" id="grpEdit">Instellingen</button></div>
           </div>
+          <h3 class="dh">Als bestand (WhatsApp, mail)</h3>
+          <p class="hint" style="margin:0">Voor iemand buiten de groep. De ander opent het bestand in Meetmaat met <b>Tekening openen</b>, of via Delen → Meetmaat.</p>
+          <div class="btns"><button type="button" class="ghost" id="exportBtn">Als bestand delen</button></div>
         </div>
       </details>
 
@@ -2552,7 +2556,7 @@ async function grpRefresh(quiet) {
       grpList = r.lijst || [];
       const nieuw = grpList.filter(x => forMe(x) && !grpSeen().includes(x.id) && !grpNotified.has(x.id));
       nieuw.forEach(x => grpNotified.add(x.id));
-      if (quiet && nieuw.length) showBanner(`<b>${nieuw.length === 1 ? "Nieuwe tekening" : nieuw.length + " nieuwe tekeningen"}</b> voor jou: ${nieuw.slice(0, 3).map(x => `${esc(x.naam)} (van ${esc(x.van)})`).join(", ")}. Open ze bij <b>Versturen</b>.`, false, 9000);
+      if (quiet && nieuw.length) showBanner(`<b>${nieuw.length === 1 ? "Nieuwe tekening" : nieuw.length + " nieuwe tekeningen"}</b> voor jou: ${nieuw.slice(0, 3).map(x => `${esc(x.naam)} (van ${esc(x.van)})`).join(", ")}. Open ze bij <b>Delen</b>.`, false, 9000);
     }
   } catch (e) { grpErr = "Kon de groep niet bereiken. Klopt de web-app-link, en is er internet?"; }
   finally { grpBusy = false; renderGrp(); }
@@ -2643,7 +2647,7 @@ $("grpLink").addEventListener("click", async () => {
       grp = { url: o.u, code: o.c, naam: grp.naam || "" }; grpSaveCfg();
       setTimeout(() => {
         const d = document.querySelector('.sec[data-sec="send"]'); if (d) d.open = true;
-        renderGrp(); if (!grp.naam) { $("grpNaam").focus(); showBanner("Groepslink ontvangen. Vul bij <b>Versturen</b> je naam in en tik op <b>Opslaan</b>.", false, 9000); }
+        renderGrp(); if (!grp.naam) { $("grpNaam").focus(); showBanner("Groepslink ontvangen. Vul bij <b>Delen</b> je naam in en tik op <b>Opslaan</b>.", false, 9000); }
         d && d.scrollIntoView({ block: "center" });
       }, 300);
     }
@@ -2835,7 +2839,12 @@ async function sendInstallLink() {
   try { await navigator.clipboard.writeText(url); toast("Link gekopieerd, plak hem in WhatsApp of een mail"); }
   catch (e) { toast("Stuur deze link: " + url); }
 }
-$("sendLink").addEventListener("click", sendInstallLink);
+$("shareBtn").addEventListener("click", () => {
+  const d = document.querySelector('.sec[data-sec="send"]'); if (!d) return;
+  d.open = true; d.scrollIntoView({ block: "start", behavior: "smooth" });
+  if (!img.w || img.sample) toast("Open eerst je eigen tekening, dan kun je hem delen.");
+  else setTimeout(() => { const t = grpOk() ? $("grpTo") : $("drawTitle"); t.focus(); }, 400);
+});
 $("sendLink2").addEventListener("click", e => { e.preventDefault(); sendInstallLink(); });
 if ("launchQueue" in window) {
   launchQueue.setConsumer(async params => {
