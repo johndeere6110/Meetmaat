@@ -133,6 +133,12 @@ body.metpijl main { padding-bottom: 90px; }
     <a class="btn" href="./">Of gebruik Meetmaat hier op de computer</a>
   </section>
 
+  <section class="card main" id="vGroep" hidden>
+    <h2>Je bent uitgenodigd voor een groep</h2>
+    <p style="margin:0">Installeer Meetmaat hieronder. Open daarna de app: hij vraagt alleen nog je naam, dan zit je in de groep en kun je tekeningen met metingen naar elkaar sturen.</p>
+    <div class="tip" id="groepIos" hidden><strong>iPhone:</strong> vraagt de app niet om je naam? Ga in Meetmaat naar <b>Instellingen</b> en vul groepscode <b id="groepCode"></b> en je naam in.</div>
+  </section>
+
   <section class="card" id="deel">
     <h2>Doorsturen naar iemand anders</h2>
     <p style="margin:0">Stuur de link via WhatsApp of mail. De ander krijgt dan deze pagina met de stappen voor zijn telefoon.</p>
@@ -187,8 +193,21 @@ body.metpijl main { padding-bottom: 90px; }
   const androidInApp = android && (/; wv\)/.test(ua) || /FBAN|FBAV|Instagram/.test(ua));
   const show = id => { $(id).hidden = false; };
 
-  // Doorsturen: deelmenu (WhatsApp, mail), anders kopiëren
-  const deelUrl = new URL("installeren.html", location.href).href;
+  // Uitnodiging voor een groep (installeren.html#groep=…): alvast bewaren, de app vraagt daarna alleen de naam
+  const gm = /[#&]groep=([A-Za-z0-9_-]+)/.exec(location.hash);
+  if (gm) {
+    try {
+      const o = JSON.parse(decodeURIComponent(escape(atob(gm[1].replace(/-/g, "+").replace(/_/g, "/")))));
+      if (o && o.u && o.c) {
+        let prev = {}; try { prev = JSON.parse(localStorage.getItem("meetmaat:groep") || "{}") || {}; } catch (e) {}
+        localStorage.setItem("meetmaat:groep", JSON.stringify({ url: o.u, code: o.c, naam: prev.code === o.c ? (prev.naam || "") : (prev.naam || "") }));
+        show("vGroep"); $("groepCode").textContent = o.c;
+        if (ios) show("groepIos");
+      }
+    } catch (e) {}
+  }
+  // Doorsturen: deelmenu (WhatsApp, mail), anders kopiëren; een groepsuitnodiging gaat mee
+  const deelUrl = new URL("installeren.html", location.href).href + (gm ? "#groep=" + gm[1] : "");
   $("bDeel").addEventListener("click", async () => {
     const note = $("deelNote");
     const zeg = t => { note.textContent = t; note.hidden = false; };

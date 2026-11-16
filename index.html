@@ -2689,9 +2689,9 @@ $("grpMain").addEventListener("click", async e => {
   });
 });
 // Groepslink: web-app-link en code in één link, zodat collega's alleen hun naam nog invullen
+const grpLinkData = () => btoa(unescape(encodeURIComponent(JSON.stringify({ u: grp.url, c: grp.code })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 $("grpLink").addEventListener("click", async () => {
-  const data = btoa(unescape(encodeURIComponent(JSON.stringify({ u: grp.url, c: grp.code })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const url = new URL("./", location.href).href + "#groep=" + data;
+  const url = new URL("./", location.href).href + "#groep=" + grpLinkData();
   try { if (navigator.share) { await navigator.share({ title: "Meetmaat groep", text: "Doe mee met de Meetmaat-groep: open deze link (en installeer Meetmaat als je hem nog niet hebt).", url }); return; } }
   catch (e) { if (e && e.name === "AbortError") return; }
   try { await navigator.clipboard.writeText(url); toast("Groepslink gekopieerd"); } catch (e) { toast("Stuur deze link: " + url); }
@@ -2713,6 +2713,10 @@ $("grpLink").addEventListener("click", async () => {
 })();
 renderGrp();
 if (grpOk()) setTimeout(() => grpRefresh(true), 2500);
+// Via de installatielink in een groep gezet, maar nog geen naam: vraag die bij het eerste openen
+else if (grp.code && grp.url && !grp.naam && !/[#&]groep=/.test(location.hash)) setTimeout(() => {
+  openSettings("grpNaam"); $("grpSetupMsg").textContent = "Je bent uitgenodigd voor de groep. Vul je naam in en tik op Opslaan.";
+}, 1200);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && grpOk()) grpRefresh(true); });
 
 /* ---------- Delen met metingen: tekening + alles wat erop staat in één bestand ---------- */
@@ -2888,10 +2892,13 @@ $("install").addEventListener("click", async () => {
   installEvt = null; $("install").hidden = true;
 });
 // Installatielink delen (deelmenu: WhatsApp, mail enz.), anders kopiëren
+// App doorsturen: installatielink; zit je in een groep, dan gaat de groep mee (de ander vult alleen zijn naam nog in)
 async function sendInstallLink() {
-  const url = new URL("installeren.html", location.href).href;
+  const inGroup = grpOk() && !grpBadCode;
+  const url = new URL("installeren.html", location.href).href + (inGroup ? "#groep=" + grpLinkData() : "");
+  const text = inGroup ? "Installeer Meetmaat en doe meteen mee met onze groep:" : "Meetmaat installeren op je telefoon:";
   try {
-    if (navigator.share) { await navigator.share({ title: "Meetmaat", text: "Meetmaat installeren op je telefoon:", url }); return; }
+    if (navigator.share) { await navigator.share({ title: "Meetmaat", text, url }); return; }
   } catch (e) { if (e && e.name === "AbortError") return; }
   try { await navigator.clipboard.writeText(url); toast("Link gekopieerd, plak hem in WhatsApp of een mail"); }
   catch (e) { toast("Stuur deze link: " + url); }
