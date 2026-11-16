@@ -219,7 +219,11 @@ input[type="number"], input[type="text"], .nm {
 .nm { font-family: var(--body); font-size: 14px; padding: 4px 8px; background: var(--panel); }
 .val { font: 600 16px var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .subv { font: 12.5px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
-.toast { font-size: 13px; color: var(--ok); min-height: 1.2em; }
+/* Melding: zwevend onderin het scherm, ook op de telefoon zichtbaar; leeg = weg */
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 50;
+  max-width: min(520px, calc(100% - 32px)); width: max-content; padding: 10px 16px; border-radius: 8px;
+  background: var(--ink); color: var(--panel); font: 500 14px/1.35 var(--body); box-shadow: 0 6px 20px rgba(0,0,0,.3); pointer-events: none; }
+.toast:empty { display: none; }
 
 /* Zand */
 .sand { display: grid; gap: 10px; }
@@ -1923,7 +1927,7 @@ function showBanner(html, err, hideMs) {
   b.innerHTML = html; b.classList.toggle("err", !!err); b.hidden = false;
   if (hideMs) showBanner.tm = setTimeout(() => { b.hidden = true; }, hideMs);
 }
-function toast(t) { const el = $("toast"); el.textContent = t; clearTimeout(toast.tm); toast.tm = setTimeout(() => el.textContent = "", 2500); }
+function toast(t) { const el = $("toast"); el.textContent = t; clearTimeout(toast.tm); toast.tm = setTimeout(() => el.textContent = "", Math.min(7000, 2200 + String(t).length * 40)); }
 
 function renderTools() {
   document.querySelectorAll("#tools [data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === tool));
