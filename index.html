@@ -291,10 +291,10 @@ input[type="number"], input[type="text"], .nm {
       <p class="sub">Open een tekening, ijk hem op een maat die je kent en lees afstanden, lengtes, oppervlakken en uitzetmaten af voor in het werk.</p>
     </div>
     <div class="filebar">
-      <label class="btn filebtn">Tekening openen<input id="file" type="file" accept="application/pdf,.pdf,image/*" aria-label="Tekening openen"></label>
+      <label class="btn filebtn">Tekening openen<input id="file" type="file" accept="application/pdf,.pdf,image/*,application/json,.json,text/plain,.txt" aria-label="Tekening openen"></label>
       <select id="page" aria-label="Pagina" hidden></select>
       <button type="button" class="ghost" id="install" hidden>App installeren</button>
-      <button type="button" class="ghost" id="sendLink">Doorsturen</button>
+      <button type="button" class="ghost" id="sendLink" title="Stuur iemand de link om Meetmaat te installeren">App doorsturen</button>
       <span class="fname" id="fname"></span>
     </div>
   </header>
@@ -392,7 +392,8 @@ input[type="number"], input[type="text"], .nm {
       <datalist id="grplist"></datalist>
       <datalist id="codelist"></datalist>
       <div class="btns">
-        <button type="button" id="copy">Kopieer lijst</button>
+        <button type="button" id="exportBtn">Delen met metingen</button>
+        <button type="button" class="ghost" id="copy">Kopieer lijst</button>
         <button type="button" class="ghost" id="clearall">Alles wissen</button>
       </div>
         </div>
@@ -1347,7 +1348,17 @@ function armed(btn, fn) {
 /* ---------- Opslaan per tekening (alleen in deze browser) ---------- */
 function save() {
   if (img.sample || !img.key) return;
+  st._w = img.w;                       // breedte van de ingelezen tekening: andere apparaten kunnen anders inlezen
   try { localStorage.setItem("meetmaat:" + img.key, JSON.stringify(st)); } catch (e) {}
+}
+// Alle punten en maten omrekenen als de tekening op een andere resolutie is ingelezen (ander apparaat)
+function rescaleState(S, f) {
+  const P = p => { if (p && p.x != null) { p.x *= f; p.y *= f; } };
+  (S.items || []).forEach(it => { (it.pts || []).forEach(P); (it.holes || []).forEach(h => h.forEach(P)); if (it.apx != null) it.apx *= f * f; if (it.apxOuter != null) it.apxOuter *= f * f; });
+  P(S.origin); if (S.calib) { P(S.calib.a); P(S.calib.b); }
+  if (S.sand) (S.sand.pts || []).forEach(P);
+  (S.pp || []).forEach(q => { if (q.x != null) P(q); });
+  if (S.mmPerPx) S.mmPerPx /= f;
 }
 function loadState(key) {
   try { const s = JSON.parse(localStorage.getItem("meetmaat:" + key) || "null"); if (s && Array.isArray(s.items)) return s; } catch (e) {}
@@ -2411,6 +2422,7 @@ function setImage(key, name, sample, auto) {
   stage.style.width = img.w + "px"; stage.style.height = img.h + "px";
   cv.style.width = img.w + "px"; cv.style.height = img.h + "px";
   st = sample ? sampleState() : (loadState(key) || blank());
+  if (!sample && st._w && Math.abs(st._w - img.w) > 0.5) { rescaleState(st, img.w / st._w); st._w = img.w; }
   st.sand = Object.assign(sandDefaults(), st.sand || {});
   if (!Array.isArray(st.pp)) st.pp = [];
   ppPending = null; ppFromVal = "0";
@@ -2455,7 +2467,58 @@ async function renderPdfPage() {
     setImage(`${fileMeta.name}|${fileMeta.size}|p${pageNo}`, fileMeta.name + (pdfDoc.numPages > 1 ? ` · blad ${pageNo}` : ""), false, auto);
   } finally { $("loading").hidden = true; }
 }
+/* ---------- Delen met metingen: tekening + alles wat erop staat in één bestand ---------- */
+const blobToB64 = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1] || ""); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
+async function buildExport() {
+  if (!img.w || img.sample || !fileMeta) return null;
+  const rec = await IDB.get("last");
+  if (!rec || rec.name !== fileMeta.name || rec.size !== fileMeta.size) return null;
+  save();
+  const payload = { app: "meetmaat", v: 1, file: { name: rec.name, type: rec.type, size: rec.size }, page: pdfDoc ? pageNo : 1, w: img.w, made: new Date().toISOString(), state: st, data: await blobToB64(rec.blob) };
+  const fname = rec.name.replace(/\.[^.]+$/, "") + " - meetmaat.json";
+  return new File([JSON.stringify(payload)], fname, { type: "application/json" });
+}
+$("exportBtn").addEventListener("click", async () => {
+  if (!img.w || img.sample) { toast("Open eerst je eigen tekening."); return; }
+  const b = $("exportBtn"); b.disabled = true;
+  try {
+    const file = await buildExport();
+    if (!file) { toast("De tekening zelf is niet meer bewaard. Open hem opnieuw en probeer het nog eens."); return; }
+    const text = `${fileMeta.name} met metingen. Openen in Meetmaat: Tekening openen, en kies dit bestand.`;
+    // deelmenu (telefoon): Chrome deelt geen .json, wel .txt; Meetmaat opent beide
+    const txtFile = new File([file], file.name.replace(/\.json$/, ".txt"), { type: "text/plain" });
+    for (const f of [file, txtFile]) {
+      if (!(navigator.canShare && navigator.canShare({ files: [f] }))) continue;
+      try { await navigator.share({ files: [f], title: "Meetmaat", text }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name;
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
+    showBanner(`<b>${esc(file.name)}</b> is opgeslagen (meestal in Downloads). Stuur het via WhatsApp of mail naar de telefoon. Daar: Meetmaat → <b>Tekening openen</b> → dit bestand.`, false, 10000);
+  } finally { b.disabled = false; }
+});
+async function importMeetmaat(f) {
+  let o = null;
+  try { o = JSON.parse(await f.text()); } catch (e) {}
+  if (!o || o.app !== "meetmaat" || !o.data || !o.file || !o.state) { showBanner("Dit is geen Meetmaat-bestand. Open een PDF, een foto of een bestand dat met <b>Delen met metingen</b> is gemaakt.", true, 7000); return; }
+  showBanner(`Bezig met overnemen: <b>${esc(o.file.name)}</b>…`);
+  const bin = Uint8Array.from(atob(o.data), c => c.charCodeAt(0));
+  const file = new File([bin], o.file.name, { type: o.file.type || "" });
+  const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name), page = isPdf ? (o.page || 1) : 0;
+  const key = `${file.name}|${file.size}${isPdf ? `|p${page}` : ""}`;
+  const S = o.state; if (o.w) S._w = o.w;
+  let had = false;
+  try {
+    const prev = localStorage.getItem("meetmaat:" + key);
+    if (prev) { had = (JSON.parse(prev).items || []).length > 0; localStorage.setItem("meetmaat:" + key + "|vorige", prev); }
+    localStorage.setItem("meetmaat:" + key, JSON.stringify(S));
+  } catch (e) {}
+  await openFile(file);
+  if (pdfDoc && page > 1 && page <= pdfDoc.numPages) { pageNo = page; $("page").value = String(page); await renderPdfPage(); }
+  showBanner(`<b>${esc(file.name)}</b> overgenomen met ${S.items.length} meting${S.items.length === 1 ? "" : "en"}${(S.pp || []).length ? ` en ${S.pp.length} peilpunt${S.pp.length === 1 ? "" : "en"}` : ""}.${had ? " Wat hier al op deze tekening stond is vervangen." : ""}`, false, 8000);
+}
 async function openFile(f, fromStore) {
+  if (/\.(json|txt)$/i.test(f.name) || /^(application\/json|text\/plain)$/.test(f.type)) return importMeetmaat(f);
   fileMeta = { name: f.name, size: f.size };
   if (!fromStore) IDB.put("last", { name: f.name, type: f.type, size: f.size, blob: new Blob([f], { type: f.type }) }).catch(() => {});
   const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
