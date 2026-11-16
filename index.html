@@ -1996,7 +1996,13 @@ function renderPeil() {
   const opts = [`<option value="0">0-punt (0 cm)</option>`, ...L.map(x => `<option value="${x.id}">${esc(x.name)} (${fmtPeil(x.h)})</option>`)];
   $("ppFrom").innerHTML = opts.join(""); $("ppFrom").value = ppFromVal;
   const conc = (st.sand && st.sand.conc) || 18;
-  $("ppQuick").innerHTML = `<button type="button" class="ghost" data-t="0">0 · bovenkant ${topName()}</button><button type="button" class="ghost" data-t="${-conc}">−${nl(conc, conc % 1 ? 1 : 0)} · onderkant ${topName()}</button>`;
+  // snelknoppen: bovenkant en onderkant van de opbouw (uit Grondwerk), plus de laatste eigen hoogtes
+  const cmS = v => (v > 0 ? "+" : v < 0 ? "−" : "") + nl(Math.abs(v), Math.abs(v) % 1 ? 1 : 0);
+  const quick = [[0, `bovenkant ${topName()}`], [-conc, `onderkant ${topName()}`]];
+  const ins = +(st.sand && st.sand.ins) || 0;
+  if (ins && st.sand.mid !== "geen") quick.push([-(conc + ins), `onderkant ${midName()}`]);
+  (st.ppRecent || []).forEach(v => { if (!quick.some(q => Math.abs(q[0] - v) < 0.05)) quick.push([v, "eigen"]); });
+  $("ppQuick").innerHTML = quick.map(([v, t]) => `<button type="button" class="ghost" data-t="${v}">${cmS(v)} · ${t}</button>`).join("");
   $("ppList").innerHTML = L.length ? L.map(x => `<li data-pp="${x.id}">
       <div class="pph"><strong>${esc(x.name)}</strong><span class="ppv">${fmtPeil(x.h)}</span></div>
       <div class="ppm">${esc(x.date || "")}${x.from ? ` · vanaf ${esc(x.from)}` : ""} · ${x.x != null ? "op de tekening" : "geen plek op de tekening"}</div>
@@ -2022,6 +2028,13 @@ $("ppTake").addEventListener("click", () => {
   const nh = ppOldNew(); if (nh == null) return;
   ppSignV = nh < 0 ? -1 : 1; $("ppH").value = cmTxt(nh); ppTaken = { h: nh, from: ppFromName() }; ppCalc();
   $("ppH").scrollIntoView({ block: "center", behavior: "smooth" }); toast(`${fmtPeil(nh)} overgenomen`);
+});
+// een zelf getypte hoogte bewaren als snelknop (laatste 4, per tekening)
+$("ppT").addEventListener("change", () => {
+  const v = numIn($("ppT").value); if (!okN(v)) return;
+  const cm = Math.round(v) / 10;
+  st.ppRecent = [cm, ...(st.ppRecent || []).filter(x => Math.abs(x - cm) > 0.05)].slice(0, 4);
+  save(); renderPeil();
 });
 $("ppQuick").addEventListener("click", e => { const b = e.target.closest("[data-t]"); if (!b) return; $("ppT").value = b.dataset.t === "0" ? "0" : String(b.dataset.t).replace(".", ","); ppCalc(); });
 $("ppPlace").addEventListener("click", () => {
