@@ -291,7 +291,7 @@ input[type="number"], input[type="text"], .nm {
       <p class="sub">Open een tekening, ijk hem op een maat die je kent en lees afstanden, lengtes, oppervlakken en uitzetmaten af voor in het werk.</p>
     </div>
     <div class="filebar">
-      <label class="btn filebtn">Tekening openen<input id="file" type="file" accept="application/pdf,.pdf,image/*,application/json,.json,text/plain,.txt" aria-label="Tekening openen"></label>
+      <label class="btn filebtn">Tekening openen<input id="file" type="file" aria-label="Tekening openen"></label>
       <select id="page" aria-label="Pagina" hidden></select>
       <button type="button" class="ghost" id="install" hidden>App installeren</button>
       <button type="button" class="ghost" id="sendLink" title="Stuur iemand de link om Meetmaat te installeren">App doorsturen</button>
@@ -2518,7 +2518,16 @@ async function importMeetmaat(f) {
   showBanner(`<b>${esc(file.name)}</b> overgenomen met ${S.items.length} meting${S.items.length === 1 ? "" : "en"}${(S.pp || []).length ? ` en ${S.pp.length} peilpunt${S.pp.length === 1 ? "" : "en"}` : ""}.${had ? " Wat hier al op deze tekening stond is vervangen." : ""}`, false, 8000);
 }
 async function openFile(f, fromStore) {
-  if (/\.(json|txt)$/i.test(f.name) || /^(application\/json|text\/plain)$/.test(f.type)) return importMeetmaat(f);
+  // Op inhoud herkennen, niet op naam of type: WhatsApp en andere apps veranderen die soms
+  let head = "";
+  try { head = await f.slice(0, 16).text(); } catch (e) {}
+  if (/^\s*\{/.test(head)) return importMeetmaat(f);
+  const looksPdf = head.startsWith("%PDF");
+  if (!looksPdf && !/^image\//.test(f.type) && !/\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(f.name) && !/\.pdf$/i.test(f.name) && f.type !== "application/pdf") {
+    showBanner(`<b>${esc(f.name)}</b> kan Meetmaat niet openen. Kies een PDF, een foto of screenshot, of een bestand dat met <b>Delen met metingen</b> is gemaakt.`, true, 8000);
+    return;
+  }
+  if (looksPdf && f.type !== "application/pdf" && !/\.pdf$/i.test(f.name)) f = new File([f], f.name + ".pdf", { type: "application/pdf" });
   fileMeta = { name: f.name, size: f.size };
   if (!fromStore) IDB.put("last", { name: f.name, type: f.type, size: f.size, blob: new Blob([f], { type: f.type }) }).catch(() => {});
   const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
