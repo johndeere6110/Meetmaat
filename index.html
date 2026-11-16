@@ -400,6 +400,36 @@ input[type="number"], input[type="text"], .nm {
       </details>
       <div class="toast" id="toast"></div>
 
+      <details class="sec" data-sec="send">
+        <summary><h2>Versturen</h2><span class="secsum" id="sum-send"></span></summary>
+        <div class="secbody">
+          <div class="sand" id="grpSetup">
+            <p class="hint" style="margin:0">Stuur een tekening met alle metingen naar een collega of naar iedereen in je groep, zonder WhatsApp. Eenmalig instellen met een Google-script (zie de <a href="https://github.com/johndeere6110/Meetmaat/blob/main/groep/HANDLEIDING.md" target="_blank" rel="noopener" style="color:inherit">handleiding</a>), of open de groepslink die je van een collega kreeg.</p>
+            <label for="grpUrl">Web-app-link (eindigt op /exec)<input id="grpUrl" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec"></label>
+            <div class="row2">
+              <label for="grpCode">Groepscode<input id="grpCode" type="text" autocomplete="off"></label>
+              <label for="grpNaam">Je naam<input id="grpNaam" type="text" autocomplete="off" placeholder="bijv. Andy"></label>
+            </div>
+            <div class="btns"><button type="button" id="grpSave">Opslaan</button></div>
+            <p class="hint" id="grpSetupMsg" style="margin:0"></p>
+          </div>
+          <div class="sand" id="grpMain" hidden>
+            <p class="hint" style="margin:0" id="grpWho"></p>
+            <h3>Deze tekening versturen</h3>
+            <div class="row2">
+              <label for="grpTo">Naar<input id="grpTo" type="text" list="grpNames" autocomplete="off" value="iedereen"></label>
+              <div style="display:grid;align-content:end"><button type="button" id="grpSend">Versturen</button></div>
+            </div>
+            <datalist id="grpNames"></datalist>
+            <p class="hint" id="grpSendMsg" style="margin:0"></p>
+            <h3>Voor jou</h3>
+            <ul class="pplist" id="grpIn"></ul>
+            <details class="ppold" id="grpOutBox"><summary>Door jou verstuurd</summary><ul class="pplist" id="grpOut" style="margin-top:8px"></ul></details>
+            <div class="btns"><button type="button" class="ghost" id="grpRefresh">Bijwerken</button><button type="button" class="ghost" id="grpLink">Groepslink doorsturen</button><button type="button" class="ghost" id="grpEdit">Instellingen</button></div>
+          </div>
+        </div>
+      </details>
+
       <details class="sec" data-sec="peil">
         <summary><h2>Peilpunten</h2><span class="secsum" id="sum-peil"></span></summary>
         <div class="secbody">
@@ -2467,6 +2497,126 @@ async function renderPdfPage() {
     setImage(`${fileMeta.name}|${fileMeta.size}|p${pageNo}`, fileMeta.name + (pdfDoc.numPages > 1 ? ` · blad ${pageNo}` : ""), false, auto);
   } finally { $("loading").hidden = true; }
 }
+/* ---------- Groep: versturen en ophalen via het eigen Google-script ---------- */
+const GRP_KEY = "meetmaat:groep", GRP_SEEN = "meetmaat:gezien";
+let grp = {}, grpList = [], grpBusy = false, grpErr = "";
+const grpNotified = new Set();      // per keer openen één melding per nieuwe tekening
+try { grp = JSON.parse(localStorage.getItem(GRP_KEY) || "{}") || {}; } catch (e) { grp = {}; }
+const grpOk = () => !!(grp.url && grp.code && grp.naam);
+const grpSaveCfg = () => { try { localStorage.setItem(GRP_KEY, JSON.stringify(grp)); } catch (e) {} };
+const grpSeen = () => { try { return JSON.parse(localStorage.getItem(GRP_SEEN) || "[]"); } catch (e) { return []; } };
+const grpMarkSeen = id => { const s = grpSeen(); if (!s.includes(id)) { s.push(id); try { localStorage.setItem(GRP_SEEN, JSON.stringify(s.slice(-300))); } catch (e) {} } };
+const isMine = x => (x.van || "").toLowerCase() === (grp.naam || "").toLowerCase();
+const forMe = x => !isMine(x) && (/^iedereen$/i.test(x.naar || "") || (x.naar || "").toLowerCase() === (grp.naam || "").toLowerCase());
+async function grpFetch(qs, opts, asText) {
+  const ac = typeof AbortController === "function" ? new AbortController() : null, t = ac ? setTimeout(() => ac.abort(), 120000) : null;
+  try {
+    const res = await fetch(grp.url + (qs ? (grp.url.includes("?") ? "&" : "?") + qs : ""), Object.assign({ signal: ac ? ac.signal : undefined, cache: "no-store", redirect: "follow" }, opts || {}));
+    if (!res.ok) throw new Error("server " + res.status);
+    return asText ? await res.text() : await res.json();
+  } finally { if (t) clearTimeout(t); }
+}
+async function grpRefresh(quiet) {
+  if (!grpOk() || grpBusy) return renderGrp();
+  if (navigator.onLine === false) { grpErr = "Geen internet. Probeer het straks opnieuw."; return renderGrp(); }
+  grpBusy = true; grpErr = ""; renderGrp();
+  try {
+    const r = await grpFetch("a=lijst&code=" + encodeURIComponent(grp.code));
+    if (!r.ok) grpErr = r.fout === "code" ? "De groepscode klopt niet." : "Ophalen lukte niet.";
+    else {
+      grpList = r.lijst || [];
+      const nieuw = grpList.filter(x => forMe(x) && !grpSeen().includes(x.id) && !grpNotified.has(x.id));
+      nieuw.forEach(x => grpNotified.add(x.id));
+      if (quiet && nieuw.length) showBanner(`<b>${nieuw.length === 1 ? "Nieuwe tekening" : nieuw.length + " nieuwe tekeningen"}</b> voor jou: ${nieuw.slice(0, 3).map(x => `${esc(x.naam)} (van ${esc(x.van)})`).join(", ")}. Open ze bij <b>Versturen</b>.`, false, 9000);
+    }
+  } catch (e) { grpErr = "Kon de groep niet bereiken. Klopt de web-app-link, en is er internet?"; }
+  finally { grpBusy = false; renderGrp(); }
+}
+const ago = t => { const d = (Date.now() - t) / 864e5; return d < 1 ? "vandaag" : d < 2 ? "gisteren" : `${Math.floor(d)} dagen geleden`; };
+function renderGrp() {
+  const ok = grpOk();
+  $("grpSetup").hidden = ok; $("grpMain").hidden = !ok;
+  if (!ok) { $("grpUrl").value = grp.url || ""; $("grpCode").value = grp.code || ""; $("grpNaam").value = grp.naam || ""; $("sum-send").textContent = "niet ingesteld"; return; }
+  $("grpWho").innerHTML = `Jij bent <b>${esc(grp.naam)}</b>.${grpBusy ? " Bezig…" : ""}${grpErr ? ` <span style="color:var(--warn)">${esc(grpErr)}</span>` : ""}`;
+  const names = [...new Set(grpList.flatMap(x => [x.van, x.naar]).filter(n => n && !/^iedereen$/i.test(n) && n.toLowerCase() !== grp.naam.toLowerCase()))];
+  $("grpNames").innerHTML = ["iedereen", ...names].map(n => `<option value="${esc(n)}"></option>`).join("");
+  const seen = grpSeen(), mine = grpList.filter(forMe), out = grpList.filter(isMine);
+  const row = (x, own) => `<li data-gid="${esc(x.id)}"><div class="pph"><strong>${esc(x.naam)}</strong>${!own && !seen.includes(x.id) ? `<span class="ppv" style="color:var(--mark);font-size:13px">nieuw</span>` : ""}</div>
+    <div class="ppm">${own ? `naar ${esc(x.naar)}` : `van ${esc(x.van)}${/^iedereen$/i.test(x.naar) ? " · voor iedereen" : ""}`} · ${x.metingen} meting${x.metingen === 1 ? "" : "en"} · ${ago(x.tijd)} · ${nl(x.grootte / 1048576, 1)} MB</div>
+    <div class="btns">${own ? "" : `<button type="button" data-ga="open">Openen</button>`}<button type="button" class="ghost" data-ga="del">Weghalen</button></div></li>`;
+  $("grpIn").innerHTML = mine.length ? mine.map(x => row(x, false)).join("") : `<li class="ppm" style="border-style:dashed">${grpBusy ? "Bezig met ophalen…" : "Niks nieuws voor jou."}</li>`;
+  $("grpOut").innerHTML = out.length ? out.map(x => row(x, true)).join("") : `<li class="ppm" style="border-style:dashed">Nog niks verstuurd.</li>`;
+  const n = mine.filter(x => !seen.includes(x.id)).length;
+  $("sum-send").textContent = n ? `${n} nieuw` : grp.naam;
+  $("sum-send").classList.toggle("warn", !!n);
+}
+$("grpSave").addEventListener("click", async () => {
+  const url = $("grpUrl").value.trim(), code = $("grpCode").value.trim(), naam = $("grpNaam").value.trim();
+  if (!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(url)) { $("grpSetupMsg").textContent = "Plak de web-app-link van het Google-script (begint met https://script.google.com/…)."; return; }
+  if (!code || !naam) { $("grpSetupMsg").textContent = "Vul de groepscode en je naam in."; return; }
+  grp = { url, code, naam }; grpSaveCfg(); $("grpSetupMsg").textContent = "";
+  await grpRefresh(); toast(grpErr ? grpErr : "Groep ingesteld");
+});
+$("grpEdit").addEventListener("click", () => { $("grpSetup").hidden = false; $("grpMain").hidden = true; $("grpUrl").value = grp.url || ""; $("grpCode").value = grp.code || ""; $("grpNaam").value = grp.naam || ""; });
+$("grpRefresh").addEventListener("click", () => grpRefresh());
+$("grpSend").addEventListener("click", async () => {
+  const msg = $("grpSendMsg"), naar = $("grpTo").value.trim() || "iedereen";
+  if (!img.w || img.sample) { msg.textContent = "Open eerst je eigen tekening."; return; }
+  const b = $("grpSend"); b.disabled = true; msg.textContent = "Versturen…";
+  try {
+    const file = await buildExport();
+    if (!file) { msg.textContent = "De tekening zelf is niet meer bewaard. Open hem opnieuw en probeer het nog eens."; return; }
+    msg.textContent = `Versturen… (${nl(file.size / 1048576, 1)} MB, dat kan even duren)`;
+    const r = await grpFetch("", { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ code: grp.code, a: "stuur", van: grp.naam, naar, naam: fileMeta.name.replace(/\.[^.]+$/, ""), metingen: st.items.length, data: await file.text() }) });
+    if (!r.ok) { msg.textContent = r.fout === "code" ? "De groepscode klopt niet." : "Versturen lukte niet."; return; }
+    msg.textContent = `Verstuurd naar ${naar}.`; toast(`Verstuurd naar ${naar}`);
+    grpRefresh();
+  } catch (e) { msg.textContent = "Versturen lukte niet. Is er internet? Probeer het nog eens."; }
+  finally { b.disabled = false; }
+});
+$("grpMain").addEventListener("click", async e => {
+  const b = e.target.closest("[data-ga]"), li = e.target.closest("[data-gid]"); if (!b || !li) return;
+  const x = grpList.find(y => y.id === li.dataset.gid); if (!x) return;
+  if (b.dataset.ga === "open") {
+    b.disabled = true; b.textContent = "Ophalen…";
+    try {
+      const txt = await grpFetch("a=haal&id=" + encodeURIComponent(x.id) + "&code=" + encodeURIComponent(grp.code), null, true);
+      grpMarkSeen(x.id);
+      await importMeetmaat(new File([txt], x.naam + ".meetmaat", { type: "application/x-meetmaat" }));
+      renderGrp(); view.scrollIntoView({ block: "start", behavior: "smooth" });
+    } catch (err) { toast("Ophalen lukte niet. Is er internet?"); b.disabled = false; b.textContent = "Openen"; }
+  } else if (b.dataset.ga === "del") armed(b, async () => {
+    try { await grpFetch("", { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ code: grp.code, a: "weg", id: x.id }) }); } catch (err) {}
+    grpList = grpList.filter(y => y !== x); renderGrp();
+  });
+});
+// Groepslink: web-app-link en code in één link, zodat collega's alleen hun naam nog invullen
+$("grpLink").addEventListener("click", async () => {
+  const data = btoa(unescape(encodeURIComponent(JSON.stringify({ u: grp.url, c: grp.code })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const url = new URL("./", location.href).href + "#groep=" + data;
+  try { if (navigator.share) { await navigator.share({ title: "Meetmaat groep", text: "Doe mee met de Meetmaat-groep: open deze link (en installeer Meetmaat als je hem nog niet hebt).", url }); return; } }
+  catch (e) { if (e && e.name === "AbortError") return; }
+  try { await navigator.clipboard.writeText(url); toast("Groepslink gekopieerd"); } catch (e) { toast("Stuur deze link: " + url); }
+});
+(function grpFromHash() {
+  const m = /[#&]groep=([A-Za-z0-9_-]+)/.exec(location.hash); if (!m) return;
+  try {
+    const o = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, "+").replace(/_/g, "/")))));
+    if (o && o.u && o.c) {
+      grp = { url: o.u, code: o.c, naam: grp.naam || "" }; grpSaveCfg();
+      setTimeout(() => {
+        const d = document.querySelector('.sec[data-sec="send"]'); if (d) d.open = true;
+        renderGrp(); if (!grp.naam) { $("grpNaam").focus(); showBanner("Groepslink ontvangen. Vul bij <b>Versturen</b> je naam in en tik op <b>Opslaan</b>.", false, 9000); }
+        d && d.scrollIntoView({ block: "center" });
+      }, 300);
+    }
+  } catch (e) {}
+  history.replaceState(null, "", location.pathname + location.search);
+})();
+renderGrp();
+if (grpOk()) setTimeout(() => grpRefresh(true), 2500);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && grpOk()) grpRefresh(true); });
+
 /* ---------- Delen met metingen: tekening + alles wat erop staat in één bestand ---------- */
 const blobToB64 = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1] || ""); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
 async function buildExport() {
