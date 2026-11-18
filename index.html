@@ -238,7 +238,10 @@ input[type="number"], input[type="text"], .nm {
 .ppres:empty { display: none; }
 .dh { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 6px 0 -4px; font-weight: 600; }
 #settings { width: min(560px, calc(100% - 24px)); max-height: calc(100% - 24px); padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
-#settings::backdrop { background: rgba(0,0,0,.5); }
+#settings::backdrop, #luchtDlg::backdrop { background: rgba(0,0,0,.5); }
+#luchtDlg { width: min(520px, calc(100% - 24px)); max-height: calc(100% - 24px); padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+#luchtRes button { text-align: left; }
+@media (max-width: 640px) { #luchtDlg { width: 100%; max-width: 100%; height: 100%; max-height: 100%; margin: 0; border-radius: 0; } }
 .sethead { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); z-index: 1; }
 .setbody { padding: 12px 16px 18px; display: grid; gap: 18px; }
 .setbody section { display: grid; gap: 10px; }
@@ -328,6 +331,13 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
         <div class="btns"><button type="button" class="ghost" id="sendLink">App doorsturen</button><a class="btn ghostlink" href="installeren.html">Hulp bij installeren</a></div>
       </div>
     </section>
+    <section>
+      <h3 class="dh">Proef: luchtfoto</h3>
+      <div class="sand">
+        <p class="hint" style="margin:0">Haal een luchtfoto van PDOK op (heel Nederland, ±8 cm per pixel) en meet er meteen op, zonder te ijken. Zoek een adres of gebruik je locatie.</p>
+        <div class="btns"><button type="button" class="ghost" id="luchtOpen">Luchtfoto ophalen</button></div>
+      </div>
+    </section>
     <section class="keyhelp">
       <h3 class="dh">Sneltoetsen (pc)</h3>
       <dl class="keys">
@@ -345,6 +355,25 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
             <dt>+ − 0</dt><dd>Inzoomen, uitzoomen, hele tekening</dd>
           </dl>
     </section>
+  </div>
+</dialog>
+
+<dialog id="luchtDlg" aria-labelledby="luchtTitle">
+  <div class="sethead"><h2 id="luchtTitle">Luchtfoto</h2><button type="button" class="ghost" id="luchtClose">Sluiten</button></div>
+  <div class="setbody">
+    <div class="sand">
+      <label for="luchtQ">Adres, postcode of plaats<input id="luchtQ" type="search" autocomplete="off" placeholder="bijv. Dorpsstraat 1 Hem"></label>
+      <div class="btns"><button type="button" id="luchtZoek">Zoeken</button><button type="button" class="ghost" id="luchtGps">Mijn locatie</button></div>
+      <ul class="pplist" id="luchtRes"></ul>
+      <p class="hint" id="luchtPlek" style="margin:0"></p>
+      <label for="luchtSize">Hoe groot (breed × hoog)<select id="luchtSize">
+        <option value="50">50 × 50 m</option><option value="100">100 × 100 m</option><option value="200" selected>200 × 200 m</option>
+        <option value="300">300 × 300 m</option><option value="500">500 × 500 m</option><option value="1000">1 × 1 km</option>
+      </select></label>
+      <div class="btns"><button type="button" id="luchtGo" disabled>Luchtfoto openen</button></div>
+      <p class="hint" id="luchtMsg" style="margin:0"></p>
+      <p class="hint" style="margin:0">Luchtfoto: PDOK, Beeldmateriaal Nederland. Hoe ver hij er naast kan liggen weet ik niet precies, schat enkele decimeters; daken en hoge dingen staan vaak iets scheef. Goed voor percelen en vakken, niet voor uitzetten op de centimeter.</p>
+    </div>
   </div>
 </dialog>
 
@@ -1709,7 +1738,7 @@ function drawOverlay() {
     `<circle class="hd ${cls}" cx="${p.x}" cy="${p.y}" r="${6 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/><circle class="hit" data-h="${id}" cx="${p.x}" cy="${p.y}" r="${16 * k}"/>`;
   let s = "";
 
-  if (st.calib && !st.calib.scale) {
+  if (st.calib && !st.calib.scale && !st.calib.lucht) {
     const { a, b, mm } = st.calib;
     s += `<path class="halo" d="${P([a, b])}"/><path class="cal" d="${P([a, b])}"/>`;
     s += label((a.x + b.x) / 2, (a.y + b.y) / 2 - 9 * k, `IJk ${fmtMM(mm)}`, "cal");
@@ -1855,6 +1884,12 @@ function renderCal() {
   }
   c.className = "calinfo";
   const sc = st.calib && st.calib.scale;
+  if (st.calib && st.calib.lucht) {
+    c.innerHTML = `<span class="big">Op schaal via de luchtfoto</span><span>1 pixel = ${nl(st.mmPerPx / 10, 1)} cm · nauwkeurigheid ±${fmtMM(Math.max(st.mmPerPx, 10))} per punt (plus hoe de foto zelf ligt)</span>
+      <span class="hint">De luchtfoto van PDOK heeft een vaste schaal, ijken is niet nodig. Daken en hoge dingen kunnen iets scheef staan; meet op de grond.</span>
+      <div class="btns"><button type="button" class="ghost" data-cal="clear">IJking verwijderen</button></div>`;
+    return;
+  }
   c.innerHTML = `<span class="big">${sc ? `Geijkt op schaal 1:${sc}` : st.calib && st.calib.auto ? `Automatisch geijkt op ${st.calib.n} maatlijnen` : `IJkmaat ${st.calib ? fmtMM(st.calib.mm) : "–"}`}</span>
     ${sc ? `<span class="hint">${st.calib.auto ? "Deze schaal staat op de tekening." : "Zelf ingevuld."} Klopt alleen als de PDF op ware grootte is. Meet daarom één maat na die je kent; wijkt hij af, ijk dan met <b>IJken</b>.${st.calib.others && st.calib.others.length ? ` Er staat ook ${st.calib.others.map(n => "1:" + n).join(", ")} op (bijv. een overzichtskaartje).` : ""}</span>` : ""}
     ${st.calib && st.calib.auto && !sc ? `<span class="hint">Gevonden maten: ${st.calib.vals.join(", ")} mm · onderling ${nl(st.calib.spread, 2)}% verschil. Zelf ijken met <b>IJken</b> mag altijd.</span>` : ""}
@@ -2726,6 +2761,101 @@ else if (grp.code && grp.url && !grp.naam && !/[#&]groep=/.test(location.hash)) 
 }, 1200);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && grpOk()) grpRefresh(true); });
 
+/* ---------- Proef: luchtfoto van PDOK (RD-coördinaten, vaste schaal: geen ijking nodig) ---------- */
+const PDOK_LS = "https://api.pdok.nl/bzk/locatieserver/search/v3_1/free";
+const PDOK_WMS = "https://service.pdok.nl/hwh/luchtfotorgb/wms/v1_0";
+let luchtPlek = null, luchtPending = null;
+// WGS84 (GPS) → RD, benaderingsformules (Schreutelkamp & Strang van Hees), op ±1 m nauwkeurig
+function wgsToRd(lat, lon) {
+  const dp = 0.36 * (lat - 52.15517440), dl = 0.36 * (lon - 5.38720621);
+  const R = [[0, 1, 190094.945], [1, 1, -11832.228], [2, 1, -114.221], [0, 3, -32.391], [1, 0, -0.705], [3, 1, -2.340], [1, 3, -0.608], [0, 2, -0.008], [2, 3, 0.148]];
+  const S = [[1, 0, 309056.544], [0, 2, 3638.893], [2, 0, 73.077], [1, 2, -157.984], [3, 0, 59.788], [0, 1, 0.433], [2, 2, -6.439], [1, 1, -0.032], [0, 4, 0.092], [1, 4, -0.054]];
+  let x = 155000, y = 463000;
+  R.forEach(([p, q, c]) => { x += c * dp ** p * dl ** q; });
+  S.forEach(([p, q, c]) => { y += c * dp ** p * dl ** q; });
+  return { x, y };
+}
+function luchtSetPlek(p) {
+  luchtPlek = p;
+  $("luchtPlek").innerHTML = p ? `Gekozen: <b>${esc(p.naam)}</b>` : "";
+  $("luchtGo").disabled = !p;
+}
+$("luchtOpen").addEventListener("click", () => {
+  $("settings").close();
+  const d = $("luchtDlg"); try { d.showModal(); } catch (e) { d.setAttribute("open", ""); }
+  setTimeout(() => $("luchtQ").focus(), 50);
+});
+$("luchtClose").addEventListener("click", () => $("luchtDlg").close());
+async function luchtZoek() {
+  const q = $("luchtQ").value.trim(); if (!q) return;
+  const ul = $("luchtRes"); ul.innerHTML = `<li class="ppm" style="border-style:dashed">Zoeken…</li>`;
+  try {
+    const r = await (await fetch(`${PDOK_LS}?q=${encodeURIComponent(q)}&rows=6&fl=weergavenaam,centroide_rd,type`)).json();
+    const docs = (r.response && r.response.docs) || [];
+    if (!docs.length) { ul.innerHTML = `<li class="ppm" style="border-style:dashed">Niks gevonden. Probeer straat + plaats, of een postcode.</li>`; return; }
+    ul.innerHTML = docs.map((d, i) => `<li><button type="button" class="ghost" data-li="${i}">${esc(d.weergavenaam)}</button></li>`).join("");
+    ul.onclick = e => {
+      const b = e.target.closest("[data-li]"); if (!b) return;
+      const d = docs[+b.dataset.li], m = /POINT\(([\d.]+) ([\d.]+)\)/.exec(d.centroide_rd || "");
+      if (!m) return;
+      luchtSetPlek({ x: +m[1], y: +m[2], naam: d.weergavenaam });
+      ul.innerHTML = "";
+      // een plaats of weg is groot: dan een groter stuk voorstellen
+      if (d.type === "woonplaats" || d.type === "gemeente") $("luchtSize").value = "1000";
+    };
+  } catch (e) { ul.innerHTML = `<li class="ppm" style="border-style:dashed">Zoeken lukte niet. Is er internet?</li>`; }
+}
+$("luchtZoek").addEventListener("click", luchtZoek);
+$("luchtQ").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); luchtZoek(); } });
+$("luchtGps").addEventListener("click", () => {
+  if (!navigator.geolocation) { $("luchtMsg").textContent = "Deze telefoon of browser geeft geen locatie."; return; }
+  $("luchtMsg").textContent = "Locatie zoeken…";
+  navigator.geolocation.getCurrentPosition(pos => {
+    const { latitude: la, longitude: lo, accuracy: acc } = pos.coords;
+    if (la < 50.6 || la > 53.7 || lo < 3.2 || lo > 7.3) { $("luchtMsg").textContent = "Je bent niet in Nederland: daar heeft PDOK geen luchtfoto."; return; }
+    const rd = wgsToRd(la, lo);
+    luchtSetPlek({ x: rd.x, y: rd.y, naam: `mijn locatie (GPS ±${Math.round(acc)} m)` });
+    $("luchtMsg").textContent = "";
+    // dichtstbijzijnde adres erbij, voor een duidelijke naam van de tekening
+    fetch(`${PDOK_LS.replace(/free$/, "reverse")}?lat=${la}&lon=${lo}&rows=1&type=adres&fl=weergavenaam,afstand`).then(r => r.json()).then(r => {
+      const d = r.response && r.response.docs && r.response.docs[0];
+      if (d && d.afstand < 250 && luchtPlek && luchtPlek.x === rd.x) luchtSetPlek({ x: rd.x, y: rd.y, naam: `bij ${d.weergavenaam}` });
+    }).catch(() => {});
+  }, err => { $("luchtMsg").textContent = err.code === 1 ? "Geen toestemming voor je locatie. Zet locatie aan voor Meetmaat of de browser." : "Locatie niet gevonden. Probeer het buiten nog eens, of zoek een adres."; },
+  { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 });
+});
+// Luchtfoto ophalen: PDOK levert max. 2000 × 2000 px per keer, dus groter in stukken (tegels)
+$("luchtGo").addEventListener("click", async () => {
+  if (!luchtPlek) return;
+  const size = +$("luchtSize").value, mpp = Math.max(0.08, size / 4000);
+  const N = Math.round(size / mpp), t = Math.ceil(N / 2000), tile = Math.ceil(N / t), W = tile * t, half = W * mpp / 2;
+  const x0 = luchtPlek.x - half, yTop = luchtPlek.y + half;
+  const msg = $("luchtMsg"), b = $("luchtGo"); b.disabled = true;
+  try {
+    const c = document.createElement("canvas"); c.width = W; c.height = W;
+    const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, W, W);
+    let n = 0;
+    for (let j = 0; j < t; j++) for (let i = 0; i < t; i++) {
+      msg.textContent = `Luchtfoto ophalen… ${++n} van ${t * t}`;
+      const minx = x0 + i * tile * mpp, maxy = yTop - j * tile * mpp, w = tile * mpp;
+      const url = `${PDOK_WMS}?service=WMS&version=1.3.0&request=GetMap&layers=Actueel_orthoHR&styles=&crs=EPSG:28992&bbox=${minx.toFixed(2)},${(maxy - w).toFixed(2)},${(minx + w).toFixed(2)},${maxy.toFixed(2)}&width=${tile}&height=${tile}&format=image/jpeg`;
+      const res = await fetch(url);
+      if (!res.ok || !/^image\//.test(res.headers.get("content-type") || "")) throw new Error("PDOK gaf geen foto terug");
+      const bmp = await createImageBitmap(await res.blob());
+      g.drawImage(bmp, i * tile, j * tile, tile, tile);
+    }
+    msg.textContent = "Openen…";
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.9));
+    const naam = luchtPlek.naam.replace(/[\\/:*?"<>|]+/g, "_");
+    const file = new File([blob], `Luchtfoto ${naam} ${size} m.jpg`, { type: "image/jpeg" });
+    luchtPending = { name: file.name, mmPerPx: mpp * 1000, wPx: W, geo: { x0, yTop, mpp }, title: `Luchtfoto ${luchtPlek.naam}` };
+    $("luchtDlg").close();
+    await openFile(file);
+    msg.textContent = "";
+  } catch (e) { msg.textContent = "Ophalen lukte niet: " + (e && e.message ? e.message : e) + ". Is er internet? Probeer een kleiner stuk."; }
+  finally { b.disabled = !luchtPlek; }
+});
+
 /* ---------- Delen met metingen: tekening + alles wat erop staat in één bestand ---------- */
 const blobToB64 = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1] || ""); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
 async function buildExport() {
@@ -2814,6 +2944,19 @@ async function openFile(f, fromStore) {
       URL.revokeObjectURL(url);
       setPiles([], 0);
       setImage(`${f.name}|${f.size}`, f.name, false);
+      if (luchtPending && luchtPending.name === f.name) {
+        const L = luchtPending; luchtPending = null;
+        if (!st.mmPerPx) {
+          const sc = img.w / L.wPx;                               // het canvas kan kleiner zijn dan de foto
+          st.mmPerPx = L.mmPerPx / sc;
+          st.calib = { a: { x: 0, y: 0 }, b: { x: img.w, y: 0 }, mm: img.w * st.mmPerPx, lucht: true };
+          st.geo = Object.assign({ crs: "EPSG:28992", pxScale: sc }, L.geo);
+          if (!st.title) st.title = L.title;
+          save(); renderTitle(); renderAll();
+        }
+        setTool("dist");
+        showBanner(`<b>${esc(L.title)}</b> geopend en <b>meteen op schaal</b>: 1 pixel = ${nl(st.mmPerPx / 10, 1)} cm. Luchtfoto: PDOK.`, false, 7000);
+      }
     }
   } catch (err) {
     const msg = "Kon de tekening niet openen: " + (err && err.message ? err.message : err);
