@@ -245,6 +245,10 @@ input[type="number"], input[type="text"], .nm {
 .luchtprev:active { cursor: grabbing; }
 .luchtprev img { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .lpframe { position: absolute; inset: 25%; border: 2px solid var(--accent); box-shadow: 0 0 0 999px rgba(0,0,0,.35); pointer-events: none; }
+.lpdraai { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.lpdraai button { padding: 6px 9px; }
+.lpdraai b { min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
+.lpdraai input[type=range] { flex: 1 1 100%; width: 100%; }
 .lpdot { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #e3261b; border: 2px solid #fff; pointer-events: none; }
 @media (max-width: 640px) { #luchtDlg { width: 100%; max-width: 100%; height: 100%; max-height: 100%; margin: 0; border-radius: 0; } }
 .sethead { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); z-index: 1; }
@@ -372,6 +376,20 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
       <ul class="pplist" id="luchtRes"></ul>
       <p class="hint" id="luchtPlek" style="margin:0"></p>
       <div id="luchtPrev" class="luchtprev" hidden><img id="luchtPrevImg" alt="Voorbeeld luchtfoto" draggable="false"><i class="lpdot" id="luchtDot"></i><div class="lpframe"></div></div>
+      <div id="luchtDraai" class="lpdraai" hidden>
+        <span>Draaien</span>
+        <button type="button" class="ghost" data-rot="-1" aria-label="1 graad linksom">↺ 1°</button>
+        <button type="button" class="ghost" data-rot="-0.1" aria-label="0,1 graad linksom">↺ 0,1°</button>
+        <b id="luchtHoekTxt">0°</b>
+        <button type="button" class="ghost" data-rot="0.1" aria-label="0,1 graad rechtsom">↻ 0,1°</button>
+        <button type="button" class="ghost" data-rot="1" aria-label="1 graad rechtsom">↻ 1°</button>
+        <input type="range" id="luchtHoek" min="-45" max="45" step="0.1" value="0" aria-label="Hoek">
+        <button type="button" class="ghost" data-rot="0">Noord boven</button>
+      </div>
+      <div id="luchtRechtBox" hidden>
+        <p class="hint" style="margin:0 0 6px">Precies recht leggen op een meting: die rand komt exact horizontaal of verticaal te liggen.</p>
+        <div class="btns" id="luchtRecht"></div>
+      </div>
       <p class="hint" id="luchtPrevHint" style="margin:0" hidden>Schuif de foto tot je stuk binnen het gele kader valt, of tik op een plek om die in het midden te zetten. De rode stip is het adres of je locatie.</p>
       <label id="luchtMeeL" style="display:flex;gap:8px;align-items:center" hidden><input type="checkbox" id="luchtMee" checked> Metingen van de open luchtfoto meenemen</label>
       <label for="luchtSize">Hoe groot (breed × hoog)<select id="luchtSize">
@@ -1471,9 +1489,10 @@ function rescaleState(S, f) {
   (S.pp || []).forEach(q => { if (q.x != null) P(q); });
   if (S.mmPerPx) S.mmPerPx /= f;
 }
-function moveState(S, dx, dy) {
-  const P = p => { if (p && p.x != null) { p.x += dx; p.y += dy; } };
-  (S.items || []).forEach(it => { (it.pts || []).forEach(P); (it.holes || []).forEach(h => h.forEach(P)); });
+// Alle punten omzetten (bijv. naar een verschoven of gedraaide luchtfoto); k = schaalfactor voor oppervlaktes
+function mapState(S, fn, k) {
+  const P = p => { if (p && p.x != null) { const q = fn(p); p.x = q.x; p.y = q.y; } };
+  (S.items || []).forEach(it => { (it.pts || []).forEach(P); (it.holes || []).forEach(h => h.forEach(P)); if (it.apx != null) it.apx *= k * k; if (it.apxOuter != null) it.apxOuter *= k * k; });
   P(S.origin); if (S.calib) { P(S.calib.a); P(S.calib.b); }
   if (S.sand) (S.sand.pts || []).forEach(P);
   (S.pp || []).forEach(q => { if (q.x != null) P(q); });
@@ -1900,7 +1919,8 @@ function renderCal() {
   c.className = "calinfo";
   const sc = st.calib && st.calib.scale;
   if (st.calib && st.calib.lucht) {
-    c.innerHTML = `<span class="big">Op schaal via de luchtfoto</span><span>1 pixel = ${nl(st.mmPerPx / 10, 1)} cm · nauwkeurigheid ±${fmtMM(Math.max(st.mmPerPx, 10))} per punt (plus hoe de foto zelf ligt)</span>
+    const ga = st.geo && st.geo.a ? st.geo.a * 180 / Math.PI : 0;
+    c.innerHTML = `<span class="big">Op schaal via de luchtfoto</span><span>${ga ? `${nl(Math.abs(ga), 2)}° ${ga > 0 ? "rechtsom" : "linksom"} gedraaid · ` : "Noord boven · "}1 pixel = ${nl(st.mmPerPx / 10, 1)} cm · nauwkeurigheid ±${fmtMM(Math.max(st.mmPerPx, 10))} per punt (plus hoe de foto zelf ligt)</span>
       <span class="hint">De luchtfoto van PDOK heeft een vaste schaal, ijken is niet nodig. Daken en hoge dingen kunnen iets scheef staan; meet op de grond.</span>
       <div class="btns"><button type="button" class="ghost" data-cal="clear">IJking verwijderen</button></div>`;
     return;
@@ -2790,6 +2810,26 @@ function wgsToRd(lat, lon) {
   S.forEach(([p, q, c]) => { y += c * dp ** p * dl ** q; });
   return { x, y };
 }
+// Waar een luchtfoto ligt: midden (RD), meter per canvaspixel en draaiing (rad, linksom op de kaart)
+function geoNorm(g, w, h) {
+  const s = g.mpp / g.pxScale;
+  if (g.cx != null) return { cx: g.cx, cy: g.cy, s, a: g.a || 0 };
+  return { cx: g.x0 + w * s / 2, cy: g.yTop - h * s / 2, s, a: 0 };   // oude luchtfoto's: noord boven
+}
+function pxToRd(G, w, h, p) {
+  const du = p.x - w / 2, dv = p.y - h / 2, c = Math.cos(G.a), n = Math.sin(G.a);
+  return { x: G.cx + G.s * (du * c + dv * n), y: G.cy + G.s * (du * n - dv * c) };
+}
+function rdToPx(G, w, h, q) {
+  const dX = q.x - G.cx, dY = q.y - G.cy, c = Math.cos(G.a), n = Math.sin(G.a);
+  return { x: w / 2 + (dX * c + dY * n) / G.s, y: h / 2 + (dX * n - dY * c) / G.s };
+}
+let luchtA = 0;   // draaiing in graden; + = foto rechtsom gedraaid (= x-as van de foto linksom op de kaart)
+function luchtSetHoek(a) {
+  a = Math.round(Math.max(-45, Math.min(45, a)) * 100) / 100;
+  luchtA = a; $("luchtHoek").value = a; $("luchtHoekTxt").textContent = nl(a, Math.abs(a % 1) > 0.001 ? (Math.abs(a * 10 % 1) > 0.01 ? 2 : 1) : 0) + "°";
+  if (luchtPlek) { lpMove(0, 0); lpDot(); }
+}
 function luchtSetPlek(p) {
   if (p && p.ox == null) { p.ox = p.x; p.oy = p.y; }
   luchtPlek = p;
@@ -2802,17 +2842,18 @@ const LP_F = 2;
 let lpDrag = null, lpSeq = 0;
 function lpMove(dx, dy) {
   const t = `translate(${dx}px,${dy}px)`;
-  $("luchtPrevImg").style.transform = t; $("luchtDot").style.transform = t;
+  $("luchtPrevImg").style.transform = `${t} rotate(${luchtA}deg)`; $("luchtDot").style.transform = t;
 }
 function lpDot() {
   const P = luchtPlek, span = +$("luchtSize").value * LP_F, d = $("luchtDot");
-  const fx = 0.5 + (P.ox - P.x) / span, fy = 0.5 - (P.oy - P.y) / span;
+  const a = luchtA * Math.PI / 180, c = Math.cos(a), n = Math.sin(a), dX = P.ox - P.x, dY = P.oy - P.y;
+  const fx = 0.5 + (dX * c + dY * n) / span, fy = 0.5 + (dX * n - dY * c) / span;
   d.hidden = fx < 0 || fx > 1 || fy < 0 || fy > 1;
   d.style.left = fx * 100 + "%"; d.style.top = fy * 100 + "%";
 }
 function luchtPreview() {
   const box = $("luchtPrev"), P = luchtPlek;
-  box.hidden = $("luchtPrevHint").hidden = !P;
+  box.hidden = $("luchtPrevHint").hidden = $("luchtDraai").hidden = !P;
   if (!P) return;
   const half = +$("luchtSize").value * LP_F / 2, px = Math.min(1024, Math.round((box.clientWidth || 400) * Math.min(2, devicePixelRatio || 1)));
   const url = `${PDOK_WMS}?service=WMS&version=1.3.0&request=GetMap&layers=Actueel_orthoHR&styles=&crs=EPSG:28992&bbox=${(P.x - half).toFixed(2)},${(P.y - half).toFixed(2)},${(P.x + half).toFixed(2)},${(P.y + half).toFixed(2)}&width=${px}&height=${px}&format=image/jpeg`;
@@ -2837,12 +2878,41 @@ function lpEnd(e) {
   let { dx, dy } = lpDrag; lpDrag = null;
   if (Math.hypot(dx, dy) < 6) { dx = r.left + r.width / 2 - e.clientX; dy = r.top + r.height / 2 - e.clientY; lpMove(dx, dy); }   // tik: die plek in het midden
   const m = +$("luchtSize").value * LP_F / r.width;     // meter per schermpixel
-  luchtPlek.x -= dx * m; luchtPlek.y += dy * m;
+  const a = luchtA * Math.PI / 180, c = Math.cos(a), n = Math.sin(a);
+  luchtPlek.x += m * (-dx * c - dy * n); luchtPlek.y += m * (-dx * n + dy * c);
   luchtPreview();
 }
 $("luchtPrev").addEventListener("pointerup", lpEnd);
 $("luchtPrev").addEventListener("pointercancel", lpEnd);
 $("luchtSize").addEventListener("change", luchtPreview);
+$("luchtHoek").addEventListener("input", e => luchtSetHoek(+e.target.value));
+$("luchtDraai").addEventListener("click", e => {
+  const b = e.target.closest("[data-rot]"); if (!b) return;
+  const d = +b.dataset.rot; luchtSetHoek(d === 0 ? 0 : luchtA + d);
+});
+// Recht leggen: de langste zijde van een meting wordt precies horizontaal of verticaal
+function luchtRechtKnoppen() {
+  const g = luchtCur(), box = $("luchtRechtBox"), el = $("luchtRecht");
+  box.hidden = !g; if (!g) return;
+  const G = geoNorm(g, img.w, img.h), opts = [];
+  st.items.forEach((it, i) => {
+    if (!["dist", "poly", "area"].includes(it.type) || !it.pts || it.pts.length < 2) return;
+    let best = null;
+    const n = it.pts.length, segs = it.type === "area" ? n : n - 1;
+    for (let k = 0; k < segs; k++) { const p = it.pts[k], q = it.pts[(k + 1) % n], L = d2(p, q); if (!best || L > best.L) best = { p, q, L }; }
+    if (!best || best.L < 5) return;
+    const A = pxToRd(G, img.w, img.h, best.p), B = pxToRd(G, img.w, img.h, best.q);
+    let phi = Math.atan2(B.y - A.y, B.x - A.x) * 180 / Math.PI;
+    phi = ((phi % 90) + 90) % 90; if (phi > 45) phi -= 90;
+    opts.push(`<button type="button" class="ghost" data-recht="${phi.toFixed(3)}">${i + 1} · ${esc(it.name)}</button>`);
+  });
+  el.innerHTML = opts.slice(0, 10).join("") || `<span class="hint">Meet eerst met <b>Afstand</b> langs een rechte rand (muur, stoeprand, perceelgrens). Dan kun je de foto hier precies daarop recht leggen.</span>`;
+}
+$("luchtRecht").addEventListener("click", e => {
+  const b = e.target.closest("[data-recht]"); if (!b) return;
+  luchtSetHoek(+b.dataset.recht);
+  $("luchtMsg").textContent = `Gedraaid naar ${$("luchtHoekTxt").textContent}. Tik op Luchtfoto openen.`;
+});
 // Staat er al een luchtfoto open, dan begint het venster op die plek (om bij te schuiven)
 const luchtCur = () => st.geo && st.geo.crs === "EPSG:28992" && img.w ? st.geo : null;
 $("luchtOpen").addEventListener("click", () => {
@@ -2850,12 +2920,14 @@ $("luchtOpen").addEventListener("click", () => {
   const d = $("luchtDlg"); try { d.showModal(); } catch (e) { d.setAttribute("open", ""); }
   const g = luchtCur();
   $("luchtMeeL").hidden = !(g && (st.items.length || st.pp.length || st.origin));
+  luchtRechtKnoppen();
   if (g) {
-    const wm = img.w / g.pxScale * g.mpp, hm = img.h / g.pxScale * g.mpp;
+    const G = geoNorm(g, img.w, img.h), wm = img.w * G.s;
     const opts = [...$("luchtSize").options].map(o => +o.value);
     $("luchtSize").value = String(opts.reduce((a, b) => Math.abs(b - wm) < Math.abs(a - wm) ? b : a));
-    luchtSetPlek({ x: g.x0 + wm / 2, y: g.yTop - hm / 2, naam: (st.title || "open luchtfoto").replace(/^Luchtfoto /, "") });
-    $("luchtMsg").textContent = "Dit is de open luchtfoto. Schuif hem bij en tik op Luchtfoto openen.";
+    luchtSetHoek(G.a * 180 / Math.PI);
+    luchtSetPlek({ x: G.cx, y: G.cy, naam: (st.title || "open luchtfoto").replace(/^Luchtfoto /, "") });
+    $("luchtMsg").textContent = "Dit is de open luchtfoto. Schuif of draai hem bij en tik op Luchtfoto openen.";
   } else {
     if (luchtPlek) luchtPreview();
     setTimeout(() => $("luchtQ").focus(), 50);
@@ -2874,6 +2946,7 @@ async function luchtZoek() {
       const b = e.target.closest("[data-li]"); if (!b) return;
       const d = docs[+b.dataset.li], m = /POINT\(([\d.]+) ([\d.]+)\)/.exec(d.centroide_rd || "");
       if (!m) return;
+      luchtSetHoek(0);
       luchtSetPlek({ x: +m[1], y: +m[2], naam: d.weergavenaam });
       ul.innerHTML = "";
       // een plaats of weg is groot: dan een groter stuk voorstellen
@@ -2890,6 +2963,7 @@ $("luchtGps").addEventListener("click", () => {
     const { latitude: la, longitude: lo, accuracy: acc } = pos.coords;
     if (la < 50.6 || la > 53.7 || lo < 3.2 || lo > 7.3) { $("luchtMsg").textContent = "Je bent niet in Nederland: daar heeft PDOK geen luchtfoto."; return; }
     const rd = wgsToRd(la, lo);
+    luchtSetHoek(0);
     luchtSetPlek({ x: rd.x, y: rd.y, naam: `mijn locatie (GPS ±${Math.round(acc)} m)` });
     $("luchtMsg").textContent = "";
     // dichtstbijzijnde adres erbij, voor een duidelijke naam van de tekening
@@ -2903,29 +2977,39 @@ $("luchtGps").addEventListener("click", () => {
 // Luchtfoto ophalen: PDOK levert max. 2000 × 2000 px per keer, dus groter in stukken (tegels)
 $("luchtGo").addEventListener("click", async () => {
   if (!luchtPlek) return;
-  const size = +$("luchtSize").value, mpp = Math.max(0.08, size / 4000);
-  const N = Math.round(size / mpp), t = Math.ceil(N / 2000), tile = Math.ceil(N / t), W = tile * t, half = W * mpp / 2;
-  const x0 = luchtPlek.x - half, yTop = luchtPlek.y + half;
+  const size = +$("luchtSize").value, mpp = Math.max(0.08, size / 4000), W = Math.round(size / mpp);
+  const cx = luchtPlek.x, cy = luchtPlek.y, a = luchtA * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+  // PDOK levert noord boven en max. 2000 px per keer: haal een (groter) recht stuk in tegels op en teken die gedraaid
+  const M = Math.ceil(W * (Math.abs(ca) + Math.abs(sa))), t = Math.ceil(M / 1990), tile = Math.ceil(M / t);
+  const bx0 = cx - tile * t * mpp / 2, byTop = cy + tile * t * mpp / 2;
   const msg = $("luchtMsg"), b = $("luchtGo"); b.disabled = true;
   try {
     const c = document.createElement("canvas"); c.width = W; c.height = W;
     const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, W, W);
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
     let n = 0;
     for (let j = 0; j < t; j++) for (let i = 0; i < t; i++) {
       msg.textContent = `Luchtfoto ophalen… ${++n} van ${t * t}`;
-      const minx = x0 + i * tile * mpp, maxy = yTop - j * tile * mpp, w = tile * mpp;
-      const url = `${PDOK_WMS}?service=WMS&version=1.3.0&request=GetMap&layers=Actueel_orthoHR&styles=&crs=EPSG:28992&bbox=${minx.toFixed(2)},${(maxy - w).toFixed(2)},${(minx + w).toFixed(2)},${maxy.toFixed(2)}&width=${tile}&height=${tile}&format=image/jpeg`;
+      // 1 pixel extra rondom, zodat er geen naadjes tussen de tegels komen
+      const minx = bx0 + i * tile * mpp - mpp, maxy = byTop - j * tile * mpp + mpp, w = (tile + 2) * mpp;
+      const url = `${PDOK_WMS}?service=WMS&version=1.3.0&request=GetMap&layers=Actueel_orthoHR&styles=&crs=EPSG:28992&bbox=${minx.toFixed(3)},${(maxy - w).toFixed(3)},${(minx + w).toFixed(3)},${maxy.toFixed(3)}&width=${tile + 2}&height=${tile + 2}&format=image/jpeg`;
       const res = await fetch(url);
       if (!res.ok || !/^image\//.test(res.headers.get("content-type") || "")) throw new Error("PDOK gaf geen foto terug");
       const bmp = await createImageBitmap(await res.blob());
-      g.drawImage(bmp, i * tile, j * tile, tile, tile);
+      const ex = (minx - cx) / mpp, ey = (maxy - cy) / mpp;
+      g.setTransform(ca, sa, -sa, ca, W / 2 + ex * ca + ey * sa, W / 2 + ex * sa - ey * ca);
+      g.drawImage(bmp, 0, 0);
     }
+    g.setTransform(1, 0, 0, 1, 0, 0);
     msg.textContent = "Openen…";
     const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.9));
     const naam = luchtPlek.naam.replace(/[\\/:*?"<>|]+/g, "_");
     const file = new File([blob], `Luchtfoto ${naam} ${size} m.jpg`, { type: "image/jpeg" });
-    luchtPending = { name: file.name, mmPerPx: mpp * 1000, wPx: W, geo: { x0, yTop, mpp }, title: `Luchtfoto ${luchtPlek.naam}` };
-    if (!$("luchtMeeL").hidden && $("luchtMee").checked && luchtCur()) luchtPending.carry = JSON.parse(JSON.stringify(st));
+    luchtPending = { name: file.name, mmPerPx: mpp * 1000, wPx: W, geo: { cx, cy, mpp, a }, title: `Luchtfoto ${luchtPlek.naam}` };
+    if (!$("luchtMeeL").hidden && $("luchtMee").checked && luchtCur()) {
+      luchtPending.carry = JSON.parse(JSON.stringify(st));
+      luchtPending.carryG = geoNorm(st.geo, img.w, img.h); luchtPending.carryWH = [img.w, img.h];
+    }
     $("luchtDlg").close();
     await openFile(file);
     msg.textContent = "";
@@ -3027,9 +3111,9 @@ async function openFile(f, fromStore) {
         let mee = 0;
         if (L.carry && !st.items.length) {
           // metingen van de vorige luchtfoto omrekenen naar deze (via de RD-coördinaten)
-          const S = L.carry, og = S.geo, k = (og.mpp / og.pxScale) / (L.geo.mpp / sc);
-          rescaleState(S, k);
-          moveState(S, (og.x0 - L.geo.x0) / L.geo.mpp * sc, (L.geo.yTop - og.yTop) / L.geo.mpp * sc);
+          const S = L.carry, OG = L.carryG, [ow, oh] = L.carryWH;
+          const NG = { cx: L.geo.cx, cy: L.geo.cy, s: L.geo.mpp / sc, a: L.geo.a };
+          mapState(S, p => rdToPx(NG, img.w, img.h, pxToRd(OG, ow, oh, p)), OG.s / NG.s);
           delete S.mmPerPx; delete S._w;
           st = S; mee = st.items.length;
         }
