@@ -241,6 +241,11 @@ input[type="number"], input[type="text"], .nm {
 #settings::backdrop, #luchtDlg::backdrop { background: rgba(0,0,0,.5); }
 #luchtDlg { width: min(520px, calc(100% - 24px)); max-height: calc(100% - 24px); padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
 #luchtRes button { text-align: left; }
+.luchtprev { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1; overflow: hidden; background: var(--viewer); border-radius: 6px; touch-action: none; cursor: grab; user-select: none; }
+.luchtprev:active { cursor: grabbing; }
+.luchtprev img { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.lpframe { position: absolute; inset: 25%; border: 2px solid var(--accent); box-shadow: 0 0 0 999px rgba(0,0,0,.35); pointer-events: none; }
+.lpdot { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #e3261b; border: 2px solid #fff; pointer-events: none; }
 @media (max-width: 640px) { #luchtDlg { width: 100%; max-width: 100%; height: 100%; max-height: 100%; margin: 0; border-radius: 0; } }
 .sethead { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); z-index: 1; }
 .setbody { padding: 12px 16px 18px; display: grid; gap: 18px; }
@@ -366,6 +371,9 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
       <div class="btns"><button type="button" id="luchtZoek">Zoeken</button><button type="button" class="ghost" id="luchtGps">Mijn locatie</button></div>
       <ul class="pplist" id="luchtRes"></ul>
       <p class="hint" id="luchtPlek" style="margin:0"></p>
+      <div id="luchtPrev" class="luchtprev" hidden><img id="luchtPrevImg" alt="Voorbeeld luchtfoto" draggable="false"><i class="lpdot" id="luchtDot"></i><div class="lpframe"></div></div>
+      <p class="hint" id="luchtPrevHint" style="margin:0" hidden>Schuif de foto tot je stuk binnen het gele kader valt, of tik op een plek om die in het midden te zetten. De rode stip is het adres of je locatie.</p>
+      <label id="luchtMeeL" style="display:flex;gap:8px;align-items:center" hidden><input type="checkbox" id="luchtMee" checked> Metingen van de open luchtfoto meenemen</label>
       <label for="luchtSize">Hoe groot (breed × hoog)<select id="luchtSize">
         <option value="50">50 × 50 m</option><option value="100">100 × 100 m</option><option value="200" selected>200 × 200 m</option>
         <option value="300">300 × 300 m</option><option value="500">500 × 500 m</option><option value="1000">1 × 1 km</option>
@@ -1462,6 +1470,13 @@ function rescaleState(S, f) {
   if (S.sand) (S.sand.pts || []).forEach(P);
   (S.pp || []).forEach(q => { if (q.x != null) P(q); });
   if (S.mmPerPx) S.mmPerPx /= f;
+}
+function moveState(S, dx, dy) {
+  const P = p => { if (p && p.x != null) { p.x += dx; p.y += dy; } };
+  (S.items || []).forEach(it => { (it.pts || []).forEach(P); (it.holes || []).forEach(h => h.forEach(P)); });
+  P(S.origin); if (S.calib) { P(S.calib.a); P(S.calib.b); }
+  if (S.sand) (S.sand.pts || []).forEach(P);
+  (S.pp || []).forEach(q => { if (q.x != null) P(q); });
 }
 function loadState(key) {
   try { const s = JSON.parse(localStorage.getItem("meetmaat:" + key) || "null"); if (s && Array.isArray(s.items)) return s; } catch (e) {}
@@ -2776,14 +2791,75 @@ function wgsToRd(lat, lon) {
   return { x, y };
 }
 function luchtSetPlek(p) {
+  if (p && p.ox == null) { p.ox = p.x; p.oy = p.y; }
   luchtPlek = p;
   $("luchtPlek").innerHTML = p ? `Gekozen: <b>${esc(p.naam)}</b>` : "";
   $("luchtGo").disabled = !p;
+  luchtPreview();
 }
+// Voorbeeld: een groter stuk (2× zo breed) in lage resolutie, met het kader van wat je ophaalt in het midden
+const LP_F = 2;
+let lpDrag = null, lpSeq = 0;
+function lpMove(dx, dy) {
+  const t = `translate(${dx}px,${dy}px)`;
+  $("luchtPrevImg").style.transform = t; $("luchtDot").style.transform = t;
+}
+function lpDot() {
+  const P = luchtPlek, span = +$("luchtSize").value * LP_F, d = $("luchtDot");
+  const fx = 0.5 + (P.ox - P.x) / span, fy = 0.5 - (P.oy - P.y) / span;
+  d.hidden = fx < 0 || fx > 1 || fy < 0 || fy > 1;
+  d.style.left = fx * 100 + "%"; d.style.top = fy * 100 + "%";
+}
+function luchtPreview() {
+  const box = $("luchtPrev"), P = luchtPlek;
+  box.hidden = $("luchtPrevHint").hidden = !P;
+  if (!P) return;
+  const half = +$("luchtSize").value * LP_F / 2, px = Math.min(1024, Math.round((box.clientWidth || 400) * Math.min(2, devicePixelRatio || 1)));
+  const url = `${PDOK_WMS}?service=WMS&version=1.3.0&request=GetMap&layers=Actueel_orthoHR&styles=&crs=EPSG:28992&bbox=${(P.x - half).toFixed(2)},${(P.y - half).toFixed(2)},${(P.x + half).toFixed(2)},${(P.y + half).toFixed(2)}&width=${px}&height=${px}&format=image/jpeg`;
+  const seq = ++lpSeq, im = new Image();
+  im.onload = () => { if (seq !== lpSeq) return; $("luchtPrevImg").src = url; lpMove(0, 0); lpDot(); };
+  im.onerror = () => { if (seq === lpSeq) $("luchtMsg").textContent = "Voorbeeld laden lukte niet. Is er internet?"; };
+  im.src = url;
+}
+$("luchtPrev").addEventListener("pointerdown", e => {
+  if (!luchtPlek) return;
+  $("luchtPrev").setPointerCapture(e.pointerId);
+  lpDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, dy: 0 };
+});
+$("luchtPrev").addEventListener("pointermove", e => {
+  if (!lpDrag || e.pointerId !== lpDrag.id) return;
+  lpDrag.dx = e.clientX - lpDrag.x; lpDrag.dy = e.clientY - lpDrag.y;
+  lpMove(lpDrag.dx, lpDrag.dy);
+});
+function lpEnd(e) {
+  if (!lpDrag || e.pointerId !== lpDrag.id) return;
+  const box = $("luchtPrev"), r = box.getBoundingClientRect();
+  let { dx, dy } = lpDrag; lpDrag = null;
+  if (Math.hypot(dx, dy) < 6) { dx = r.left + r.width / 2 - e.clientX; dy = r.top + r.height / 2 - e.clientY; lpMove(dx, dy); }   // tik: die plek in het midden
+  const m = +$("luchtSize").value * LP_F / r.width;     // meter per schermpixel
+  luchtPlek.x -= dx * m; luchtPlek.y += dy * m;
+  luchtPreview();
+}
+$("luchtPrev").addEventListener("pointerup", lpEnd);
+$("luchtPrev").addEventListener("pointercancel", lpEnd);
+$("luchtSize").addEventListener("change", luchtPreview);
+// Staat er al een luchtfoto open, dan begint het venster op die plek (om bij te schuiven)
+const luchtCur = () => st.geo && st.geo.crs === "EPSG:28992" && img.w ? st.geo : null;
 $("luchtOpen").addEventListener("click", () => {
   $("settings").close();
   const d = $("luchtDlg"); try { d.showModal(); } catch (e) { d.setAttribute("open", ""); }
-  setTimeout(() => $("luchtQ").focus(), 50);
+  const g = luchtCur();
+  $("luchtMeeL").hidden = !(g && (st.items.length || st.pp.length || st.origin));
+  if (g) {
+    const wm = img.w / g.pxScale * g.mpp, hm = img.h / g.pxScale * g.mpp;
+    const opts = [...$("luchtSize").options].map(o => +o.value);
+    $("luchtSize").value = String(opts.reduce((a, b) => Math.abs(b - wm) < Math.abs(a - wm) ? b : a));
+    luchtSetPlek({ x: g.x0 + wm / 2, y: g.yTop - hm / 2, naam: (st.title || "open luchtfoto").replace(/^Luchtfoto /, "") });
+    $("luchtMsg").textContent = "Dit is de open luchtfoto. Schuif hem bij en tik op Luchtfoto openen.";
+  } else {
+    if (luchtPlek) luchtPreview();
+    setTimeout(() => $("luchtQ").focus(), 50);
+  }
 });
 $("luchtClose").addEventListener("click", () => $("luchtDlg").close());
 async function luchtZoek() {
@@ -2849,6 +2925,7 @@ $("luchtGo").addEventListener("click", async () => {
     const naam = luchtPlek.naam.replace(/[\\/:*?"<>|]+/g, "_");
     const file = new File([blob], `Luchtfoto ${naam} ${size} m.jpg`, { type: "image/jpeg" });
     luchtPending = { name: file.name, mmPerPx: mpp * 1000, wPx: W, geo: { x0, yTop, mpp }, title: `Luchtfoto ${luchtPlek.naam}` };
+    if (!$("luchtMeeL").hidden && $("luchtMee").checked && luchtCur()) luchtPending.carry = JSON.parse(JSON.stringify(st));
     $("luchtDlg").close();
     await openFile(file);
     msg.textContent = "";
@@ -2946,16 +3023,25 @@ async function openFile(f, fromStore) {
       setImage(`${f.name}|${f.size}`, f.name, false);
       if (luchtPending && luchtPending.name === f.name) {
         const L = luchtPending; luchtPending = null;
+        const sc = img.w / L.wPx;                                 // het canvas kan kleiner zijn dan de foto
+        let mee = 0;
+        if (L.carry && !st.items.length) {
+          // metingen van de vorige luchtfoto omrekenen naar deze (via de RD-coördinaten)
+          const S = L.carry, og = S.geo, k = (og.mpp / og.pxScale) / (L.geo.mpp / sc);
+          rescaleState(S, k);
+          moveState(S, (og.x0 - L.geo.x0) / L.geo.mpp * sc, (L.geo.yTop - og.yTop) / L.geo.mpp * sc);
+          delete S.mmPerPx; delete S._w;
+          st = S; mee = st.items.length;
+        }
         if (!st.mmPerPx) {
-          const sc = img.w / L.wPx;                               // het canvas kan kleiner zijn dan de foto
           st.mmPerPx = L.mmPerPx / sc;
           st.calib = { a: { x: 0, y: 0 }, b: { x: img.w, y: 0 }, mm: img.w * st.mmPerPx, lucht: true };
           st.geo = Object.assign({ crs: "EPSG:28992", pxScale: sc }, L.geo);
           if (!st.title) st.title = L.title;
-          save(); renderTitle(); renderAll();
+          save(); renderTitle(); syncSandInputs(); renderAll();
         }
         setTool("dist");
-        showBanner(`<b>${esc(L.title)}</b> geopend en <b>meteen op schaal</b>: 1 pixel = ${nl(st.mmPerPx / 10, 1)} cm. Luchtfoto: PDOK.`, false, 7000);
+        showBanner(`<b>${esc(st.title || L.title)}</b> geopend en <b>meteen op schaal</b>: 1 pixel = ${nl(st.mmPerPx / 10, 1)} cm.${mee ? ` ${mee} ${mee === 1 ? "meting" : "metingen"} meegenomen van de vorige luchtfoto.` : ""} Luchtfoto: PDOK.`, false, 7000);
       }
     }
   } catch (err) {
