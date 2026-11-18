@@ -629,6 +629,16 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
           <label class="chk"><input type="checkbox" id="ahnShow"> Hoogtekaart op de foto</label>
           <div class="ahnleg"><span id="ahnLo"></span><i></i><span id="ahnHi"></span></div>
           <p class="hint" style="margin:0">Bij je metingen staat nu ook de hoogte: bij Afstand en Lengte begin, eind en verval, bij Oppervlak het gemiddelde, bij Uitzetmaat het punt.</p>
+          <h3>Bijstellen op eigen meting</h3>
+          <p class="hint" style="margin:0">Het AHN kan een paar cm naast zitten, en de grond kan sinds 2022 veranderd zijn. Zet een <b>Uitzetmaat</b>-punt op open grond (gras, asfalt, geen talud), meet daar met de laser de hoogte t.o.v. NAP en vul die hier in. Alle hoogtes en kubiekes schuiven dan mee. Met 3 of meer punten verspreid over het werk zie je ook of het overal klopt.</p>
+          <div class="row2">
+            <label for="ahnRefPt">Punt<select id="ahnRefPt"></select></label>
+            <label for="ahnRefH">Gemeten (m NAP)<input id="ahnRefH" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 0,62 of -1,15"></label>
+          </div>
+          <div class="btns"><button type="button" id="ahnRefAdd">Toevoegen</button></div>
+          <p class="hint" id="ahnRefMsg" style="margin:0"></p>
+          <ul class="pplist" id="ahnRefList"></ul>
+          <div class="ahnres" id="ahnRefSum"></div>
           <h3>Afgraven en ophogen</h3>
           <div class="row2">
             <label for="ahnVlak">Vlak<select id="ahnVlak"></select></label>
@@ -3144,8 +3154,9 @@ async function readTiffF32(buf) {
   if (Number.isFinite(nod)) for (let i = 0; i < out.length; i++) if (out[i] === Math.fround(nod)) out[i] = NaN;
   return { w, h, res: sc[0], x0: tp[3] - tp[0] * sc[0], y0: tp[4] + tp[1] * sc[1], data: out };
 }
-function ahnAtRd(q, zoek) {
+function ahnAtRd(q, zoek, ruw) {
   if (!ahn) return null;
+  const off = ruw ? 0 : ahn.off || 0;
   const c = Math.floor((q.x - ahn.x0) / ahn.res), r = Math.floor((ahn.y0 - q.y) / ahn.res);
   for (let d = 0; d <= (zoek ? 2 : 0); d++) {           // geen maaiveld precies hier: kijk iets verder (tot 1 m)
     let sum = 0, n = 0;
@@ -3154,9 +3165,20 @@ function ahnAtRd(q, zoek) {
       if (cc < 0 || rr < 0 || cc >= ahn.w || rr >= ahn.h) continue;
       const v = ahn.data[rr * ahn.w + cc]; if (ahnOk(v)) { sum += v; n++; }
     }
-    if (n) return sum / n;
+    if (n) return sum / n + off;
   }
   return null;
+}
+// Bijstellen: verschil tussen eigen meting (m NAP) en het AHN op die plek; het gemiddelde schuift alle hoogtes
+function ahnRefs() {
+  if (!ahn || !Array.isArray(st.ahnRef)) return [];
+  return st.ahnRef.map(r => { const raw = ahnAtRd(r, false, true); return { r, raw, d: raw == null ? null : r.h - raw }; });
+}
+function ahnUpdOff() {
+  if (!ahn) return;
+  const ds = ahnRefs().filter(x => x.d != null).map(x => x.d);
+  const off = ds.length ? ds.reduce((a, b) => a + b, 0) / ds.length : 0;
+  if (off !== ahn.off) { ahn.off = off; ahnCache.clear(); }
 }
 const ahnG = () => { const g = luchtCur(); return g ? geoNorm(g, img.w, img.h) : null; };
 function ahnAt(p) { const G = ahnG(); return G && ahn ? ahnAtRd(pxToRd(G, img.w, img.h, p), true) : null; }
@@ -3175,7 +3197,8 @@ function ahnVlak(it) {
     total++;
     const v = ahn.data[r * ahn.w + c];
     if (!ahnOk(v)) continue;
-    vals.push(v); sum += v; if (v < min) min = v; if (v > max) max = v;
+    const vv = v + (ahn.off || 0);
+    vals.push(vv); sum += vv; if (vv < min) min = vv; if (vv > max) max = vv;
   }
   const r = vals.length ? { n: vals.length, total, mean: sum / vals.length, min, max, vals, cel: ahn.res * ahn.res } : null;
   ahnCache.set(it.id, { sig, r });
@@ -3237,7 +3260,7 @@ async function ahnGet() {
     if (!res.ok || !/tiff/.test(res.headers.get("content-type") || "")) throw new Error("het AHN gaf geen hoogtes terug");
     const t = await readTiffF32(await res.arrayBuffer());
     if (img.key !== key) return;
-    ahn = Object.assign({ key }, t); ahnCache.clear();
+    ahn = Object.assign({ key, off: 0 }, t); ahnCache.clear(); ahnUpdOff();
     if (!st.ahn) { st.ahn = true; save(); }
     msg.textContent = "";
     ahnOverlay(); renderAll();
@@ -3254,12 +3277,31 @@ function renderAhn() {
   const on = !!luchtCur();
   $("secAhn").hidden = !on;
   if (!on) return;
-  $("sum-ahn").textContent = ahn ? "geladen" : ahnBusy ? "ophalen…" : "";
+  $("sum-ahn").textContent = ahn ? (ahn.off ? `bijgesteld ${ahn.off >= 0 ? "+" : "−"}${nl(Math.abs(ahn.off) * 100, 0)} cm` : "geladen") : ahnBusy ? "ophalen…" : "";
   $("ahnGet").textContent = ahn ? "Opnieuw ophalen" : "Hoogtes ophalen";
   $("ahnOn").hidden = !ahn;
   if (!ahn) return;
   $("ahnShow").checked = st.ahnShow !== false;
+  ahnUpdOff();
   $("ahnLo").textContent = ahn.lo != null ? fmtNap(ahn.lo) : ""; $("ahnHi").textContent = ahn.hi != null ? fmtNap(ahn.hi) : "";
+  // bijstellen
+  const sp = st.items.filter(it => it.type === "set" && it.pts && it.pts.length), rs = $("ahnRefPt");
+  const keep = rs.value;
+  rs.innerHTML = sp.length ? sp.map(it => { const h = ahnAt(it.pts[it.pts.length - 1]); return `<option value="${it.id}">${st.items.indexOf(it) + 1} · ${esc(it.name)}${h == null ? " (geen AHN)" : ""}</option>`; }).join("") : `<option value="">Zet eerst een Uitzetmaat-punt</option>`;
+  if (sp.some(it => String(it.id) === keep)) rs.value = keep;
+  rs.disabled = $("ahnRefAdd").disabled = !sp.length;
+  const R = ahnRefs();
+  $("ahnRefList").innerHTML = R.map((x, i) => `<li><div class="pph"><b>${esc(x.r.name)}</b>${x.d == null ? "" : `<span class="ppv">${x.d >= 0 ? "+" : "−"}${nl(Math.abs(x.d) * 100, 1)} cm</span>`}</div>
+      <span class="ppm">gemeten ${fmtNap(x.r.h)} · AHN ${x.raw == null ? "geen hoogte hier" : fmtNap(x.raw)}</span>
+      <div class="btns"><button type="button" class="ghost" data-ref="${i}">Wissen</button></div></li>`).join("");
+  const ds = R.filter(x => x.d != null).map(x => x.d);
+  if (!ds.length) $("ahnRefSum").innerHTML = "";
+  else {
+    const sprd = Math.max(...ds) - Math.min(...ds);
+    $("ahnRefSum").innerHTML = `<span>Alle hoogtes ${ahn.off >= 0 ? "+" : "−"}<b>${nl(Math.abs(ahn.off) * 100, 1)} cm</b> bijgesteld (${ds.length} ${ds.length === 1 ? "punt" : "punten"}${ds.length > 1 ? `, onderling ${nl(sprd * 100, 1)} cm verschil` : ""}).</span>
+      ${ds.length > 1 && sprd > 0.1 ? `<span class="hint" style="color:var(--warn)">De punten wijken onderling meer dan 10 cm af. Waarschijnlijk is de grond ergens veranderd sinds 2022, of ligt een punt op een talud of onder begroeiing. Vertrouw de AHN-hoogtes hier niet blind.</span>` : ""}
+      ${ds.length === 1 ? `<span class="hint">Met één punt weet je niet of het AHN overal even veel afwijkt. Meet er nog een paar verspreid over het werk.</span>` : ""}`;
+  }
   const vl = st.items.filter(it => it.type === "area" && it.pts && it.pts.length > 2), sel = $("ahnVlak");
   if (!vl.some(it => it.id === st.ahnVlak)) st.ahnVlak = vl.length ? vl[0].id : null;
   sel.innerHTML = vl.length ? vl.map(it => `<option value="${it.id}"${it.id === st.ahnVlak ? " selected" : ""}>${st.items.indexOf(it) + 1} · ${esc(it.name)}</option>`).join("") : `<option value="">Meet eerst een Oppervlak</option>`;
@@ -3281,6 +3323,23 @@ function renderAhn() {
   out.innerHTML = html;
 }
 $("ahnGet").addEventListener("click", () => ahnGet());
+$("ahnRefAdd").addEventListener("click", () => {
+  const msg = $("ahnRefMsg"), it = st.items.find(x => String(x.id) === $("ahnRefPt").value);
+  const t = $("ahnRefH").value.trim().replace("−", "-").replace(",", ".");
+  if (!it) { msg.textContent = "Kies eerst een punt."; return; }
+  if (t === "" || isNaN(+t) || Math.abs(+t) > 300) { msg.textContent = "Vul de gemeten hoogte in meters t.o.v. NAP in, bijv. 0,62 of -1,15."; return; }
+  const rd = pxToRd(ahnG(), img.w, img.h, it.pts[it.pts.length - 1]);
+  if (ahnAtRd(rd, false, true) == null) { msg.textContent = "Precies op dit punt heeft het AHN geen maaiveld (gebouw, water of vlak ernaast). Kies voor bijstellen een punt midden op open grond."; return; }
+  if (!Array.isArray(st.ahnRef)) st.ahnRef = [];
+  st.ahnRef = st.ahnRef.filter(r => r.id !== it.id);
+  st.ahnRef.push({ id: it.id, name: it.name, x: rd.x, y: rd.y, h: +t });
+  $("ahnRefH").value = ""; msg.textContent = "";
+  save(); ahnUpdOff(); ahnOverlay(); renderAll();
+});
+$("ahnRefList").addEventListener("click", e => {
+  const b = e.target.closest("[data-ref]"); if (!b) return;
+  armed(b, () => { st.ahnRef.splice(+b.dataset.ref, 1); save(); ahnUpdOff(); ahnOverlay(); renderAll(); });
+});
 $("ahnShow").addEventListener("change", e => { st.ahnShow = e.target.checked; save(); ahnOverlay(); });
 $("ahnVlak").addEventListener("change", e => { st.ahnVlak = +e.target.value; save(); renderAhn(); });
 $("ahnPeil").addEventListener("input", e => {
