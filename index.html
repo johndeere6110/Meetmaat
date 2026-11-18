@@ -123,6 +123,14 @@ button .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke
 #cv { display: block; background: var(--paper); box-shadow: 0 1px 8px rgba(0,0,0,.25); }
 #ov { position: absolute; left: 0; top: 0; overflow: visible; }
 #sharp { position: absolute; left: 0; top: 0; pointer-events: none; }
+#ahnImg { position: absolute; left: 0; top: 0; pointer-events: none; opacity: .55; }
+.ahnleg { display: flex; align-items: center; gap: 8px; font: 500 13px var(--mono); }
+.ahnleg i { flex: 1; height: 12px; border-radius: 3px; background: linear-gradient(to right, hsl(240,85%,50%), hsl(180,85%,45%), hsl(120,85%,40%), hsl(60,85%,50%), hsl(0,85%,50%)); }
+.ahnres { display: grid; gap: 4px; font-size: 14px; }
+.ahnres b { font: 600 16px var(--mono); white-space: nowrap; }
+.sand label.chk, label.chk { display: flex; flex-direction: row; gap: 8px; align-items: center; font-size: 14px; }
+.sand label.chk input, label.chk input { width: 18px; height: 18px; flex: none; margin: 0; padding: 0; }
+.ahnv { color: var(--ink); }
 
 /* Lijndiktes in schermpixels: --k = 1 / zoom (de tekening zit in een CSS-transform, daar werkt non-scaling-stroke niet) */
 #ov { --k: 1; }
@@ -349,7 +357,7 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
     <section>
       <h3 class="dh">Proef: luchtfoto</h3>
       <div class="sand">
-        <p class="hint" style="margin:0">Haal een luchtfoto van PDOK op (heel Nederland, ±8 cm per pixel) en meet er meteen op, zonder te ijken. Zoek een adres of gebruik je locatie.</p>
+        <p class="hint" style="margin:0">Haal een luchtfoto van PDOK op (heel Nederland, 5 of 8 cm per pixel, met hoogtes uit het AHN) en meet er meteen op, zonder te ijken. Zoek een adres of gebruik je locatie.</p>
         <div class="btns"><button type="button" class="ghost" id="luchtOpen">Luchtfoto ophalen</button></div>
       </div>
     </section>
@@ -397,14 +405,14 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
         <div class="btns" id="luchtRecht"></div>
       </div>
       <p class="hint" id="luchtPrevHint" style="margin:0" hidden>Schuif de foto tot je stuk binnen het gele kader valt, of tik op een plek om die in het midden te zetten. De rode stip is het adres of je locatie.</p>
-      <label id="luchtMeeL" style="display:flex;gap:8px;align-items:center" hidden><input type="checkbox" id="luchtMee" checked> Metingen van de open luchtfoto meenemen</label>
+      <label id="luchtMeeL" class="chk" hidden><input type="checkbox" id="luchtMee" checked> Metingen van de open luchtfoto meenemen</label>
       <label for="luchtSize">Hoe groot (breed × hoog)<select id="luchtSize">
         <option value="50">50 × 50 m</option><option value="100">100 × 100 m</option><option value="150">150 × 150 m</option><option value="200" selected>200 × 200 m</option><option value="250">250 × 250 m</option>
         <option value="300">300 × 300 m</option><option value="500">500 × 500 m</option><option value="1000">1 × 1 km</option>
       </select></label>
       <div class="btns"><button type="button" id="luchtGo" disabled>Luchtfoto openen</button></div>
       <p class="hint" id="luchtMsg" style="margin:0"></p>
-      <p class="hint" style="margin:0">Luchtfoto: PDOK, Beeldmateriaal Nederland. Hoe ver hij er naast kan liggen weet ik niet precies, schat enkele decimeters; daken en hoge dingen staan vaak iets scheef. Goed voor percelen en vakken, niet voor uitzetten op de centimeter.</p>
+      <p class="hint" style="margin:0">Luchtfoto: PDOK, Beeldmateriaal Nederland (voorjaar 2026). Op sommige plekken is de bron 5 cm per pixel, elders 8 cm; de app kijkt zelf welke. Hoe ver hij er naast kan liggen weet ik niet precies, schat enkele decimeters; daken en hoge dingen staan vaak iets scheef. Goed voor percelen en vakken, niet voor uitzetten op de centimeter.</p>
     </div>
   </div>
 </dialog>
@@ -460,7 +468,7 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
     <div class="viewer">
       <div class="hintbar" id="hint" aria-live="polite"></div>
       <div id="view" aria-label="Tekening">
-        <div id="stage"><canvas id="cv" width="10" height="10"></canvas><canvas id="sharp" hidden></canvas><svg id="ov" xmlns="http://www.w3.org/2000/svg"></svg></div>
+        <div id="stage"><canvas id="cv" width="10" height="10"></canvas><canvas id="sharp" hidden></canvas><img id="ahnImg" alt="" hidden><svg id="ov" xmlns="http://www.w3.org/2000/svg"></svg></div>
         <div class="banner" id="banner" hidden></div>
         <form class="calibbox" id="calibbox" hidden>
           <strong>Hoe lang is deze lijn in het echt?</strong>
@@ -606,6 +614,28 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
             <div class="btns"><button type="button" class="ghost" id="ppTake" hidden>Overnemen bij nieuw peilpunt</button></div>
           </div>
         </details>
+      </div>
+        </div>
+      </details>
+
+      <details class="sec" data-sec="ahn" id="secAhn" hidden>
+        <summary><h2>Hoogtes (AHN)</h2><span class="secsum" id="sum-ahn"></span></summary>
+        <div class="secbody">
+      <div class="sand">
+        <p class="hint" style="margin:0">Maaiveldhoogte uit het Actueel Hoogtebestand Nederland (AHN4, gemeten 2020–2022), in meters t.o.v. NAP, per halve meter. Op gebouwen en water is geen maaiveld gemeten. Wat er sinds 2022 is gegraven of opgehoogd staat er niet in: een richtwaarde, controleer met de laser.</p>
+        <div class="btns"><button type="button" id="ahnGet">Hoogtes ophalen</button></div>
+        <p class="hint" id="ahnMsg" style="margin:0"></p>
+        <div id="ahnOn" hidden>
+          <label class="chk"><input type="checkbox" id="ahnShow"> Hoogtekaart op de foto</label>
+          <div class="ahnleg"><span id="ahnLo"></span><i></i><span id="ahnHi"></span></div>
+          <p class="hint" style="margin:0">Bij je metingen staat nu ook de hoogte: bij Afstand en Lengte begin, eind en verval, bij Oppervlak het gemiddelde, bij Uitzetmaat het punt.</p>
+          <h3>Afgraven en ophogen</h3>
+          <div class="row2">
+            <label for="ahnVlak">Vlak<select id="ahnVlak"></select></label>
+            <label for="ahnPeil">Gewenst peil (m NAP)<input id="ahnPeil" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 0,45 of -0,20"></label>
+          </div>
+          <div class="ahnres" id="ahnRes"></div>
+        </div>
       </div>
         </div>
       </details>
@@ -1907,7 +1937,7 @@ function renderList() {
         <button type="button" data-act="show">Toon</button><button type="button" data-act="del" aria-label="Meting ${i + 1} verwijderen">✕</button></div>
       <input class="nm" type="text" data-act="name" list="codelist" value="${esc(it.name)}" aria-label="Naam van meting ${i + 1}">
       ${it.type !== "set" ? `<input class="grp" type="text" data-act="grp" list="grplist" value="${esc(it.grp || "")}" placeholder="Groep, bijv. gras" aria-label="Groep van meting ${i + 1}">` : ""}
-      <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div>${d.cmp ? `<div class="cmp ${d.cmpCls}">${d.cmp}</div>` : ""}${(() => {
+      <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div>${(() => { const t = ahnLine(it); return t ? `<div class="subv ahnv">${esc(t)}</div>` : ""; })()}${d.cmp ? `<div class="cmp ${d.cmpCls}">${d.cmp}</div>` : ""}${(() => {
         const par = it.minus != null ? st.items.find(o => o.id === it.minus) : parentArea(it);
         return par ? `<button type="button" class="ghost minus" data-act="minus" data-par="${par.id}" aria-pressed="${it.minus === par.id}">${it.minus === par.id ? `Wordt afgetrokken van ${esc(par.name)}` : `Aftrekken van ${esc(par.name)}`}</button>` : "";
       })()}</li>`;
@@ -2082,7 +2112,7 @@ function renderTotals() {
   el.hidden = false;
   el.innerHTML = `<div class="tth">Totalen per groep</div>` + G.map(g => `<div class="tt"><span class="ttn">${esc(g.name)}</span><span class="ttc">${g.n} meting${g.n === 1 ? "" : "en"}</span><span class="ttv">${[g.na ? fmtArea(g.a) : "", g.nl ? fmtLen(g.l) : ""].filter(Boolean).join(" · ")}</span></div>`).join("");
 }
-function renderAll() { drawOverlay(); renderList(); renderTotals(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); updateHint(); renderTools(); renderSums(); }
+function renderAll() { drawOverlay(); renderList(); renderTotals(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); renderAhn(); updateHint(); renderTools(); renderSums(); }
 // Korte stand per onderdeel in de kop, zodat je het niet hoeft open te klappen
 function renderSums() {
   const set = (k, t, warn) => { const e = $("sum-" + k); if (e) { e.textContent = t; e.classList.toggle("warn", !!warn); } };
@@ -2604,6 +2634,7 @@ function setImage(key, name, sample, auto) {
   else showBanner(`<b>${esc(name)}</b> geopend${piles.length ? `, ${piles.length} ${rk().mv} herkend` : ""}. Begin met <b>IJken</b>.`, false, 5000);
   drawPiles();
   setTool(sample ? "pan" : (st.mmPerPx ? "dist" : "calib"));
+  ahnSync();
   fit();
 }
 function canvasLimits(w, h) {
@@ -2996,10 +3027,34 @@ $("luchtGps").addEventListener("click", () => {
   }, err => { $("luchtMsg").textContent = err.code === 1 ? "Geen toestemming voor je locatie. Zet locatie aan voor Meetmaat of de browser." : "Locatie niet gevonden. Probeer het buiten nog eens, of zoek een adres."; },
   { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 });
 });
+// Hoe scherp is de bron hier? In 8 cm-gebieden geeft PDOK bij 1 cm per pixel blokjes van 8 pixels; in 5 cm-gebieden niet
+async function luchtBronRes(x, y) {
+  try {
+    const url = `${PDOK_WMS}?service=WMS&version=1.3.0&request=GetMap&layers=Actueel_orthoHR&styles=&crs=EPSG:28992&bbox=${(x - 2).toFixed(2)},${(y - 2).toFixed(2)},${(x + 2).toFixed(2)},${(y + 2).toFixed(2)}&width=400&height=400&format=image/png`;
+    const res = await fetch(url);
+    if (!res.ok) return 0.08;
+    const bmp = await createImageBitmap(await res.blob()), c = document.createElement("canvas");
+    c.width = 400; c.height = 400; const g = c.getContext("2d"); g.drawImage(bmp, 0, 0);
+    const d = g.getImageData(0, 0, 400, 400).data;
+    let inBlok = 0, tot = 0;
+    for (let yy = 0; yy < 400; yy += 7) {
+      let run = 1;
+      for (let xx = 1; xx <= 400; xx++) {
+        const i = (yy * 400 + xx) * 4, j = i - 4;
+        if (xx < 400 && d[i] === d[j] && d[i + 1] === d[j + 1] && d[i + 2] === d[j + 2]) { run++; continue; }
+        if (run >= 7 && run <= 9) inBlok += run;
+        tot += run; run = 1;
+      }
+    }
+    return inBlok / tot > 0.2 ? 0.08 : 0.05;
+  } catch (e) { return 0.08; }
+}
 // Luchtfoto ophalen: PDOK levert max. 2000 × 2000 px per keer, dus groter in stukken (tegels)
 $("luchtGo").addEventListener("click", async () => {
   if (!luchtPlek) return;
-  const size = +$("luchtSize").value, mpp = Math.max(0.08, size / 4000), W = Math.round(size / mpp);
+  const msg0 = $("luchtMsg"); msg0.textContent = "Kijken hoe scherp de foto hier is…"; $("luchtGo").disabled = true;
+  const bron = await luchtBronRes(luchtPlek.x, luchtPlek.y);
+  const size = +$("luchtSize").value, mpp = Math.max(bron, size / 4000), W = Math.round(size / mpp);
   const cx = luchtPlek.x, cy = luchtPlek.y, a = luchtA * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
   // PDOK levert noord boven en max. 2000 px per keer: haal een (groter) recht stuk in tegels op en teken die gedraaid
   const M = Math.ceil(W * (Math.abs(ca) + Math.abs(sa))), t = Math.ceil(M / 1990), tile = Math.ceil(M / t);
@@ -3027,7 +3082,7 @@ $("luchtGo").addEventListener("click", async () => {
     const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.9));
     const naam = luchtPlek.naam.replace(/[\\/:*?"<>|]+/g, "_");
     const file = new File([blob], `Luchtfoto ${naam} ${size} m.jpg`, { type: "image/jpeg" });
-    luchtPending = { name: file.name, mmPerPx: mpp * 1000, wPx: W, geo: { cx, cy, mpp, a }, title: `Luchtfoto ${luchtPlek.naam}` };
+    luchtPending = { name: file.name, mmPerPx: mpp * 1000, wPx: W, bron, geo: { cx, cy, mpp, a }, title: `Luchtfoto ${luchtPlek.naam}` };
     if (!$("luchtMeeL").hidden && $("luchtMee").checked && luchtCur()) {
       luchtPending.carry = JSON.parse(JSON.stringify(st));
       luchtPending.carryG = geoNorm(st.geo, img.w, img.h); luchtPending.carryWH = [img.w, img.h];
@@ -3037,6 +3092,200 @@ $("luchtGo").addEventListener("click", async () => {
     msg.textContent = "";
   } catch (e) { msg.textContent = "Ophalen lukte niet: " + (e && e.message ? e.message : e) + ". Is er internet? Probeer een kleiner stuk."; }
   finally { b.disabled = !luchtPlek; }
+});
+
+/* ---------- Hoogtes uit het AHN (PDOK WCS, maaiveld per 0,5 m, t.o.v. NAP) ---------- */
+const AHN_WCS = "https://service.pdok.nl/rws/ahn/wcs/v1_0";
+let ahn = null, ahnBusy = false;
+const ahnCache = new Map();
+const ahnOk = v => Number.isFinite(v) && v > -60 && v < 400;
+const fmtNap = h => (h > 0.004 ? "+" : h < -0.004 ? "−" : "") + nl(Math.abs(h), 2) + " m";
+async function inflate(u8) {
+  const s = new Blob([u8]).stream().pipeThrough(new DecompressionStream("deflate"));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+// Kleine GeoTIFF-lezer voor één band float32 (ongecomprimeerd of deflate, met of zonder voorspeller 3)
+async function readTiffF32(buf) {
+  const dv = new DataView(buf), le = dv.getUint16(0) === 0x4949;
+  if (dv.getUint16(2, le) !== 42) throw new Error("geen hoogtebestand");
+  const ifd = dv.getUint32(4, le), n = dv.getUint16(ifd, le), T = {}, SZ = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 11: 4, 12: 8, 16: 8 };
+  for (let i = 0; i < n; i++) {
+    const e = ifd + 2 + i * 12, tag = dv.getUint16(e, le), type = dv.getUint16(e + 2, le), cnt = dv.getUint32(e + 4, le);
+    const off = (SZ[type] || 1) * cnt <= 4 ? e + 8 : dv.getUint32(e + 8, le);
+    if (type === 2) { T[tag] = new TextDecoder().decode(new Uint8Array(buf, off, cnt)).replace(/\0[\s\S]*$/, ""); continue; }
+    const a = [];
+    for (let k = 0; k < cnt; k++) a.push(type === 3 ? dv.getUint16(off + 2 * k, le) : type === 4 ? dv.getUint32(off + 4 * k, le) : type === 12 ? dv.getFloat64(off + 8 * k, le) : type === 11 ? dv.getFloat32(off + 4 * k, le) : type === 1 ? dv.getUint8(off + k) : 0);
+    T[tag] = a;
+  }
+  const w = T[256][0], h = T[257][0], comp = (T[259] || [1])[0], pred = (T[317] || [1])[0];
+  if ((T[258] || [0])[0] !== 32 || (T[339] || [1])[0] !== 3 || (T[277] || [1])[0] !== 1) throw new Error("onverwacht soort hoogtebestand");
+  if (![1, 8, 32946].includes(comp) || ![1, 3].includes(pred)) throw new Error("onbekende compressie in het hoogtebestand");
+  const tiled = !!T[322], bw = tiled ? T[322][0] : w, bh = tiled ? T[323][0] : (T[278] || [h])[0];
+  const offs = tiled ? T[324] : T[273], lens = tiled ? T[325] : T[279], across = tiled ? Math.ceil(w / bw) : 1;
+  const out = new Float32Array(w * h).fill(NaN), tmp = new DataView(new ArrayBuffer(4));
+  for (let b = 0; b < offs.length; b++) {
+    let u8 = new Uint8Array(buf, offs[b], lens[b]);
+    u8 = comp === 1 ? u8.slice() : await inflate(u8);
+    const bx = (b % across) * bw, by = Math.floor(b / across) * bh, rb = bw * 4, rows = Math.min(bh, Math.floor(u8.length / rb));
+    for (let r = 0; r < rows; r++) {
+      const y = by + r; if (y >= h) break;
+      const row = u8.subarray(r * rb, (r + 1) * rb);
+      if (pred === 3) for (let i = 1; i < rb; i++) row[i] = (row[i] + row[i - 1]) & 255;
+      for (let k = 0; k < bw; k++) {
+        const x = bx + k; if (x >= w) break;
+        if (pred === 3) { tmp.setUint8(0, row[k]); tmp.setUint8(1, row[bw + k]); tmp.setUint8(2, row[2 * bw + k]); tmp.setUint8(3, row[3 * bw + k]); out[y * w + x] = tmp.getFloat32(0, false); }
+        else out[y * w + x] = new DataView(row.buffer, row.byteOffset + k * 4, 4).getFloat32(0, le);
+      }
+    }
+  }
+  const sc = T[33550], tp = T[33922];
+  if (!sc || !tp) throw new Error("hoogtebestand zonder ligging");
+  const nod = T[42113] != null ? parseFloat(T[42113]) : NaN;
+  if (Number.isFinite(nod)) for (let i = 0; i < out.length; i++) if (out[i] === Math.fround(nod)) out[i] = NaN;
+  return { w, h, res: sc[0], x0: tp[3] - tp[0] * sc[0], y0: tp[4] + tp[1] * sc[1], data: out };
+}
+function ahnAtRd(q, zoek) {
+  if (!ahn) return null;
+  const c = Math.floor((q.x - ahn.x0) / ahn.res), r = Math.floor((ahn.y0 - q.y) / ahn.res);
+  for (let d = 0; d <= (zoek ? 2 : 0); d++) {           // geen maaiveld precies hier: kijk iets verder (tot 1 m)
+    let sum = 0, n = 0;
+    for (let rr = r - d; rr <= r + d; rr++) for (let cc = c - d; cc <= c + d; cc++) {
+      if (d && Math.max(Math.abs(rr - r), Math.abs(cc - c)) < d) continue;
+      if (cc < 0 || rr < 0 || cc >= ahn.w || rr >= ahn.h) continue;
+      const v = ahn.data[rr * ahn.w + cc]; if (ahnOk(v)) { sum += v; n++; }
+    }
+    if (n) return sum / n;
+  }
+  return null;
+}
+const ahnG = () => { const g = luchtCur(); return g ? geoNorm(g, img.w, img.h) : null; };
+function ahnAt(p) { const G = ahnG(); return G && ahn ? ahnAtRd(pxToRd(G, img.w, img.h, p), true) : null; }
+// Alle halve-metercellen binnen een vlak
+function ahnVlak(it) {
+  const sig = ahn.key + "|" + it.pts.map(p => p.x.toFixed(1) + "," + p.y.toFixed(1)).join(";");
+  const hit = ahnCache.get(it.id); if (hit && hit.sig === sig) return hit.r;
+  const G = ahnG(), poly = it.pts.map(p => pxToRd(G, img.w, img.h, p));
+  const xs = poly.map(q => q.x), ys = poly.map(q => q.y);
+  const c0 = Math.max(0, Math.floor((Math.min(...xs) - ahn.x0) / ahn.res)), c1 = Math.min(ahn.w - 1, Math.floor((Math.max(...xs) - ahn.x0) / ahn.res));
+  const r0 = Math.max(0, Math.floor((ahn.y0 - Math.max(...ys)) / ahn.res)), r1 = Math.min(ahn.h - 1, Math.floor((ahn.y0 - Math.min(...ys)) / ahn.res));
+  const vals = []; let total = 0, sum = 0, min = Infinity, max = -Infinity;
+  for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+    const q = { x: ahn.x0 + (c + 0.5) * ahn.res, y: ahn.y0 - (r + 0.5) * ahn.res };
+    if (!inPoly(q, poly)) continue;
+    total++;
+    const v = ahn.data[r * ahn.w + c];
+    if (!ahnOk(v)) continue;
+    vals.push(v); sum += v; if (v < min) min = v; if (v > max) max = v;
+  }
+  const r = vals.length ? { n: vals.length, total, mean: sum / vals.length, min, max, vals, cel: ahn.res * ahn.res } : null;
+  ahnCache.set(it.id, { sig, r });
+  return r;
+}
+function ahnLine(it) {
+  if (!ahn || !luchtCur() || !it.pts || !it.pts.length) return "";
+  if (it.type === "area") {
+    const r = ahnVlak(it);
+    return r ? `Maaiveld gem. ${fmtNap(r.mean)} NAP (${fmtNap(r.min)} tot ${fmtNap(r.max)})` : "Maaiveld: geen AHN-hoogte in dit vlak";
+  }
+  const geen = "geen hoogte (gebouw of water)";
+  if (it.type === "set") { const h = ahnAt(it.pts[it.pts.length - 1]); return h == null ? "Hier geen maaiveldhoogte (gebouw of water)" : `Maaiveld ${fmtNap(h)} NAP`; }
+  const a = ahnAt(it.pts[0]), b = ahnAt(it.pts[it.pts.length - 1]);
+  if (a == null || b == null) return `Maaiveld begin ${a == null ? geen : fmtNap(a) + " NAP"} · eind ${b == null ? geen : fmtNap(b) + " NAP"}`;
+  const L = st.mmPerPx ? lenOf(it) * st.mmPerPx / 1000 : 0, dh = a - b;
+  return `Maaiveld begin ${fmtNap(a)} · eind ${fmtNap(b)} NAP · verval ${nl(Math.abs(dh) * 100, 0)} cm${L > 1 ? ` (${nl(Math.abs(dh) / L * 100, 2)}%)` : ""}${Math.abs(dh) >= 0.005 ? (dh > 0 ? " omlaag" : " omhoog") : ""}`;
+}
+function hsl2rgb(hh, ss, ll) {
+  const k = n => (n + hh / 30) % 12, a = ss * Math.min(ll, 1 - ll);
+  const f = n => ll - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return [f(0) * 255, f(8) * 255, f(4) * 255];
+}
+function ahnOverlay() {
+  const im = $("ahnImg"), G = ahnG();
+  if (!ahn || !G || st.ahnShow === false) { im.hidden = true; return; }
+  const f = Math.max(1, ahn.res / G.s), W = Math.ceil(img.w / f), H = Math.ceil(img.h / f);
+  const v = new Float32Array(W * H).fill(NaN), sample = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const h = ahnAtRd(pxToRd(G, img.w, img.h, { x: (x + 0.5) * f, y: (y + 0.5) * f }), false);
+    if (h != null) { v[y * W + x] = h; if ((x + y * 7) % 5 === 0) sample.push(h); }
+  }
+  if (!sample.length) { im.hidden = true; ahn.lo = ahn.hi = null; return; }
+  sample.sort((p, q) => p - q);
+  let lo = sample[Math.floor(sample.length * 0.02)], hi = sample[Math.floor(sample.length * 0.98)];
+  if (hi - lo < 0.2) { const m = (hi + lo) / 2; lo = m - 0.1; hi = m + 0.1; }
+  ahn.lo = lo; ahn.hi = hi;
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const g = c.getContext("2d"), id = g.createImageData(W, H);
+  for (let i = 0; i < v.length; i++) {
+    if (!Number.isFinite(v[i])) continue;
+    const t = Math.max(0, Math.min(1, (v[i] - lo) / (hi - lo))), [r, gg, b] = hsl2rgb(240 * (1 - t), 0.85, 0.5);
+    id.data[i * 4] = r; id.data[i * 4 + 1] = gg; id.data[i * 4 + 2] = b; id.data[i * 4 + 3] = 255;
+  }
+  g.putImageData(id, 0, 0);
+  im.src = c.toDataURL("image/png");
+  im.style.width = img.w + "px"; im.style.height = img.h + "px"; im.hidden = false;
+}
+async function ahnGet() {
+  const G = ahnG(); if (!G || ahnBusy) return;
+  ahnBusy = true; const key = img.key, msg = $("ahnMsg");
+  msg.textContent = "Hoogtes ophalen…"; $("ahnGet").disabled = true;
+  try {
+    const cs = [[0, 0], [img.w, 0], [0, img.h], [img.w, img.h]].map(([x, y]) => pxToRd(G, img.w, img.h, { x, y }));
+    const minx = Math.floor(Math.min(...cs.map(q => q.x)) / 0.5) * 0.5 - 1, maxx = Math.ceil(Math.max(...cs.map(q => q.x)) / 0.5) * 0.5 + 1;
+    const miny = Math.floor(Math.min(...cs.map(q => q.y)) / 0.5) * 0.5 - 1, maxy = Math.ceil(Math.max(...cs.map(q => q.y)) / 0.5) * 0.5 + 1;
+    const url = `${AHN_WCS}?service=WCS&version=2.0.1&request=GetCoverage&coverageId=dtm_05m&subset=x(${minx},${maxx})&subset=y(${miny},${maxy})&format=image/tiff`;
+    const res = await fetch(url);
+    if (!res.ok || !/tiff/.test(res.headers.get("content-type") || "")) throw new Error("het AHN gaf geen hoogtes terug");
+    const t = await readTiffF32(await res.arrayBuffer());
+    if (img.key !== key) return;
+    ahn = Object.assign({ key }, t); ahnCache.clear();
+    if (!st.ahn) { st.ahn = true; save(); }
+    msg.textContent = "";
+    ahnOverlay(); renderAll();
+  } catch (e) { msg.textContent = "Hoogtes ophalen lukte niet: " + (e && e.message ? e.message : e) + ". Is er internet?"; }
+  finally { ahnBusy = false; $("ahnGet").disabled = false; renderAhn(); }
+}
+// Bij een andere tekening: oude hoogtes weg; was er bij deze luchtfoto al om hoogtes gevraagd, dan opnieuw ophalen
+function ahnSync() {
+  if (ahn && ahn.key !== img.key) { ahn = null; ahnCache.clear(); }
+  ahnOverlay(); renderAhn();
+  if (!ahn && st.ahn && luchtCur()) ahnGet();
+}
+function renderAhn() {
+  const on = !!luchtCur();
+  $("secAhn").hidden = !on;
+  if (!on) return;
+  $("sum-ahn").textContent = ahn ? "geladen" : ahnBusy ? "ophalen…" : "";
+  $("ahnGet").textContent = ahn ? "Opnieuw ophalen" : "Hoogtes ophalen";
+  $("ahnOn").hidden = !ahn;
+  if (!ahn) return;
+  $("ahnShow").checked = st.ahnShow !== false;
+  $("ahnLo").textContent = ahn.lo != null ? fmtNap(ahn.lo) : ""; $("ahnHi").textContent = ahn.hi != null ? fmtNap(ahn.hi) : "";
+  const vl = st.items.filter(it => it.type === "area" && it.pts && it.pts.length > 2), sel = $("ahnVlak");
+  if (!vl.some(it => it.id === st.ahnVlak)) st.ahnVlak = vl.length ? vl[0].id : null;
+  sel.innerHTML = vl.length ? vl.map(it => `<option value="${it.id}"${it.id === st.ahnVlak ? " selected" : ""}>${st.items.indexOf(it) + 1} · ${esc(it.name)}</option>`).join("") : `<option value="">Meet eerst een Oppervlak</option>`;
+  sel.disabled = !vl.length;
+  if (document.activeElement !== $("ahnPeil")) $("ahnPeil").value = st.ahnPeil != null ? nl(st.ahnPeil, 2) : "";
+  const out = $("ahnRes"), it = vl.find(x => x.id === st.ahnVlak);
+  if (!it) { out.innerHTML = ""; return; }
+  const r = ahnVlak(it);
+  if (!r) { out.innerHTML = `<span class="hint">In dit vlak staat geen maaiveld in het AHN (gebouw of water).</span>`; return; }
+  const dek = r.n / r.total;
+  let html = `<span>Maaiveld nu: gem. ${fmtNap(r.mean)} NAP · laagste ${fmtNap(r.min)} · hoogste ${fmtNap(r.max)}</span>`;
+  if (st.ahnPeil != null) {
+    let af = 0, op = 0;
+    for (const v of r.vals) { if (v > st.ahnPeil) af += (v - st.ahnPeil) * r.cel; else op += (st.ahnPeil - v) * r.cel; }
+    const k = 1 / dek;
+    html += `<span>Afgraven <b>${nl(af * k, 1)} m³</b> · ophogen <b>${nl(op * k, 1)} m³</b></span>
+      <span class="hint">Vaste grond, zonder inklinken of opbouw (kijk daarvoor bij Grondwerk).${dek < 0.98 ? ` Het AHN heeft maaiveld op ${nl(dek * 100, 0)}% van dit vlak (de rest is gebouw of water); dat stuk is gerekend met het gemiddelde.` : ""}</span>`;
+  } else html += `<span class="hint">Vul een gewenst peil in, dan rekent hij uit hoeveel er af moet en bij moet.</span>`;
+  out.innerHTML = html;
+}
+$("ahnGet").addEventListener("click", () => ahnGet());
+$("ahnShow").addEventListener("change", e => { st.ahnShow = e.target.checked; save(); ahnOverlay(); });
+$("ahnVlak").addEventListener("change", e => { st.ahnVlak = +e.target.value; save(); renderAhn(); });
+$("ahnPeil").addEventListener("input", e => {
+  const t = e.target.value.trim().replace("−", "-").replace(",", ".");
+  st.ahnPeil = t === "" || isNaN(+t) ? null : +t; save(); renderAhn();
 });
 
 /* ---------- Delen met metingen: tekening + alles wat erop staat in één bestand ---------- */
@@ -3147,7 +3396,8 @@ async function openFile(f, fromStore) {
           save(); renderTitle(); syncSandInputs(); renderAll();
         }
         setTool("dist");
-        showBanner(`<b>${esc(st.title || L.title)}</b> geopend en <b>meteen op schaal</b>: 1 pixel = ${nl(st.mmPerPx / 10, 1)} cm.${mee ? ` ${mee} ${mee === 1 ? "meting" : "metingen"} meegenomen van de vorige luchtfoto.` : ""} Luchtfoto: PDOK.`, false, 7000);
+        showBanner(`<b>${esc(st.title || L.title)}</b> geopend en <b>meteen op schaal</b>: 1 pixel = ${nl(st.mmPerPx / 10, 1)} cm${L.bron === 0.05 ? " (hier is de bron 5 cm)" : ""}.${mee ? ` ${mee} ${mee === 1 ? "meting" : "metingen"} meegenomen van de vorige luchtfoto.` : ""} Luchtfoto: PDOK.`, false, 7000);
+        ahnSync();
       }
     }
   } catch (err) {
