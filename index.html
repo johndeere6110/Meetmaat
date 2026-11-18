@@ -244,7 +244,13 @@ input[type="number"], input[type="text"], .nm {
 .luchtprev { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1; overflow: hidden; background: var(--viewer); border-radius: 6px; touch-action: none; cursor: grab; user-select: none; }
 .luchtprev:active { cursor: grabbing; }
 .luchtprev img { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.lpframe { position: absolute; inset: 25%; border: 2px solid var(--accent); box-shadow: 0 0 0 999px rgba(0,0,0,.35); pointer-events: none; }
+.lpframe { position: absolute; inset: 25%; border: 2px solid var(--accent); box-shadow: 0 0 0 999px rgba(0,0,0,.35); pointer-events: none;
+  /* hulplijnen om op het oog recht te leggen */
+  background-image: linear-gradient(to right, rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.6) 1px, transparent 1px);
+  background-size: 25% 25%; background-position: -1px -1px; }
+.lplines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.lplines polyline, .lplines polygon { fill: none; stroke: var(--mark); stroke-width: 2px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.lplines .sel { stroke: var(--accent); stroke-width: 4px; }
 .lpdraai { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .lpdraai button { padding: 6px 9px; }
 .lpdraai b { min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
@@ -375,7 +381,7 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
       <div class="btns"><button type="button" id="luchtZoek">Zoeken</button><button type="button" class="ghost" id="luchtGps">Mijn locatie</button></div>
       <ul class="pplist" id="luchtRes"></ul>
       <p class="hint" id="luchtPlek" style="margin:0"></p>
-      <div id="luchtPrev" class="luchtprev" hidden><img id="luchtPrevImg" alt="Voorbeeld luchtfoto" draggable="false"><i class="lpdot" id="luchtDot"></i><div class="lpframe"></div></div>
+      <div id="luchtPrev" class="luchtprev" hidden><img id="luchtPrevImg" alt="Voorbeeld luchtfoto" draggable="false"><svg id="luchtLines" class="lplines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg><i class="lpdot" id="luchtDot"></i><div class="lpframe"></div></div>
       <div id="luchtDraai" class="lpdraai" hidden>
         <span>Draaien</span>
         <button type="button" class="ghost" data-rot="-1" aria-label="1 graad linksom">↺ 1°</button>
@@ -2842,7 +2848,7 @@ const LP_F = 2;
 let lpDrag = null, lpSeq = 0;
 function lpMove(dx, dy) {
   const t = `translate(${dx}px,${dy}px)`;
-  $("luchtPrevImg").style.transform = `${t} rotate(${luchtA}deg)`; $("luchtDot").style.transform = t;
+  $("luchtPrevImg").style.transform = `${t} rotate(${luchtA}deg)`; $("luchtDot").style.transform = $("luchtLines").style.transform = t;
 }
 function lpDot() {
   const P = luchtPlek, span = +$("luchtSize").value * LP_F, d = $("luchtDot");
@@ -2850,6 +2856,16 @@ function lpDot() {
   const fx = 0.5 + (dX * c + dY * n) / span, fy = 0.5 + (dX * n - dY * c) / span;
   d.hidden = fx < 0 || fx > 1 || fy < 0 || fy > 1;
   d.style.left = fx * 100 + "%"; d.style.top = fy * 100 + "%";
+  lpLines();
+}
+// Metingen van de open luchtfoto in het voorbeeld (in RD, dus ze draaien en schuiven mee)
+let luchtLines = [], luchtLineSel = null;
+function lpLines() {
+  const P = luchtPlek, svg = $("luchtLines");
+  if (!P || !luchtLines.length) { svg.innerHTML = ""; return; }
+  const span = +$("luchtSize").value * LP_F, a = luchtA * Math.PI / 180, c = Math.cos(a), n = Math.sin(a);
+  const f = q => { const dX = q.x - P.x, dY = q.y - P.y; return `${((0.5 + (dX * c + dY * n) / span) * 100).toFixed(2)},${((0.5 + (dX * n - dY * c) / span) * 100).toFixed(2)}`; };
+  svg.innerHTML = luchtLines.map(L => `<${L.closed ? "polygon" : "polyline"} points="${L.pts.map(f).join(" ")}"${L.id === luchtLineSel ? ' class="sel"' : ""}/>`).join("");
 }
 function luchtPreview() {
   const box = $("luchtPrev"), P = luchtPlek;
@@ -2893,8 +2909,13 @@ $("luchtDraai").addEventListener("click", e => {
 // Recht leggen: de langste zijde van een meting wordt precies horizontaal of verticaal
 function luchtRechtKnoppen() {
   const g = luchtCur(), box = $("luchtRechtBox"), el = $("luchtRecht");
-  box.hidden = !g; if (!g) return;
+  box.hidden = !g; luchtLines = []; luchtLineSel = null;
+  if (!g) return;
   const G = geoNorm(g, img.w, img.h), opts = [];
+  st.items.forEach(it => {
+    if (["dist", "poly", "area"].includes(it.type) && it.pts && it.pts.length > 1)
+      luchtLines.push({ id: it.id, closed: it.type === "area", pts: it.pts.map(q => pxToRd(G, img.w, img.h, q)) });
+  });
   st.items.forEach((it, i) => {
     if (!["dist", "poly", "area"].includes(it.type) || !it.pts || it.pts.length < 2) return;
     let best = null;
@@ -2904,12 +2925,13 @@ function luchtRechtKnoppen() {
     const A = pxToRd(G, img.w, img.h, best.p), B = pxToRd(G, img.w, img.h, best.q);
     let phi = Math.atan2(B.y - A.y, B.x - A.x) * 180 / Math.PI;
     phi = ((phi % 90) + 90) % 90; if (phi > 45) phi -= 90;
-    opts.push(`<button type="button" class="ghost" data-recht="${phi.toFixed(3)}">${i + 1} · ${esc(it.name)}</button>`);
+    opts.push(`<button type="button" class="ghost" data-recht="${phi.toFixed(3)}" data-id="${it.id}">${i + 1} · ${esc(it.name)}</button>`);
   });
   el.innerHTML = opts.slice(0, 10).join("") || `<span class="hint">Meet eerst met <b>Afstand</b> langs een rechte rand (muur, stoeprand, perceelgrens). Dan kun je de foto hier precies daarop recht leggen.</span>`;
 }
 $("luchtRecht").addEventListener("click", e => {
   const b = e.target.closest("[data-recht]"); if (!b) return;
+  luchtLineSel = +b.dataset.id;
   luchtSetHoek(+b.dataset.recht);
   $("luchtMsg").textContent = `Gedraaid naar ${$("luchtHoekTxt").textContent}. Tik op Luchtfoto openen.`;
 });
