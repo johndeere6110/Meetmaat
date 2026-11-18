@@ -7,7 +7,7 @@ Bouwtekening openen, ijken en maten aflezen voor uitzetten in het werk. Werkt op
 
 ## Wat de app doet
 
-- **Tekening openen:** PDF, foto of screenshot. De laatste tekening wordt onthouden, met ijking en metingen.
+- **Tekening openen:** PDF, foto of screenshot (of een .meetmaat-bestand). **Foto** opent meteen je galerij of camera. De laatste tekening wordt onthouden, met ijking en metingen.
 - **Automatisch ijken:** bij een PDF zoekt de app de maatgetallen (bijv. 47970, 12000) en hun maatlijnen op en ijkt daarop. Staan er geen maatlijnen op (bijv. een inrichtings- of rioleringsplan), dan ijkt hij op de schaal uit het stempel ("SCHAAL 1:300"); je kunt de schaal ook zelf invullen. Dat klopt alleen als de PDF op ware grootte is, dus meet één bekende maat na. Zelf ijken op een bekende maatlijn kan altijd; de ijking verwijderen ook.
 - **Palen en putten:** in een PDF worden de rondjes herkend. De app gokt of het palen (in een raster) of putten zijn; per tekening zelf te kiezen. Punten klikken vast op het hart.
 - **Meten:** Afstand (2 punten), Lengte (route met bochten, bijv. een sleuf), Oppervlak.

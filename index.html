@@ -175,6 +175,8 @@ button .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke
 .banner { position: absolute; left: 10px; top: 10px; right: 60px; max-width: 520px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 0 4px 4px 0; padding: 8px 12px; font-size: 13px; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
 .banner.err { border-left-color: var(--warn); color: var(--warn); font-weight: 500; }
 .filebtn { position: relative; overflow: hidden; }
+.filebtn.ghostbtn { background: transparent; color: var(--ink); }
+@media (max-width: 640px) { .filebar { gap: 6px; } .filebar > .btn, .filebar > button:not(.fname) { padding: 8px 10px; font-size: 13.5px; } }
 .filebtn input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 40px; }
 .calibbox { position: absolute; z-index: 4; left: 50%; top: 14px; transform: translateX(-50%); width: min(340px, calc(100% - 28px)); background: var(--panel); border: 1px solid var(--ink); border-radius: 6px; padding: 14px; display: grid; gap: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.3); }
 .calibbox label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; }
@@ -354,6 +356,7 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
     </div>
     <div class="filebar">
       <label class="btn filebtn">Tekening openen<input id="file" type="file" aria-label="Tekening openen"></label>
+      <label class="btn filebtn ghostbtn" title="Foto of screenshot uit je galerij (of met de camera)">Foto<input id="photo" type="file" accept="image/*" aria-label="Foto uit galerij"></label>
       <select id="page" aria-label="Pagina" hidden></select>
       <button type="button" class="ghost" id="install" hidden>App installeren</button>
       <button type="button" class="ghost" id="shareBtn" title="Deze tekening met metingen delen met iemand">Delen</button>
@@ -2818,12 +2821,12 @@ async function openFile(f, fromStore) {
     showBanner(esc(msg), true);
   } finally { $("loading").hidden = true; }
 }
-$("file").addEventListener("change", e => {
+["file", "photo"].forEach(id => $(id).addEventListener("change", e => {
   const f = e.target.files && e.target.files[0];
   if (f) openFile(f);
   else showBanner("Er is geen bestand gekozen.", true, 4000);
   e.target.value = "";
-});
+}));
 $("page").addEventListener("change", e => { pageNo = +e.target.value; renderPdfPage(); });
 view.addEventListener("dragover", e => e.preventDefault());
 view.addEventListener("drop", e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) openFile(f); });
