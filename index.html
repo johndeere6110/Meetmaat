@@ -193,9 +193,16 @@ button .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke
 .banner { position: absolute; left: 10px; top: 10px; right: 60px; max-width: 520px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 0 4px 4px 0; padding: 8px 12px; font-size: 13px; box-shadow: 0 1px 6px rgba(0,0,0,.15); }
 .banner.err { border-left-color: var(--warn); color: var(--warn); font-weight: 500; }
 .filebtn { position: relative; overflow: hidden; }
+.tekwrap { position: relative; }
+.tekmenu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: min(310px, calc(100vw - 32px)); display: grid; gap: 2px; padding: 6px; background: var(--panel); border: 1px solid var(--ink); border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.3); }
+.tekmenu .mi { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font-weight: 600; font-size: 15px; cursor: pointer; }
+.tekmenu .mi:hover, .tekmenu .mi:focus-visible { background: var(--bg); }
+.tekmenu .mi small { font-weight: 400; font-size: 12.5px; color: var(--muted); }
+.tekmenu .tmh { font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 4px 12px 2px; }
+.tekmenu .tmf { font-size: 12px; color: var(--muted); padding: 6px 12px 4px; border-top: 1px solid var(--line); margin-top: 2px; }
 .filebtn.ghostbtn { background: transparent; color: var(--ink); }
-@media (max-width: 640px) { .filebar { gap: 6px; } .filebar > .btn, .filebar > button:not(.fname) { padding: 8px 9px; font-size: 13.5px; } .setbtn .setlbl { display: none; } .filebar > .setbtn { padding: 8px; } }
-@media (max-width: 400px) { .filebar { gap: 5px; } .filebar > .btn, .filebar > button:not(.fname) { padding: 7px 8px; font-size: 13px; } .openw { display: none; } }
+@media (max-width: 640px) { .filebar { gap: 6px; } .filebar > .btn, .filebar > button:not(.fname), .tekwrap > .btn { padding: 8px 9px; font-size: 13.5px; } .setbtn .setlbl { display: none; } .filebar > .setbtn { padding: 8px; } }
+@media (max-width: 400px) { .filebar { gap: 5px; } .filebar > .btn, .filebar > button:not(.fname), .tekwrap > .btn { padding: 7px 8px; font-size: 13px; } }
 .setbtn { display: inline-flex; align-items: center; gap: 6px; }
 .setbtn svg { flex: none; }
 .filebtn input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 40px; }
@@ -259,7 +266,8 @@ input[type="number"], input[type="text"], .nm {
 .ppres:empty { display: none; }
 .dh { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 6px 0 -4px; font-weight: 600; }
 #settings { width: min(560px, calc(100% - 24px)); max-height: calc(100% - 24px); padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
-#settings::backdrop, #luchtDlg::backdrop { background: rgba(0,0,0,.5); }
+#settings::backdrop, #luchtDlg::backdrop, #leegDlg::backdrop { background: rgba(0,0,0,.5); }
+#leegDlg { width: min(440px, calc(100% - 24px)); padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
 #luchtDlg { width: min(520px, calc(100% - 24px)); max-height: calc(100% - 24px); padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
 #luchtRes button { text-align: left; }
 .luchtprev { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1; overflow: hidden; background: var(--viewer); border-radius: 6px; touch-action: none; cursor: grab; user-select: none; }
@@ -416,6 +424,23 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
   </div>
 </dialog>
 
+<dialog id="leegDlg" aria-labelledby="leegTitle">
+  <div class="sethead"><h2 id="leegTitle">Leeg vel op schaal</h2><button type="button" class="ghost" id="leegClose">Sluiten</button></div>
+  <div class="setbody">
+    <div class="sand">
+      <p class="hint" style="margin:0">Een leeg geruit vel, meteen op schaal. Handig voor een afschotplan of schets zonder tekening.</p>
+      <label for="leegNaam">Naam<input id="leegNaam" type="text" autocomplete="off" placeholder="bijv. Kerkplein afschot"></label>
+      <div class="row2">
+        <label for="leegW">Breedte (m)<input id="leegW" type="text" inputmode="decimal" autocomplete="off" value="100"></label>
+        <label for="leegH">Hoogte (m)<input id="leegH" type="text" inputmode="decimal" autocomplete="off" value="60"></label>
+      </div>
+      <label for="leegR">Raster<select id="leegR"><option value="1">elke 1 m</option><option value="2">elke 2 m</option><option value="5" selected>elke 5 m</option><option value="10">elke 10 m</option><option value="20">elke 20 m</option></select></label>
+      <div class="btns"><button type="button" id="leegGo">Vel maken</button></div>
+      <p class="hint" id="leegMsg" style="margin:0"></p>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="luchtDlg" aria-labelledby="luchtTitle">
   <div class="sethead"><h2 id="luchtTitle">Luchtfoto</h2><button type="button" class="ghost" id="luchtClose">Sluiten</button></div>
   <div class="setbody">
@@ -459,9 +484,17 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
       <p class="sub">Open een tekening, ijk hem op een maat die je kent en lees afstanden, lengtes, oppervlakken en uitzetmaten af voor in het werk.</p>
     </div>
     <div class="filebar">
-      <label class="btn filebtn">Tekening<span class="openw"> openen</span><input id="file" type="file" aria-label="Tekening openen"></label>
+      <div class="tekwrap">
+        <button type="button" class="btn" id="tekBtn" aria-haspopup="true" aria-expanded="false" title="Nieuwe tekening: PDF of foto, luchtfoto of een leeg vel">Tekening ▾</button>
+        <div class="tekmenu" id="tekMenu" hidden>
+          <span class="tmh">Nieuwe tekening</span>
+          <label class="mi filebtn">PDF of foto openen<small>ook een .meetmaat-bestand</small><input id="file" type="file" aria-label="PDF of foto openen"></label>
+          <button type="button" class="mi" id="luchtBtn">Luchtfoto ophalen<small>adres of je locatie, meteen op schaal</small></button>
+          <button type="button" class="mi" id="leegBtn">Leeg vel op schaal<small>zonder tekening, met een raster</small></button>
+          <span class="tmf">Je huidige tekening blijft bewaard: open hetzelfde bestand later weer, dan staan je metingen er nog.</span>
+        </div>
+      </div>
       <label class="btn filebtn ghostbtn" title="Foto of screenshot uit je galerij (of met de camera)">Foto<input id="photo" type="file" accept="image/*" aria-label="Foto uit galerij"></label>
-      <button type="button" class="ghost" id="luchtBtn" title="Luchtfoto van een adres of je locatie, meteen op schaal (met hoogtes)">Luchtfoto</button>
       <select id="page" aria-label="Pagina" hidden></select>
       <button type="button" class="ghost" id="install" hidden>App installeren</button>
       <button type="button" class="ghost" id="shareBtn" title="Deze tekening met metingen delen met iemand">Delen</button>
@@ -1934,7 +1967,7 @@ function drawOverlay() {
     `<circle class="hd ${cls}" cx="${p.x}" cy="${p.y}" r="${6 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/><circle class="hit" data-h="${id}" cx="${p.x}" cy="${p.y}" r="${16 * k}"/>`;
   let s = "";
 
-  if (st.calib && !st.calib.scale && !st.calib.lucht) {
+  if (st.calib && !st.calib.scale && !st.calib.lucht && !st.calib.leeg) {
     const { a, b, mm } = st.calib;
     s += `<path class="halo" d="${P([a, b])}"/><path class="cal" d="${P([a, b])}"/>`;
     s += label((a.x + b.x) / 2, (a.y + b.y) / 2 - 9 * k, `IJk ${fmtMM(mm)}`, "cal");
@@ -2149,6 +2182,10 @@ function renderCal() {
   }
   c.className = "calinfo";
   const sc = st.calib && st.calib.scale;
+  if (st.calib && st.calib.leeg) {
+    c.innerHTML = `<span class="big">Leeg vel op schaal</span><span>1 hokje = ${nl0(st.calib.raster || 5)} m · 1 pixel = ${nl(st.mmPerPx / 10, 1)} cm</span><span class="hint">Dit vel heeft een vaste schaal, ijken is niet nodig.</span>`;
+    return;
+  }
   if (st.calib && st.calib.lucht) {
     const ga = st.geo && st.geo.a ? st.geo.a * 180 / Math.PI : 0;
     c.innerHTML = `<span class="big">Op schaal via de luchtfoto</span><span>${ga ? `${nl(Math.abs(ga), 2)}° ${ga > 0 ? "rechtsom" : "linksom"} gedraaid · ` : "Noord boven · "}1 pixel = ${nl(st.mmPerPx / 10, 1)} cm · nauwkeurigheid ±${fmtMM(Math.max(st.mmPerPx, 10))} per punt (plus hoe de foto zelf ligt)</span>
@@ -2311,9 +2348,10 @@ function renderTotals() {
 // Onderdelen die bij deze tekening weinig doen (geen palen; ijking van een luchtfoto) onderaan in het zijpaneel
 const SIDE = document.querySelector("aside.side"), SIDE_ORDER = [...SIDE.children];
 function sideOrder() {
-  const lucht = !!(st.calib && st.calib.lucht);
+  const lucht = !!(st.calib && (st.calib.lucht || st.calib.leeg));
   const onder = el => (el.dataset.sec === "cal" && lucht) || (el.dataset.sec === "pal" && img.w && !piles.length);
-  const want = [...SIDE_ORDER.filter(e => !onder(e)), ...SIDE_ORDER.filter(onder)];
+  const voet = SIDE_ORDER.filter(e => e.tagName === "P");      // algemene tip blijft altijd onderaan
+  const want = [...SIDE_ORDER.filter(e => !onder(e) && !voet.includes(e)), ...SIDE_ORDER.filter(onder), ...voet];
   if (want.some((e, i) => SIDE.children[i] !== e)) want.forEach(e => SIDE.appendChild(e));
 }
 function renderAll() { sideOrder(); drawOverlay(); renderList(); renderTotals(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); renderAfp(); renderAhn(); updateHint(); renderTools(); renderSums(); }
@@ -4275,6 +4313,17 @@ async function openFile(f, fromStore) {
       URL.revokeObjectURL(url);
       setPiles([], 0);
       setImage(`${f.name}|${f.size}`, f.name, false);
+      if (leegPending && leegPending.name === f.name) {
+        const L = leegPending; leegPending = null;
+        if (!st.mmPerPx) {
+          st.mmPerPx = L.mmPerPx * L.wPx / img.w;
+          st.calib = { a: { x: 0, y: 0 }, b: { x: img.w, y: 0 }, mm: img.w * st.mmPerPx, leeg: true, raster: L.raster };
+          st.title = L.title;
+          save(); renderTitle(); renderAll();
+        }
+        setTool("pan");
+        showBanner(`<b>${esc(L.title)}</b>: leeg vel van ${nl0(L.W)} × ${nl0(L.H)} m, meteen op schaal (raster ${nl0(L.raster)} m).`, false, 6000);
+      }
       if (luchtPending && luchtPending.name === f.name) {
         const L = luchtPending; luchtPending = null;
         const sc = img.w / L.wPx;                                 // het canvas kan kleiner zijn dan de foto
@@ -4305,6 +4354,46 @@ async function openFile(f, fromStore) {
     showBanner(esc(msg), true);
   } finally { $("loading").hidden = true; }
 }
+// Menu "Tekening": nieuwe tekening uit een bestand, luchtfoto of leeg vel
+function tekMenu(open) { $("tekMenu").hidden = !open; $("tekBtn").setAttribute("aria-expanded", open); }
+$("tekBtn").addEventListener("click", e => { e.stopPropagation(); tekMenu($("tekMenu").hidden); });
+document.addEventListener("click", e => { if (!$("tekMenu").hidden && !e.target.closest(".tekwrap")) tekMenu(false); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("tekMenu").hidden) tekMenu(false); });
+$("file").addEventListener("change", () => tekMenu(false));
+$("luchtBtn").addEventListener("click", () => tekMenu(false));
+let leegPending = null;
+$("leegBtn").addEventListener("click", () => {
+  tekMenu(false);
+  const d = $("leegDlg"); $("leegMsg").textContent = "";
+  try { d.showModal(); } catch (e) { d.setAttribute("open", ""); }
+  setTimeout(() => $("leegNaam").focus(), 50);
+});
+$("leegClose").addEventListener("click", () => $("leegDlg").close());
+$("leegGo").addEventListener("click", async () => {
+  const num = id => { const t = $(id).value.trim().replace(",", "."); return t === "" || isNaN(+t) ? NaN : +t; };
+  const W = num("leegW"), H = num("leegH"), R = +$("leegR").value, msg = $("leegMsg");
+  if (!(W >= 1 && H >= 1 && W <= 5000 && H <= 5000)) { msg.textContent = "Vul een breedte en hoogte in tussen 1 en 5000 m."; return; }
+  const ppm = Math.max(0.5, Math.min(40, 3000 / Math.max(W, H))), cw = Math.round(W * ppm), ch = Math.round(H * ppm);
+  const c = document.createElement("canvas"); c.width = cw; c.height = ch;
+  const g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, cw, ch);
+  const stap = R * ppm >= 4 ? R : Math.ceil(4 / ppm / R) * R;      // te fijn raster: grover tekenen
+  const lw = Math.max(1, Math.round(Math.max(cw, ch) / 1500));      // lijnen en getallen schalen mee met het vel
+  const lijn = (i, x0, y0, x1, y1) => { g.strokeStyle = i % 5 ? "rgba(0,0,0,.16)" : "rgba(0,0,0,.42)"; g.lineWidth = i % 5 ? lw : lw * 2; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); };
+  for (let i = 0, m = 0; m <= W + 1e-9; i++, m = i * stap) { const x = Math.round(m * ppm); lijn(i, x, 0, x, ch); }
+  for (let i = 0, m = 0; m <= H + 1e-9; i++, m = i * stap) { const y = Math.round(m * ppm); lijn(i, 0, y, cw, y); }
+  g.strokeStyle = "#111"; g.lineWidth = lw * 3; g.strokeRect(lw * 1.5, lw * 1.5, cw - lw * 3, ch - lw * 3);
+  g.fillStyle = "rgba(0,0,0,.6)"; g.font = `600 ${Math.max(12, Math.round(Math.max(cw, ch) / 85))}px sans-serif`; g.textBaseline = "top";
+  for (let i = 5, m = 5 * stap; m < W - 1e-9; i += 5, m = i * stap) g.fillText(nl0(m) + " m", Math.round(m * ppm) + 6 * lw, 6 * lw);
+  for (let i = 5, m = 5 * stap; m < H - 1e-9; i += 5, m = i * stap) g.fillText(nl0(m) + " m", 6 * lw, Math.round(m * ppm) + 6 * lw);
+  const blob = await new Promise(r => c.toBlob(r, "image/png"));
+  const nu = new Date(), pad = n => String(n).padStart(2, "0"), stamp = `${nu.getFullYear()}-${pad(nu.getMonth() + 1)}-${pad(nu.getDate())} ${pad(nu.getHours())}.${pad(nu.getMinutes())}.${pad(nu.getSeconds())}`;
+  const naam = $("leegNaam").value.trim() || `Nieuwe tekening ${pad(nu.getDate())}-${pad(nu.getMonth() + 1)}`;
+  const file = new File([blob], `${naam.replace(/[\\/:*?"<>|]+/g, "_")} ${stamp}.png`, { type: "image/png" });
+  leegPending = { name: file.name, mmPerPx: 1000 / ppm, wPx: cw, title: naam, raster: stap, W, H };
+  $("leegDlg").close(); $("leegNaam").value = "";
+  await openFile(file);
+});
 ["file", "photo"].forEach(id => $(id).addEventListener("change", e => {
   const f = e.target.files && e.target.files[0];
   if (f) openFile(f);
