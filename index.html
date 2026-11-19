@@ -135,6 +135,7 @@ button .ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke
 #ov .ahnp { fill: #111; }
 #ov .ahnx { stroke: #111; stroke-width: calc(2px * var(--k)); }
 #ov .ahnxh { stroke: #fff; stroke-width: calc(5px * var(--k)); }
+#ov .ahnx, #ov .ahnxh, #ov .ctr, #ov .aft { pointer-events: none; }
 .ahnres { display: grid; gap: 4px; font-size: 14px; }
 .ahnres b { font: 600 16px var(--mono); white-space: nowrap; }
 .sand label.chk, label.chk { display: flex; flex-direction: row; gap: 8px; align-items: center; font-size: 14px; }
@@ -318,6 +319,12 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
 #ov .ppt { fill: var(--accent); stroke: var(--paper-ink); stroke-width: calc(1.5px * var(--k)); }
 .sand h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 6px 0 -4px; font-weight: 600; }
 .sand .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sand .row3, .afs .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.afs { margin-top: 6px; padding: 8px; border: 1px dashed var(--line); border-radius: 6px; }
+.afres { font: 500 13px/1.45 var(--mono); }
+.afres b { font-weight: 700; }
+button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
+#ov .afh { fill: #0b4f8a; }
 .sand .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .sand label { display: grid; gap: 3px; font-size: 12.5px; font-weight: 500; align-content: start; }
 .sand input, .sand select, .sand textarea { width: 100%; min-width: 0; font: 500 14px/1.35 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
@@ -624,6 +631,39 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
         </div>
       </details>
 
+      <details class="sec" data-sec="afschot">
+        <summary><h2>Afschot</h2><span class="secsum" id="sum-afschot"></span></summary>
+        <div class="secbody">
+      <div class="sand">
+        <p class="hint" style="margin:0"><b>Langs een lijn</b> (riool, goot): tik bij een Afstand of Lengte in <b>Metingen</b> op <b>Afschot</b>. Hieronder: de hoogte van je <b>Uitzetmaat</b>-punten, gerekend vanaf het nulpunt. Hoogtes in cm t.o.v. 0-peil; afschot als 0,5%, 1:200 of 5 mm/m.</p>
+        <div class="seg" id="afpMode" role="group" aria-label="Hoogte van uitzetpunten">
+          <button type="button" data-afm="uit">Uit</button><button type="button" data-afm="rond">Vanaf nulpunt</button><button type="button" data-afm="vlak">Schuin vlak (X/Y)</button>
+        </div>
+        <div id="afpBody" hidden>
+          <label for="afpH0">Hoogte bij het nulpunt (cm)<input id="afpH0" type="text" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+          <div id="afpRond" class="sand">
+            <label for="afpS">Afschot<input id="afpS" type="text" autocomplete="off" placeholder="bijv. 1% of 1:100"></label>
+            <div class="seg" id="afpDir" role="group" aria-label="Richting">
+              <button type="button" data-dir="hoog">Nulpunt is het hoogste punt</button><button type="button" data-dir="laag">Nulpunt is het laagste (put)</button>
+            </div>
+          </div>
+          <div id="afpVlak" class="sand">
+            <div class="row2">
+              <label for="afpSx">Afschot X (links–rechts)<input id="afpSx" type="text" autocomplete="off" placeholder="bijv. 1% of leeg"></label>
+              <label for="afpDx">Richting<select id="afpDx"><option value="-1">daalt naar rechts</option><option value="1">stijgt naar rechts</option></select></label>
+            </div>
+            <div class="row2">
+              <label for="afpSy">Afschot Y (onder–boven)<input id="afpSy" type="text" autocomplete="off" placeholder="bijv. 0,5% of leeg"></label>
+              <label for="afpDy">Richting<select id="afpDy"><option value="-1">daalt naar boven</option><option value="1">stijgt naar boven</option></select></label>
+            </div>
+          </div>
+          <p class="hint" id="afpInfo" style="margin:0"></p>
+          <ul class="pplist" id="afpList"></ul>
+        </div>
+      </div>
+        </div>
+      </details>
+
       <details class="sec" data-sec="ahn" id="secAhn" hidden>
         <summary><h2>Hoogtes (AHN)</h2><span class="secsum" id="sum-ahn"></span></summary>
         <div class="secbody">
@@ -632,7 +672,7 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
         <div class="btns"><button type="button" id="ahnGet">Hoogtes ophalen</button></div>
         <p class="hint" id="ahnMsg" style="margin:0"></p>
         <div id="ahnOn" hidden>
-          <p class="hint" style="margin:0"><b>Tik met Schuiven</b> op de foto voor de hoogte op die plek (op de pc: houd de muis erboven, bij Vizier staat hij onder het kruisje). Bij je metingen staat ook de hoogte: bij Afstand en Lengte begin, eind en verval, bij Oppervlak het gemiddelde, bij Uitzetmaat het punt.</p>
+          <p class="hint" style="margin:0"><b>Tik met Schuiven</b> op de foto voor de hoogte op die plek (op de pc: houd bij Schuiven de muis erboven; bij Vizier staat hij onder het kruisje). Tik je op een meting, dan selecteer je die. Bij je metingen staat ook de hoogte: bij Afstand en Lengte begin, eind en verval, bij Oppervlak het gemiddelde, bij Uitzetmaat het punt.</p>
           <label for="ahnPeil">Gewenst peil (m NAP), voor de af-en-bij-kaart en de kubiekes<input id="ahnPeil" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 0,45 of -0,20"></label>
           <h3>Kaart</h3>
           <div class="seg" id="ahnMode" role="group" aria-label="Kleuren op de foto">
@@ -1862,6 +1902,8 @@ function drawOverlay() {
       s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/>`;
       s += `<circle class="hit" data-sel="${it.id}" cx="${p.x}" cy="${p.y}" r="${14 * k}" style="cursor:pointer"/>`;
       labs.push({ x: p.x + 10 * k, y: p.y - 10 * k, n, t: d.short, anc: "start" });
+      const ah = afpH(p);
+      if (ah != null) s += label(p.x + 10 * k * zm, p.y + 16 * k * zm, fmtPeil(ah), "afh", "start");
     } else {
       const closed = it.type === "area";
       const dd = P(it.pts) + (closed ? " Z" : "");
@@ -1871,6 +1913,14 @@ function drawOverlay() {
       s += `<path class="halo${on ? " on" : ""}" d="${dd}"/><path class="mk" d="${dd}"/>`;
       s += `<path class="selhit" data-sel="${it.id}" d="${dd}"/>`;
       if (it.pts.length <= 40) it.pts.forEach(p => { s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${3.5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.2 * k}"/>`; });
+      const AR = it.af && (it.type === "dist" || it.type === "poly") ? afLine(it) : null;
+      if (AR && AR.s != null) afStations(it, AR).forEach((o, j, arr) => {
+        const A0 = j < arr.length - 1 ? o.p : arr[j - 1].p, B0 = j < arr.length - 1 ? arr[j + 1].p : o.p;   // richting van de lijn hier
+        const dx = B0.x - A0.x, dy = B0.y - A0.y, L = Math.hypot(dx, dy) || 1;
+        const nx = -dy / L, ny = dx / L, t = 6 * k * zm;
+        s += `<path class="mk aft" d="M${o.p.x - nx * t} ${o.p.y - ny * t}L${o.p.x + nx * t} ${o.p.y + ny * t}"/>`;
+        s += label(o.p.x + nx * 16 * k * zm, o.p.y + ny * 16 * k * zm + 4 * k * zm, cmTxt(o.h) === "0" ? "0" : (o.h > 0 ? "+" : "−") + cmTxt(o.h), "afh", "middle");
+      });
       if (it.type === "dist") labs.push({ x: (it.pts[0].x + it.pts[1].x) / 2, y: (it.pts[0].y + it.pts[1].y) / 2 - 9 * k, n, t: d.short, anc: "middle" });
       else if (it.type === "area") labs.push({ area: it, n, t: d.short });
       else { const l = it.pts[it.pts.length - 1]; labs.push({ x: l.x + 10 * k, y: l.y - 10 * k, n, t: d.short, anc: "start" }); }
@@ -1968,7 +2018,7 @@ function renderList() {
         <button type="button" data-act="show">Toon</button><button type="button" data-act="del" aria-label="Meting ${i + 1} verwijderen">✕</button></div>
       <input class="nm" type="text" data-act="name" list="codelist" value="${esc(it.name)}" aria-label="Naam van meting ${i + 1}">
       ${it.type !== "set" ? `<input class="grp" type="text" data-act="grp" list="grplist" value="${esc(it.grp || "")}" placeholder="Groep, bijv. gras" aria-label="Groep van meting ${i + 1}">` : ""}
-      <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div>${(() => { const t = ahnLine(it); return t ? `<div class="subv ahnv">${esc(t)}</div>` : ""; })()}${d.cmp ? `<div class="cmp ${d.cmpCls}">${d.cmp}</div>` : ""}${(() => {
+      <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div>${(() => { const t = ahnLine(it); return t ? `<div class="subv ahnv">${esc(t)}</div>` : ""; })()}${it.type === "set" && afpH(it.pts[0]) != null ? `<div class="subv ahnv">Hoogte (afschot) ${fmtPeil(afpH(it.pts[0]))}</div>` : ""}${it.type === "dist" || it.type === "poly" ? afBlock(it) : ""}${d.cmp ? `<div class="cmp ${d.cmpCls}">${d.cmp}</div>` : ""}${(() => {
         const par = it.minus != null ? st.items.find(o => o.id === it.minus) : parentArea(it);
         return par ? `<button type="button" class="ghost minus" data-act="minus" data-par="${par.id}" aria-pressed="${it.minus === par.id}">${it.minus === par.id ? `Wordt afgetrokken van ${esc(par.name)}` : `Aftrekken van ${esc(par.name)}`}</button>` : "";
       })()}</li>`;
@@ -2143,7 +2193,7 @@ function renderTotals() {
   el.hidden = false;
   el.innerHTML = `<div class="tth">Totalen per groep</div>` + G.map(g => `<div class="tt"><span class="ttn">${esc(g.name)}</span><span class="ttc">${g.n} meting${g.n === 1 ? "" : "en"}</span><span class="ttv">${[g.na ? fmtArea(g.a) : "", g.nl ? fmtLen(g.l) : ""].filter(Boolean).join(" · ")}</span></div>`).join("");
 }
-function renderAll() { drawOverlay(); renderList(); renderTotals(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); renderAhn(); updateHint(); renderTools(); renderSums(); }
+function renderAll() { drawOverlay(); renderList(); renderTotals(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); renderAfp(); renderAhn(); updateHint(); renderTools(); renderSums(); }
 // Korte stand per onderdeel in de kop, zodat je het niet hoeft open te klappen
 function renderSums() {
   const set = (k, t, warn) => { const e = $("sum-" + k); if (e) { e.textContent = t; e.classList.toggle("warn", !!warn); } };
@@ -2417,7 +2467,8 @@ view.addEventListener("pointermove", e => {
   if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!G) {
     if (e.pointerType === "mouse" && draft.length && !vzActive()) { hover = toImg(e.clientX, e.clientY); hoverShift = e.shiftKey; scheduleOverlay(); }
-    if (e.pointerType === "mouse" && ahnReady()) { ahnHover = toImg(e.clientX, e.clientY); scheduleOverlay(); }
+    if (e.pointerType === "mouse" && ahnReady() && tool === "pan") { ahnHover = toImg(e.clientX, e.clientY); scheduleOverlay(); }
+    else if (ahnHover) { ahnHover = null; scheduleOverlay(); }
     return;
   }
   if (G.kind === "pinch") {
@@ -2553,7 +2604,14 @@ $("list").addEventListener("click", e => {
   const id = +li.dataset.id, it = st.items.find(x => x.id === id);
   const act = e.target.closest("[data-act]")?.dataset.act;
   if (act === "del") { st.items = st.items.filter(x => x.id !== id); st.items.forEach(o => { if (o.minus === id) delete o.minus; }); if (sel === id) sel = null; save(); renderAll(); return; }
-  if (act === "grp") return;
+  if (act === "grp" || /^af-[bse]$|^af-stap$/.test(act || "")) return;
+  if (act && act.startsWith("af-") && it) {
+    if (act === "af-open") { it.af = Object.assign({ fix: "s", stap: 5 }, it.af || {}, { open: true }); }
+    else if (act === "af-close") it.af.open = false;
+    else if (act === "af-rev") { const R = afLine(it); it.af.rev = !it.af.rev; if (R && R.e != null) { const b = it.af.b; it.af.b = R.e; if (it.af.fix === "e") it.af.e = b; else { it.af.s = -it.af.s; it.af.sTxt = nl(it.af.s * 100, 3).replace(/,?0+$/, "") + "%"; } } }
+    else if (act === "af-del") { armed(e.target.closest("button"), () => { delete it.af; save(); renderAll(); }); return; }
+    sel = id; save(); renderAll(); return;
+  }
   if (act === "minus" && it) { const pid = +e.target.closest("[data-par]").dataset.par; if (it.minus === pid) delete it.minus; else it.minus = pid; save(); renderAll(); return; }
   if (act === "name") { if (sel !== id) { sel = id; drawOverlay(); document.querySelectorAll("#list li.m").forEach(x => x.classList.toggle("on", +x.dataset.id === id)); } return; }
   sel = id;
@@ -2561,6 +2619,22 @@ $("list").addEventListener("click", e => {
   renderAll();
 });
 $("list").addEventListener("input", e => {
+  const aa = e.target.dataset.act;
+  if (aa === "af-b" || aa === "af-s" || aa === "af-e") {
+    const li = e.target.closest("li.m"), it = st.items.find(x => x.id === +li.dataset.id); if (!it || !it.af) return;
+    const v = e.target.value;
+    if (aa === "af-b") { const n = numIn(v); it.af.b = n == null || isNaN(n) ? null : n; }
+    if (aa === "af-s") { it.af.sTxt = v; it.af.s = parseAfschot(v); it.af.fix = "s"; it.af.e = null; const o = li.querySelector('[data-act="af-e"]'); if (o) o.value = ""; }
+    if (aa === "af-e") { const n = numIn(v); it.af.e = n == null || isNaN(n) ? null : n; it.af.fix = "e"; const o = li.querySelector('[data-act="af-s"]'); if (o) o.value = ""; }
+    save();
+    const R = afLine(it), r = li.querySelector(".afres");
+    if (r) r.innerHTML = afResTxt(it) + (aa === "af-s" && v.trim() && !Number.isFinite(it.af.s) ? `<br><span style="color:var(--warn)">"${esc(v)}" snap ik niet: schrijf bijv. 0,5%, 1:200 of 5 mm/m.</span>` : "");
+    const oe = li.querySelector('[data-act="af-e"]'), os = li.querySelector('[data-act="af-s"]');
+    if (oe && aa !== "af-e") oe.placeholder = R && R.e != null ? "= " + nl(R.e / 10, (R.e / 10) % 1 ? 1 : 0) : "bijv. -92";
+    if (os && aa !== "af-s") os.placeholder = R && R.s != null ? "= " + nl(R.s * 100, 2) + "%" : "0,5% of 1:200";
+    renderAfp(); scheduleOverlay();
+    return;
+  }
   if (e.target.dataset.act === "grp") {
     const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id);
     if (it) { const v = e.target.value.trim(); if (v) it.grp = v; else delete it.grp; save(); renderTotals(); }
@@ -2573,6 +2647,11 @@ $("list").addEventListener("input", e => {
     const li = e.target.closest("li.m"), d = describe(it); let c = li.querySelector(".cmp");
     if (d.cmp) { if (!c) { c = document.createElement("div"); li.appendChild(c); } c.className = "cmp " + d.cmpCls; c.innerHTML = d.cmp; } else if (c) c.remove();
   }
+});
+$("list").addEventListener("change", e => {
+  if (e.target.dataset.act !== "af-stap") return;
+  const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id);
+  if (it && it.af) { it.af.stap = +e.target.value; save(); scheduleOverlay(); }
 });
 $("copy").addEventListener("click", () => {
   const head = `${img.sample ? img.name : dispName()}${st.calib ? ` — geijkt op ${fmtMM(st.calib.mm)}` : " — niet geijkt"}`;
@@ -3131,6 +3210,119 @@ $("luchtGo").addEventListener("click", async () => {
   finally { b.disabled = !luchtPlek; }
 });
 
+/* ---------- Afschot: langs een lijn, vanaf het nulpunt, schuin vlak ---------- */
+// Afschot invoer → helling als fractie (m per m). "0,5" en "0,5%" = 0,5%; "1:200"; "5 mm/m"; "0,5 cm/m"; "5‰"
+function parseAfschot(t) {
+  t = String(t || "").trim().toLowerCase().replace(/\s/g, "").replace("−", "-").replace(/,/g, ".");
+  if (!t) return null;
+  let m;
+  if ((m = /^1[:/](\d+(?:\.\d+)?)$/.exec(t))) return +m[1] > 0 ? 1 / +m[1] : NaN;
+  if ((m = /^(-?\d+(?:\.\d+)?)mm\/m$/.exec(t))) return +m[1] / 1000;
+  if ((m = /^(-?\d+(?:\.\d+)?)cm\/m$/.exec(t))) return +m[1] / 100;
+  if ((m = /^(-?\d+(?:\.\d+)?)(?:‰|promille)$/.exec(t))) return +m[1] / 1000;
+  if ((m = /^(-?\d+(?:\.\d+)?)%?$/.exec(t))) return +m[1] / 100;
+  return NaN;
+}
+const fmtAfschot = f => { const a = Math.abs(f); return a < 1e-9 ? "0 (vlak)" : `${nl(a * 100, a * 100 < 1 ? 2 : 1)}% · 1:${nl0(1 / a)} · ${nl(a * 1000, a * 1000 < 10 ? 1 : 0)} mm/m`; };
+// Langs een lijn: begin + afschot → eind, of begin + eind → afschot. Hoogtes in mm t.o.v. 0-peil.
+function afLine(it) {
+  const A = it.af; if (!A || !st.mmPerPx || !it.pts || it.pts.length < 2) return null;
+  const pts = A.rev ? [...it.pts].reverse() : it.pts, Lm = polyLen(pts) * st.mmPerPx / 1000;
+  const R = { Lm, pts };
+  if (A.b == null || !(Lm > 0)) return R;
+  if (A.fix === "e" && A.e != null) { R.e = A.e; R.s = (A.b - A.e) / 1000 / Lm; }
+  else if (A.s != null && Number.isFinite(A.s)) { R.s = A.s; R.e = A.b - A.s * Lm * 1000; }
+  else return R;
+  R.b = A.b; R.verval = A.b - R.e;
+  return R;
+}
+// Hoogtes langs de lijn: begin, knikpunten, elke "stap" meter en eind
+function afStations(it, R) {
+  const stap = it.af.stap != null ? it.af.stap : 5, out = [], mpp = st.mmPerPx / 1000;
+  let acc = 0, next = stap > 0 ? stap : Infinity;
+  out.push({ p: R.pts[0], d: 0 });
+  for (let i = 1; i < R.pts.length; i++) {
+    const a = R.pts[i - 1], b = R.pts[i], Ls = d2(a, b) * mpp;
+    while (next < acc + Ls - 0.3) { const t = (next - acc) / Ls; out.push({ p: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, d: next, tus: 1 }); next += stap; }
+    acc += Ls;
+    if (next < acc + 0.3 && next >= acc - 0.3) next += stap;
+    out.push({ p: b, d: acc });
+  }
+  return out.map(o => Object.assign(o, { h: R.b - R.s * o.d * 1000 }));
+}
+function afResTxt(it) {
+  const R = afLine(it);
+  if (!R) return st.mmPerPx ? "" : "IJk eerst de tekening.";
+  if (R.b == null) return `Lengte ${nl(R.Lm, 2)} m. Vul de hoogte aan het begin in, en het afschot óf de hoogte aan het eind.`;
+  if (R.s == null) return `Lengte ${nl(R.Lm, 2)} m. Vul nu het afschot óf de hoogte aan het eind in.`;
+  const daalt = R.verval >= 0;
+  return `Begin <b>${fmtPeil(R.b)}</b> → eind <b>${fmtPeil(R.e)}</b> over ${nl(R.Lm, 2)} m<br>${Math.abs(R.verval) < 0.5 ? "vlak" : `${daalt ? "daalt" : "stijgt"} <b>${cmTxt(R.verval)} cm</b>`} · ${fmtAfschot(R.s)}${R.s && Math.abs(R.s) < 0.002 ? `<br><span style="color:var(--warn)">Let op: minder dan 1:500. Voor riool en goot is dat erg vlak.</span>` : ""}`;
+}
+function afBlock(it) {
+  const A = it.af, R = A ? afLine(it) : null;
+  if (!A || !A.open) return `<button type="button" class="ghost afbtn" data-act="af-open">Afschot${R && R.s != null ? ` · ${nl(Math.abs(R.s) * 100, 2)}% · ${R.verval >= 0 ? "verval" : "stijging"} ${cmTxt(R.verval)} cm` : ""}</button>`;
+  const v = mm => mm == null ? "" : nl(mm / 10, (mm / 10) % 1 ? 1 : 0);
+  return `<div class="sand afs">
+    <div class="row3">
+      <label>Begin (cm)<input data-act="af-b" type="text" inputmode="decimal" autocomplete="off" value="${v(A.b)}" placeholder="bijv. -80"></label>
+      <label>Afschot<input data-act="af-s" type="text" autocomplete="off" value="${esc(A.fix === "s" ? A.sTxt || "" : "")}" placeholder="${R && R.s != null && A.fix === "e" ? "= " + nl(R.s * 100, 2) + "%" : "0,5% of 1:200"}"></label>
+      <label>Eind (cm)<input data-act="af-e" type="text" inputmode="decimal" autocomplete="off" value="${A.fix === "e" ? v(A.e) : ""}" placeholder="${R && R.e != null && A.fix !== "e" ? "= " + v(R.e) : "bijv. -92"}"></label>
+    </div>
+    <div class="afres">${afResTxt(it)}</div>
+    <label>Hoogte op de tekening<select data-act="af-stap">${[[0, "alleen begin, knikken en eind"], [1, "elke 1 m"], [2, "elke 2 m"], [5, "elke 5 m"], [10, "elke 10 m"], [20, "elke 20 m"]].map(([n, t]) => `<option value="${n}"${(A.stap != null ? A.stap : 5) === n ? " selected" : ""}>${t}</option>`).join("")}</select></label>
+    <div class="btns"><button type="button" class="ghost" data-act="af-rev">Begin aan de andere kant</button><button type="button" class="ghost" data-act="af-close">Klaar</button><button type="button" class="ghost" data-act="af-del">Afschot weg</button></div>
+  </div>`;
+}
+// Uitzetpunten: hoogte vanaf het nulpunt (rond) of als schuin vlak (X/Y)
+function afpOn() { const A = st.afp; return !!(A && A.mode && A.mode !== "uit" && st.origin && st.mmPerPx); }
+function afpH(p) {
+  if (!afpOn()) return null;
+  const A = st.afp, h0 = A.h0 || 0, X = (p.x - st.origin.x) * st.mmPerPx / 1000, Y = (st.origin.y - p.y) * st.mmPerPx / 1000;
+  if (A.mode === "rond") { if (A.s == null || !Number.isFinite(A.s)) return null; return h0 + (A.laag ? 1 : -1) * A.s * Math.hypot(X, Y) * 1000; }
+  const sx = Number.isFinite(A.sx) ? A.sx : 0, sy = Number.isFinite(A.sy) ? A.sy : 0;
+  if (!sx && !sy) return null;
+  return h0 + (A.dx || -1) * sx * X * 1000 + (A.dy || -1) * sy * Y * 1000;
+}
+function renderAfp() {
+  const A = st.afp || {}, mode = A.mode || "uit";
+  document.querySelectorAll("#afpMode [data-afm]").forEach(b => b.setAttribute("aria-pressed", b.dataset.afm === mode));
+  $("afpBody").hidden = mode === "uit";
+  $("afpRond").hidden = mode !== "rond"; $("afpVlak").hidden = mode !== "vlak";
+  document.querySelectorAll("#afpDir [data-dir]").forEach(b => b.setAttribute("aria-pressed", (b.dataset.dir === "laag") === !!A.laag));
+  const keep = (id, val) => { if (document.activeElement !== $(id)) $(id).value = val; };
+  keep("afpH0", A.h0 ? nl(A.h0 / 10, (A.h0 / 10) % 1 ? 1 : 0) : "");
+  keep("afpS", A.sTxt || ""); keep("afpSx", A.sxTxt || ""); keep("afpSy", A.syTxt || "");
+  $("afpDx").value = String(A.dx || -1); $("afpDy").value = String(A.dy || -1);
+  const sets = st.items.filter(it => it.type === "set");
+  let info = "";
+  const bad = (txt, v) => txt && !Number.isFinite(v) ? ` "${esc(txt)}" snap ik niet: schrijf bijv. 1%, 1:100 of 10 mm/m.` : "";
+  if (mode !== "uit") {
+    if (!st.mmPerPx) info = "IJk eerst de tekening.";
+    else if (!st.origin) info = "Zet eerst een nulpunt met het gereedschap <b>Nulpunt</b>.";
+    else if (mode === "rond") info = A.s == null ? "Vul het afschot in." : bad(A.sTxt, A.s) || `${fmtAfschot(A.s)} · elke meter van het nulpunt af ${A.laag ? "hoger" : "lager"}.`;
+    else info = bad(A.sxTxt, A.sx) || bad(A.syTxt, A.sy) || ((Number.isFinite(A.sx) && A.sx) || (Number.isFinite(A.sy) && A.sy) ? [Number.isFinite(A.sx) && A.sx ? `X: ${fmtAfschot(A.sx)}, ${(A.dx || -1) < 0 ? "daalt" : "stijgt"} naar rechts` : "", Number.isFinite(A.sy) && A.sy ? `Y: ${fmtAfschot(A.sy)}, ${(A.dy || -1) < 0 ? "daalt" : "stijgt"} naar boven` : ""].filter(Boolean).join("<br>") : "Vul het afschot in X en/of Y in.");
+    if (afpOn() && !sets.length) info += "<br>Zet punten met <b>Uitzetmaat</b>; bij elk punt komt de hoogte te staan.";
+  }
+  $("afpInfo").innerHTML = info;
+  $("afpList").innerHTML = afpOn() ? sets.map(it => {
+    const p = it.pts[0], h = afpH(p); if (h == null) return "";
+    const X = (p.x - st.origin.x) * st.mmPerPx, Y = (st.origin.y - p.y) * st.mmPerPx;
+    return `<li><div class="pph"><b>${st.items.indexOf(it) + 1} · ${esc(it.name)}</b><span class="ppv">${fmtPeil(h)}</span></div><span class="ppm">X ${sgn(X)}${fmtMM(Math.abs(X))} · Y ${sgn(Y)}${fmtMM(Math.abs(Y))} · ${nl(Math.hypot(X, Y) / 1000, 2)} m van het nulpunt</span></li>`;
+  }).join("") : "";
+  const sum = $("sum-afschot");
+  const lijnen = st.items.filter(it => it.af && afLine(it) && afLine(it).s != null).length;
+  sum.textContent = [mode === "rond" && A.s ? "vanaf nulpunt" : mode === "vlak" ? "schuin vlak" : "", lijnen ? `${lijnen} ${lijnen === 1 ? "lijn" : "lijnen"}` : ""].filter(Boolean).join(" · ");
+}
+function afpSet(f) { st.afp = Object.assign({ mode: "uit" }, st.afp || {}); f(st.afp); save(); renderAfp(); renderList(); scheduleOverlay(); }
+$("afpMode").addEventListener("click", e => { const b = e.target.closest("[data-afm]"); if (b) afpSet(A => { A.mode = b.dataset.afm; }); });
+$("afpDir").addEventListener("click", e => { const b = e.target.closest("[data-dir]"); if (b) afpSet(A => { A.laag = b.dataset.dir === "laag"; }); });
+$("afpH0").addEventListener("input", e => afpSet(A => { const v = numIn(e.target.value); A.h0 = v == null || isNaN(v) ? 0 : v; }));
+$("afpS").addEventListener("input", e => afpSet(A => { A.sTxt = e.target.value; A.s = parseAfschot(e.target.value); }));
+$("afpSx").addEventListener("input", e => afpSet(A => { A.sxTxt = e.target.value; A.sx = parseAfschot(e.target.value); }));
+$("afpSy").addEventListener("input", e => afpSet(A => { A.syTxt = e.target.value; A.sy = parseAfschot(e.target.value); }));
+$("afpDx").addEventListener("change", e => afpSet(A => { A.dx = +e.target.value; }));
+$("afpDy").addEventListener("change", e => afpSet(A => { A.dy = +e.target.value; }));
+
 /* ---------- Hoogtes uit het AHN (PDOK WCS, maaiveld per 0,5 m, t.o.v. NAP) ---------- */
 const AHN_WCS = "https://service.pdok.nl/rws/ahn/wcs/v1_0";
 let ahn = null, ahnBusy = false, ahnProbe = null, ahnHover = null;
@@ -3139,7 +3331,7 @@ const ahnModeOf = () => st.ahnMode || (st.ahnShow === false ? "uit" : "hoogte");
 function ahnProbePt() {
   if (!ahnReady()) return null;
   if (vzActive() && hover) return hover;
-  return ahnHover || ahnProbe;
+  return tool === "pan" ? ahnHover || ahnProbe : null;
 }
 const ahnCache = new Map();
 const ahnOk = v => Number.isFinite(v) && v > -60 && v < 400;
