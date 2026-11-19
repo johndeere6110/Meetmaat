@@ -3874,23 +3874,33 @@ function lzRichting() {
 }
 // Beste laseropstelling: een plek op het plein vanwaar het verste punt zo dichtbij mogelijk is
 // Plekken waar een laser niet in de weg staat: 1,5 m uit de gevel/goot (hoogtelijnen) en uit de rand van het plan, aan de pleinkant
+// Plekken waar de laser niet in het werk staat: tegen de gevel (1 m, pleinkant) of 1,5 m buiten het werk
+// (op de stelcon/bestaande verharding langs een aansluiting, of buiten de buitenrand). Goten en lijnen midden in het werk tellen niet.
 function lzRandKand() {
   const T = planTin(); if (!T) return [];
   if (lzRandKand.c && lzRandKand.c.sig === planTin.c.sig) return lzRandKand.c.r;
-  const m = 1000 / st.mmPerPx, off = 1.5 * m, r = [];
-  const langs = (a, b, n, wie, kant) => {
+  const m = 1000 / st.mmPerPx, r = [];
+  const inFoto = q => q.x >= 0 && q.y >= 0 && q.x <= img.w && q.y <= img.h;
+  // buitenomtrek van alle punten: "buiten het werk" = daarbuiten (gaatjes binnen het werk tellen niet)
+  const H = (() => { const P = T.P.map(q => ({ x: q.x, y: q.y })).sort((a, b) => a.x - b.x || a.y - b.y), cr = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x), lo = [], hi = [];
+    for (const q of P) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+    for (const q of P.slice().reverse()) { while (hi.length > 1 && cr(hi[hi.length - 2], hi[hi.length - 1], q) <= 0) hi.pop(); hi.push(q); }
+    return lo.slice(0, -1).concat(hi.slice(0, -1)); })();
+  const buiten = q => !inPoly(q, H);
+  const langs = (a, b, off, binnen, txt) => {
     const L = d2(a, b); if (L < 1e-6) return;
     const nx = -(b.y - a.y) / L, ny = (b.x - a.x) / L, stap = Math.max(1 * m, L / 400);
     for (let d = stap / 2; d < L; d += stap) {
       const x = a.x + (b.x - a.x) * d / L, y = a.y + (b.y - a.y) * d / L;
-      for (const sg of kant) { const q = { x: x + nx * off * sg, y: y + ny * off * sg }; if (planH(q) != null) r.push({ x: q.x, y: q.y, bij: wie }); }
+      for (const sg of [1, -1]) { const q = { x: x + nx * off * sg, y: y + ny * off * sg }; if ((binnen ? planH(q) != null : buiten(q)) && inFoto(q)) r.push({ x: q.x, y: q.y, bij: txt }); }
     }
   };
-  st.items.filter(plOk).forEach(it => { for (let i = 1; i < it.pts.length; i++) langs(it.pts[i - 1], it.pts[i], 0, it.name, [1, -1]); });
-  // buitenrand van het plan
+  st.items.filter(it => plOk(it) && it.soort === "nul").forEach(it => { for (let i = 1; i < it.pts.length; i++) langs(it.pts[i - 1], it.pts[i], 1 * m, true, `tegen de gevel (${it.name}), 1 m ervandaan`); });
+  st.items.filter(it => plOk(it) && Array.isArray(it.pl.v)).forEach(it => { for (let i = 1; i < it.pts.length; i++) langs(it.pts[i - 1], it.pts[i], 1.5 * m, false, `op de bestaande verharding bij ${it.name}, 1,5 m buiten het werk`); });
   const ed = new Map(), kk = (u, w) => u.x < w.x || (u.x === w.x && u.y < w.y) ? [u.x, u.y, w.x, w.y].join() : [w.x, w.y, u.x, u.y].join();
   T.tris.forEach(t => { if (!t.in) return; [[t.a, t.b], [t.b, t.c], [t.c, t.a]].forEach(([u, w]) => { const key = kk(u, w), e = ed.get(key); if (e) e.n++; else ed.set(key, { u, w, n: 1 }); }); });
-  ed.forEach(e => { if (e.n === 1 && !(e.u.lijn && e.w.lijn && e.u.it === e.w.it)) langs(e.u, e.w, 0, "de rand", [1, -1]); });
+  const gevel = q => q.lijn && q.it.soort === "nul";
+  ed.forEach(e => { if (e.n === 1 && !(gevel(e.u) && gevel(e.w))) langs(e.u, e.w, 1.5 * m, false, "buiten de rand van het werk, 1,5 m ervandaan"); });
   lzRandKand.c = { sig: planTin.c.sig, r };
   return r;
 }
@@ -4000,8 +4010,8 @@ function lzRender() {
   let plek = "";
   if (PL && PL.alles) {
     const waar = (A.lzWaar || "rand") === "rand";
-    plek = `<div class="lzv"><b>Beste opstelplek</b><div class="seg" id="lzWaar" role="group" aria-label="Waar mag de laser staan" style="margin:6px 0"><button type="button" data-lzw="rand" aria-pressed="${waar}">Aan de kant (gevel, goot, rand)</button><button type="button" data-lzw="overal" aria-pressed="${!waar}">Overal op het plein</button></div>`
-      + `Eén plek voor het hele plan${PL.alles.bij ? `: <b>bij ${esc(PL.alles.bij)}</b> (1,5 m ervandaan)` : ""}, verste punt <b>${nl(PL.alles.d, 0)} m</b>.${ver(PL.alles.d)} <button type="button" class="ghost lzbest" data-lzplek="alles">Laser hier zetten</button>`;
+    plek = `<div class="lzv"><b>Beste opstelplek</b><div class="seg" id="lzWaar" role="group" aria-label="Waar mag de laser staan" style="margin:6px 0"><button type="button" data-lzw="rand" aria-pressed="${waar}">Buiten het werk / tegen de gevel</button><button type="button" data-lzw="overal" aria-pressed="${!waar}">Overal</button></div>`
+      + `Eén plek voor het hele plan${PL.alles.bij ? `: <b>${esc(PL.alles.bij)}</b>` : ""}, verste punt <b>${nl(PL.alles.d, 0)} m</b>.${ver(PL.alles.d)} <button type="button" class="ghost lzbest" data-lzplek="alles">Laser hier zetten</button>`;
     if (PL.per.length > 1) plek += `<br><span class="hint">Vanaf daar zet je per laservlak alleen het afschot om; de laser hoeft niet te verhuizen. Liever per vlak verplaatsen? Zie de knop bij elk laservlak.</span>`;
     plek += `<br><span class="hint">De app weet niet waar auto's, containers of hekken staan: check of je vanaf die plek overal zicht hebt.</span></div>`;
   }
@@ -4040,7 +4050,7 @@ function lzRender() {
     const pv = PL && PL.per.length > 1 ? PL.per[i] : null;
     if (pv && pv.b) {
       const nu = D.S ? Math.max(...pv.g.pts.map(q => d2(D.S.pts[0], q))) * st.mmPerPx / 1000 : null;
-      html += `<br><span class="hint">Beste plek voor dit vlak${pv.b.bij ? ` (bij ${esc(pv.b.bij)})` : ""}: verste punt ${nl(pv.b.d, 0)} m${nu != null ? ` (vanaf ${esc(D.S.name)} nu ${nl(nu, 0)} m)` : ""}.</span> <button type="button" class="ghost lzbest" data-lzplek="${i}">Laser hier</button>`;
+      html += `<br><span class="hint">Beste plek voor dit vlak${pv.b.bij ? ` (${esc(pv.b.bij.replace(/, [\d,]+ m.*$/, ""))})` : ""}: verste punt ${nl(pv.b.d, 0)} m${nu != null ? ` (vanaf ${esc(D.S.name)} nu ${nl(nu, 0)} m)` : ""}.</span> <button type="button" class="ghost lzbest" data-lzplek="${i}">Laser hier</button>`;
     }
     html += `</div>`;
   });
