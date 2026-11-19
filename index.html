@@ -640,14 +640,14 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
         <summary><h2>Afschot</h2><span class="secsum" id="sum-afschot"></span></summary>
         <div class="secbody">
       <div class="sand">
-        <p class="hint" style="margin:0"><b>Langs een lijn</b> (riool, goot): tik bij een Afstand of Lengte in <b>Metingen</b> op <b>Afschot</b>. Hieronder: de hoogte van je <b>Uitzetmaat</b>-punten, gerekend vanaf het nulpunt. Hoogtes in cm t.o.v. 0-peil; afschot als 0,5%, 1:200 of 5 mm/m.</p>
+        <p class="hint" style="margin:0"><b>Langs een lijn</b> (riool, goot): tik bij een Afstand of Lengte in <b>Metingen</b> op <b>Afschot</b>. Hieronder: de hoogte van je <b>Uitzetmaat</b>-punten, gerekend vanaf het nulpunt. Hoogtes in cm t.o.v. 0-peil; afschot in % (bijv. 0,5%).</p>
         <div class="seg" id="afpMode" role="group" aria-label="Hoogte van uitzetpunten">
           <button type="button" data-afm="uit">Uit</button><button type="button" data-afm="rond">Vanaf nulpunt</button><button type="button" data-afm="vlak">Schuin vlak (X/Y)</button><button type="button" data-afm="lijnen">Tussen 2 lijnen</button>
         </div>
         <div id="afpBody" hidden>
           <label for="afpH0" id="afpH0L">Hoogte bij het nulpunt (cm)<input id="afpH0" type="text" inputmode="decimal" autocomplete="off" placeholder="0"></label>
           <div id="afpRond" class="sand">
-            <label for="afpS">Afschot<input id="afpS" type="text" autocomplete="off" placeholder="bijv. 1% of 1:100"></label>
+            <label for="afpS">Afschot<input id="afpS" type="text" autocomplete="off" placeholder="bijv. 1%"></label>
             <div class="seg" id="afpDir" role="group" aria-label="Richting">
               <button type="button" data-dir="hoog">Nulpunt is het hoogste punt</button><button type="button" data-dir="laag">Nulpunt is het laagste (put)</button>
             </div>
@@ -2018,7 +2018,7 @@ function drawOverlay() {
     if (R) {
       s += `<path class="afl" d="M${R.p.x} ${R.p.y}L${R.q.x} ${R.q.y}"/>`;
       const mx = (R.p.x + R.q.x) / 2, my = (R.p.y + R.q.y) / 2;
-      const t = R.s != null ? `${nl(Math.abs(R.s) * 100, 2)}% · ${cmTxt(R.dh)} cm over ${nl(R.D, 2)} m` : `${nl(R.D, 2)} m`;
+      const t = R.s != null ? `${pctTxt(R.s)}% · ${cmTxt(R.dh)} cm over ${nl(R.D, 2)} m` : `${nl(R.D, 2)} m`;
       s += label(mx + 8 * k * zm, my, t, "afh", "start");
       [[R.L1, st.afp.h1], [R.L2, st.afp.h2]].forEach(([L, h]) => { if (h == null) return; const m = lijnMid(L); s += label(m.x, m.y - 10 * k * zm, fmtPeil(h), "afh", "middle"); });
     }
@@ -2656,10 +2656,10 @@ $("list").addEventListener("input", e => {
     if (aa === "af-e") { const n = numIn(v); it.af.e = n == null || isNaN(n) ? null : n; it.af.fix = "e"; const o = li.querySelector('[data-act="af-s"]'); if (o) o.value = ""; }
     save();
     const R = afLine(it), r = li.querySelector(".afres");
-    if (r) r.innerHTML = afResTxt(it) + (aa === "af-s" && v.trim() && !Number.isFinite(it.af.s) ? `<br><span style="color:var(--warn)">"${esc(v)}" snap ik niet: schrijf bijv. 0,5%, 1:200 of 5 mm/m.</span>` : "");
+    if (r) r.innerHTML = afResTxt(it) + (aa === "af-s" && v.trim() && !Number.isFinite(it.af.s) ? `<br><span style="color:var(--warn)">"${esc(v)}" snap ik niet: vul het afschot in %, bijv. 0,5 of 0,5%.</span>` : "");
     const oe = li.querySelector('[data-act="af-e"]'), os = li.querySelector('[data-act="af-s"]');
     if (oe && aa !== "af-e") oe.placeholder = R && R.e != null ? "= " + nl(R.e / 10, (R.e / 10) % 1 ? 1 : 0) : "bijv. -92";
-    if (os && aa !== "af-s") os.placeholder = R && R.s != null ? "= " + nl(R.s * 100, 2) + "%" : "0,5% of 1:200";
+    if (os && aa !== "af-s") os.placeholder = R && R.s != null ? "= " + pctTxt(R.s) + "%" : "bijv. 0,5%";
     renderAfp(); scheduleOverlay();
     return;
   }
@@ -3251,7 +3251,8 @@ function parseAfschot(t) {
   if ((m = /^(-?\d+(?:\.\d+)?)%?$/.exec(t))) return +m[1] / 100;
   return NaN;
 }
-const fmtAfschot = f => { const a = Math.abs(f); return a < 1e-9 ? "0 (vlak)" : `${nl(a * 100, a * 100 < 1 ? 2 : 1)}% · 1:${nl0(1 / a)} · ${nl(a * 1000, a * 1000 < 10 ? 1 : 0)} mm/m`; };
+const pctTxt = f => nl(Math.round(Math.abs(f) * 10000) / 100, 2).replace(/,?0+$/, "");   // 0,16 · 0,5 · 5 · 1,25
+const fmtAfschot = f => Math.abs(f) < 1e-9 ? "0% (vlak)" : pctTxt(f) + "%";
 // Langs een lijn: begin + afschot → eind, of begin + eind → afschot. Hoogtes in mm t.o.v. 0-peil.
 function afLine(it) {
   const A = it.af; if (!A || !st.mmPerPx || !it.pts || it.pts.length < 2) return null;
@@ -3284,16 +3285,16 @@ function afResTxt(it) {
   if (R.b == null) return `Lengte ${nl(R.Lm, 2)} m. Vul de hoogte aan het begin in, en het afschot óf de hoogte aan het eind.`;
   if (R.s == null) return `Lengte ${nl(R.Lm, 2)} m. Vul nu het afschot óf de hoogte aan het eind in.`;
   const daalt = R.verval >= 0;
-  return `Begin <b>${fmtPeil(R.b)}</b> → eind <b>${fmtPeil(R.e)}</b> over ${nl(R.Lm, 2)} m<br>${Math.abs(R.verval) < 0.5 ? "vlak" : `${daalt ? "daalt" : "stijgt"} <b>${cmTxt(R.verval)} cm</b>`} · ${fmtAfschot(R.s)}${R.s && Math.abs(R.s) < 0.002 ? `<br><span style="color:var(--warn)">Let op: minder dan 1:500. Voor riool en goot is dat erg vlak.</span>` : ""}`;
+  return `Begin <b>${fmtPeil(R.b)}</b> → eind <b>${fmtPeil(R.e)}</b> over ${nl(R.Lm, 2)} m<br>${Math.abs(R.verval) < 0.5 ? "vlak" : `${daalt ? "daalt" : "stijgt"} <b>${cmTxt(R.verval)} cm</b>`} · ${fmtAfschot(R.s)}${R.s && Math.abs(R.s) < 0.002 ? `<br><span style="color:var(--warn)">Let op: onder 0,2% loopt water slecht weg.</span>` : ""}`;
 }
 function afBlock(it) {
   const A = it.af, R = A ? afLine(it) : null;
-  if (!A || !A.open) return `<button type="button" class="ghost afbtn" data-act="af-open">Afschot${R && R.s != null ? ` · ${nl(Math.abs(R.s) * 100, 2)}% · ${R.verval >= 0 ? "verval" : "stijging"} ${cmTxt(R.verval)} cm` : ""}</button>`;
+  if (!A || !A.open) return `<button type="button" class="ghost afbtn" data-act="af-open">Afschot${R && R.s != null ? ` · ${pctTxt(R.s)}% · ${R.verval >= 0 ? "verval" : "stijging"} ${cmTxt(R.verval)} cm` : ""}</button>`;
   const v = mm => mm == null ? "" : nl(mm / 10, (mm / 10) % 1 ? 1 : 0);
   return `<div class="sand afs">
     <div class="row3">
       <label>Begin (cm)<input data-act="af-b" type="text" inputmode="decimal" autocomplete="off" value="${v(A.b)}" placeholder="bijv. -80"></label>
-      <label>Afschot<input data-act="af-s" type="text" autocomplete="off" value="${esc(A.fix === "s" ? A.sTxt || "" : "")}" placeholder="${R && R.s != null && A.fix === "e" ? "= " + nl(R.s * 100, 2) + "%" : "0,5% of 1:200"}"></label>
+      <label>Afschot<input data-act="af-s" type="text" autocomplete="off" value="${esc(A.fix === "s" ? A.sTxt || "" : "")}" placeholder="${R && R.s != null && A.fix === "e" ? "= " + pctTxt(R.s) + "%" : "bijv. 0,5%"}"></label>
       <label>Eind (cm)<input data-act="af-e" type="text" inputmode="decimal" autocomplete="off" value="${A.fix === "e" ? v(A.e) : ""}" placeholder="${R && R.e != null && A.fix !== "e" ? "= " + v(R.e) : "bijv. -92"}"></label>
     </div>
     <div class="afres">${afResTxt(it)}</div>
@@ -3381,7 +3382,7 @@ function renderAfp() {
       let t = afst + (R.haaks ? "" : " (ze liggen niet naast elkaar: kortste afstand)");
       if (R.s != null) {
         const daalt = R.dh < 0, wat = Math.abs(R.dh) < 0.5 ? "even hoog" : `${daalt ? "daalt" : "stijgt"} <b>${cmTxt(R.dh)} cm</b> van lijn 1 naar lijn 2`;
-        t += `<br>${wat}<br>` + (R.par ? `Afschot <b>${fmtAfschot(R.s)}</b>` : `Afschot <b>${nl(Math.abs(R.smin) * 100, 2)}% tot ${nl(Math.abs(R.smax) * 100, 2)}%</b> (gemiddeld ${fmtAfschot(R.s)})`);
+        t += `<br>${wat}<br>` + (R.par ? `Afschot <b>${fmtAfschot(R.s)}</b>` : `Afschot <b>${pctTxt(R.smin)}% tot ${pctTxt(R.smax)}%</b> (gemiddeld ${fmtAfschot(R.s)})`);
       } else t += "<br>Vul bij beide lijnen een hoogte in.";
       out.innerHTML = t;
     }
@@ -3393,12 +3394,12 @@ function renderAfp() {
   $("afpDx").value = String(A.dx || -1); $("afpDy").value = String(A.dy || -1);
   const sets = st.items.filter(it => it.type === "set");
   let info = "";
-  const bad = (txt, v) => txt && !Number.isFinite(v) ? ` "${esc(txt)}" snap ik niet: schrijf bijv. 1%, 1:100 of 10 mm/m.` : "";
+  const bad = (txt, v) => txt && !Number.isFinite(v) ? ` "${esc(txt)}" snap ik niet: vul het afschot in %, bijv. 1 of 1%.` : "";
   if (mode !== "uit") {
     if (!st.mmPerPx) info = "IJk eerst de tekening.";
     else if (mode === "lijnen") info = "";
     else if (!st.origin) info = "Zet eerst een nulpunt met het gereedschap <b>Nulpunt</b>.";
-    else if (mode === "rond") info = A.s == null ? "Vul het afschot in." : bad(A.sTxt, A.s) || `${fmtAfschot(A.s)} · elke meter van het nulpunt af ${A.laag ? "hoger" : "lager"}.`;
+    else if (mode === "rond") info = A.s == null ? "Vul het afschot in." : bad(A.sTxt, A.s) || `${fmtAfschot(A.s)}: elke meter van het nulpunt af ${pctTxt(A.s)} cm ${A.laag ? "hoger" : "lager"}.`;
     else info = bad(A.sxTxt, A.sx) || bad(A.syTxt, A.sy) || ((Number.isFinite(A.sx) && A.sx) || (Number.isFinite(A.sy) && A.sy) ? [Number.isFinite(A.sx) && A.sx ? `X: ${fmtAfschot(A.sx)}, ${(A.dx || -1) < 0 ? "daalt" : "stijgt"} naar rechts` : "", Number.isFinite(A.sy) && A.sy ? `Y: ${fmtAfschot(A.sy)}, ${(A.dy || -1) < 0 ? "daalt" : "stijgt"} naar boven` : ""].filter(Boolean).join("<br>") : "Vul het afschot in X en/of Y in.");
     if (afpOn() && !sets.length) info += "<br>Zet punten met <b>Uitzetmaat</b>; bij elk punt komt de hoogte te staan.";
   }
@@ -3411,7 +3412,7 @@ function renderAfp() {
   const sum = $("sum-afschot");
   const lijnen = st.items.filter(it => it.af && afLine(it) && afLine(it).s != null).length;
   const LR = mode === "lijnen" ? afpLijnenCalc() : null;
-  sum.textContent = [mode === "rond" && A.s ? "vanaf nulpunt" : mode === "vlak" ? "schuin vlak" : LR && LR.s != null ? `2 lijnen ${nl(Math.abs(LR.s) * 100, 1)}%` : "", lijnen ? `${lijnen} ${lijnen === 1 ? "lijn" : "lijnen"}` : ""].filter(Boolean).join(" · ");
+  sum.textContent = [mode === "rond" && A.s ? "vanaf nulpunt" : mode === "vlak" ? "schuin vlak" : LR && LR.s != null ? `2 lijnen ${pctTxt(LR.s)}%` : "", lijnen ? `${lijnen} ${lijnen === 1 ? "lijn" : "lijnen"}` : ""].filter(Boolean).join(" · ");
 }
 function afpSet(f) { st.afp = Object.assign({ mode: "uit" }, st.afp || {}); f(st.afp); save(); renderAfp(); renderList(); scheduleOverlay(); }
 $("afpMode").addEventListener("click", e => { const b = e.target.closest("[data-afm]"); if (b) afpSet(A => { A.mode = b.dataset.afm; }); });
