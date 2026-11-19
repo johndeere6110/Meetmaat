@@ -344,6 +344,7 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
 #ov .phring { fill: none; stroke: var(--accent); stroke-width: calc(4px * var(--k)); pointer-events: none; }
 #ov .hplijn { stroke: #6a1b9a; stroke-width: calc(2px * var(--k)); stroke-dasharray: calc(7px * var(--k)) calc(4px * var(--k)); pointer-events: none; }
 #ov .hpt { fill: #6a1b9a; }
+#ov .hd.hp { stroke: #6a1b9a; }
 .phin { display: grid; gap: 3px; font-size: 12.5px; font-weight: 500; margin-top: 6px; }
 .phin input, .phin select { font: 500 14px var(--mono); padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); width: 100%; }
 .side > * { min-width: 0; }            /* één te breed element mag het zijpaneel niet oprekken */
@@ -2049,6 +2050,7 @@ function drawOverlay() {
     s += `<path class="hplijn" d="M${HR.A.p.x} ${HR.A.p.y}L${HR.B.p.x} ${HR.B.p.y}"/>`;
     s += label((HR.A.p.x + HR.B.p.x) / 2, (HR.A.p.y + HR.B.p.y) / 2 - 8 * k * zm, `${fmtAfschot(HR.s)} · ${nl(HR.L, 2)} m · ${nl(HR.hoek, 0)}°`, "hpt", "middle");
     [HR.A, HR.B].forEach(q => { s += `<circle class="phring" cx="${q.p.x}" cy="${q.p.y}" r="${9 * k}"/>`; });
+    if (tool === "pan" && !hpKies) s += handle(HR.A.p, "hp:A", "hp") + handle(HR.B.p, "hp:B", "hp");   // versleepbaar
   }
   // Hoogte (AHN) op de plek waar je tikt, onder de muis of onder het vizier
   const pr = ahnProbePt();
@@ -2473,6 +2475,11 @@ function onTap(p0, g, shift) {
   renderAll();
 }
 function moveHandle(h, p0, shift) {
+  if (h.startsWith("hp:")) {      // eind van de afschotlijn: klikt vast op een hoogtepunt, of glijdt langs 0-lijn/aansluiting
+    const v = hpZoek(p0);
+    if (v) { if (h === "hp:A") st.hpA = v; else st.hpB = v; renderHp(); scheduleOverlay(); }
+    return;
+  }
   const o = ortho || shift;
   const p = h.startsWith("c:") ? p0 : snap(p0);
   if (h === "o") st.origin = p;
