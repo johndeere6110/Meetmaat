@@ -642,6 +642,7 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
         <div class="btns" id="planZet"><button type="button" class="ghost" data-zet="nul">0-punt</button><button type="button" class="ghost" data-zet="l:nul">0-lijn (gevel)</button><button type="button" class="ghost" data-zet="kolk">Kolk</button><button type="button" class="ghost" data-zet="put">Put</button><button type="button" class="ghost" data-zet="goot">Goot</button><button type="button" class="ghost" data-zet="l:aansl">Aansluiting (bestaand)</button><button type="button" class="ghost" data-zet="punt">Punt</button></div>
         <ul class="pplist" id="hpList"></ul>
         <h3>Afschot tussen twee punten</h3>
+        <div class="btns"><button type="button" id="hpKies">Van en naar aantikken op de tekening</button></div>
         <div class="row2">
           <label for="hpA">Van<select id="hpA"></select></label>
           <label for="hpB">Naar<select id="hpB"></select></label>
@@ -2046,7 +2047,8 @@ function drawOverlay() {
   const HR = hpAfschot();
   if (HR) {
     s += `<path class="hplijn" d="M${HR.A.p.x} ${HR.A.p.y}L${HR.B.p.x} ${HR.B.p.y}"/>`;
-    s += label((HR.A.p.x + HR.B.p.x) / 2, (HR.A.p.y + HR.B.p.y) / 2 - 8 * k * zm, `${fmtAfschot(HR.s)} · ${nl(HR.L, 2)} m`, "hpt", "middle");
+    s += label((HR.A.p.x + HR.B.p.x) / 2, (HR.A.p.y + HR.B.p.y) / 2 - 8 * k * zm, `${fmtAfschot(HR.s)} · ${nl(HR.L, 2)} m · ${nl(HR.hoek, 0)}°`, "hpt", "middle");
+    [HR.A, HR.B].forEach(q => { s += `<circle class="phring" cx="${q.p.x}" cy="${q.p.y}" r="${9 * k}"/>`; });
   }
   // Hoogte (AHN) op de plek waar je tikt, onder de muis of onder het vizier
   const pr = ahnProbePt();
@@ -2147,7 +2149,9 @@ function updateHint() {
   const v = vzActive() && VZ_HINTS[tool] ? VZ_HINTS[tool] : HINTS[tool];
   let t = Array.isArray(v) ? v[Math.min(draft.length, v.length - 1)] : v;
   if (loepOn() && !(tool === "calib" && draft.length >= 2)) t += " Houd je vinger vast voor een loep.";
-  if (tool === "set" && planSoort) t = `Tik op de tekening waar ${planSoort === "nul" ? "het 0-punt" : planSoort === "punt" ? "het punt" : "de " + SOORT[planSoort].n.toLowerCase()} komt; daarna vul je meteen de hoogte in.`;
+  if (hpKies === 1) t = "Afschot: tik het punt waar je vandaan komt (0-punt, kolk, 0-lijn, aansluiting …).";
+  else if (hpKies === 2) t = "Afschot: tik nu het punt waar je naartoe wilt.";
+  else if (tool === "set" && planSoort) t = `Tik op de tekening waar ${planSoort === "nul" ? "het 0-punt" : planSoort === "punt" ? "het punt" : "de " + SOORT[planSoort].n.toLowerCase()} komt; daarna vul je meteen de hoogte in.`;
   else if (tool === "poly" && planLijn === "aansl") t = "Teken de bestaande rand (stelcon, band) met een punt op elke plek waar je de hoogte gemeten hebt, en tik op Klaar of Enter. Daarna vul je per punt de hoogte in.";
   else if (tool === "poly" && planLijn === "nul") t = "Teken de 0-lijn langs de gevel en tik op Klaar of Enter. De hele lijn ligt op 0.";
   else if (tool === "set" && !st.origin) t = "Zet eerst een nulpunt met het gereedschap Nulpunt.";
@@ -2404,7 +2408,7 @@ $("ppList").addEventListener("click", e => {
 
 /* ---------- Acties ---------- */
 function setTool(t) {
-  planSoort = null; planLijn = null;
+  planSoort = null; planLijn = null; hpKies = 0;
   tool = t; draft = []; hover = null; $("calibbox").hidden = true; $("peilbox").hidden = true; $("phbox").hidden = true; peilCur = null;
   vzUpdate();
   renderAll();
@@ -2429,6 +2433,7 @@ function finish() {
 }
 function onTap(p0, g, shift) {
   if (!img.w) return;
+  if (hpKies) { hpKiesTik(p0); return; }
   if (tool === "pan") { sel = g.sel ? +g.sel : null; if (ahnReady()) ahnProbe = g.sel ? null : p0; renderAll(); return; }
   if (tool === "peil") {
     const cc = piles.length ? cellCenters() : { s: 0, list: [] };
@@ -3486,26 +3491,64 @@ function hpPunten() {
   });
   return out;
 }
+function hpLos(v, P) { return !v ? null : typeof v === "string" ? P.find(q => q.id === v) || null : v; }
 function hpAfschot() {
-  const P = hpPunten(), A = P.find(q => q.id === st.hpA), B = P.find(q => q.id === st.hpB);
+  const P = hpPunten(), A = hpLos(st.hpA, P), B = hpLos(st.hpB, P);
   if (!A || !B || A === B || !st.mmPerPx) return null;
   const L = d2(A.p, B.p) * st.mmPerPx / 1000; if (L < 0.01) return null;
   const dh = B.h - A.h, sr = dh / 1000 / L, ux = (B.p.x - A.p.x) / d2(A.p, B.p), uy = (B.p.y - A.p.y) / d2(A.p, B.p);
-  return { A, B, L, dh, s: Math.abs(sr), X: sr * ux, Y: -sr * uy };
+  // richting waarin het water loopt (van hoog naar laag), als hoek t.o.v. de X-as van de tekening (rechts = 0°, tegen de klok in)
+  const fx = dh <= 0 ? ux : -ux, fy = dh <= 0 ? -uy : uy;
+  let hoek = Math.atan2(fy, fx) * 180 / Math.PI; if (hoek < 0) hoek += 360;
+  return { A, B, L, dh, s: Math.abs(sr), X: sr * ux, Y: -sr * uy, hoek };
 }
+// Aantikken: dichtstbijzijnde hoogtepunt, of het plekje op een 0-lijn / aansluiting (met de hoogte die daar geldt)
+let hpKies = 0;
+function hpZoek(p) {
+  const tol = 22 / T.s; let best = null;
+  hpPunten().forEach(q => { const d = d2(q.p, p); if (d < tol && (!best || d < best.d)) best = { d, v: q.id }; });
+  if (best) return best.v;
+  st.items.forEach(it => {
+    if (!it.pl || !(it.soort === "nul" || Array.isArray(it.pl.v))) return;
+    let acc = 0;
+    const dl = [0]; for (let i = 1; i < it.pts.length; i++) dl.push(dl[i - 1] + d2(it.pts[i - 1], it.pts[i]));
+    for (let i = 1; i < it.pts.length; i++) {
+      const a = it.pts[i - 1], b = it.pts[i], dx = b.x - a.x, dy = b.y - a.y, t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+      const q = { x: a.x + t * dx, y: a.y + t * dy }, d = d2(q, p);
+      if (d >= tol || (best && d >= best.d)) continue;
+      let h = 0;
+      if (Array.isArray(it.pl.v)) { const ha = it.pl.v[i - 1], hb = it.pl.v[i]; if (ha == null || hb == null) continue; h = ha + (hb - ha) * t; }
+      best = { d, v: { naam: `${it.name} (aangetikt)`, h, p: q } };
+    }
+  });
+  return best ? best.v : null;
+}
+function hpKiesTik(p) {
+  const v = hpZoek(p);
+  if (!v) { flashHint("Tik op een hoogtepunt (0-punt, kolk, put), op de 0-lijn of op een aansluiting."); return; }
+  if (hpKies === 1) { st.hpA = v; st.hpB = null; hpKies = 2; }
+  else { st.hpB = v; hpKies = 0; }
+  save(); renderAll();
+  const R = !hpKies ? hpAfschot() : null; if (R) toast(`${fmtAfschot(R.s)} over ${nl(R.L, 2)} m · richting ${nl(R.hoek, 0)}°`);
+}
+$("hpKies").addEventListener("click", () => {
+  setTool("pan"); hpKies = 1; renderAll();
+  if (window.matchMedia("(max-width: 900px)").matches) $("view").scrollIntoView({ block: "center" });
+});
 function renderHp() {
   const hp = st.items.filter(it => isHp(it) || (it.pl && (it.soort === "nul" || Array.isArray(it.pl.v))));
   $("sum-hplan").textContent = hp.length ? `${hp.length} ${hp.length === 1 ? "punt/lijn" : "punten/lijnen"}` : "";
   document.querySelectorAll("#planZet [data-zet]").forEach(b => b.setAttribute("aria-pressed", (tool === "set" && planSoort === b.dataset.zet) || (tool === "poly" && planLijn && "l:" + planLijn === b.dataset.zet)));
   $("hpList").innerHTML = hp.map(it => `<li><div class="pph"><b>${esc(it.name)}</b><span class="ppv">${it.type === "set" ? (it.h != null ? fmtPeil(it.h) : "geen hoogte") : it.soort === "nul" ? "0 cm" : it.pl.v.map(h => h == null ? "?" : (h > 0 ? "+" : h < 0 ? "−" : "") + cmTxt(h)).join(" · ") + " cm"}</span></div></li>`).join("");
-  const P = hpPunten(), opt = cur => `<option value="">kies een punt</option>` + P.map(q => `<option value="${q.id}"${q.id === cur ? " selected" : ""}>${esc(q.naam)} (${fmtPeil(q.h)})</option>`).join("");
+  const P = hpPunten(), opt = cur => `<option value="">kies een punt</option>` + (cur && typeof cur === "object" ? `<option value="__tik" selected>${esc(cur.naam)} (${fmtPeil(cur.h)})</option>` : "") + P.map(q => `<option value="${q.id}"${q.id === cur ? " selected" : ""}>${esc(q.naam)} (${fmtPeil(q.h)})</option>`).join("");
+  $("hpKies").textContent = hpKies === 1 ? "Tik nu het punt waar je vandaan komt…" : hpKies === 2 ? "Tik nu het punt waar je naartoe wilt…" : "Van en naar aantikken op de tekening";
   $("hpA").innerHTML = opt(st.hpA); $("hpB").innerHTML = opt(st.hpB);
   const R = hpAfschot(), sg = v => (v > 0.00005 ? "+" : v < -0.00005 ? "−" : "") + pctTxt(v) + "%";
   $("hpRes").innerHTML = !P.length ? `<span class="hint">Zet eerst punten met een hoogte.</span>` : !R ? `<span class="hint">Kies twee punten.</span>`
-    : `${esc(R.A.naam)} → ${esc(R.B.naam)}: <b>${nl(R.L, 2)} m</b>, ${Math.abs(R.dh) < 0.5 ? "even hoog" : `${R.dh < 0 ? "daalt" : "stijgt"} <b>${cmTxt(R.dh)} cm</b>`}<br>Afschot <b>${fmtAfschot(R.s)}</b> · X-as <b>${sg(R.X)}</b> · Y-as <b>${sg(R.Y)}</b><br><span class="hint">X = links–rechts, Y = onder–boven op de tekening; + = stijgt naar rechts / naar boven.</span>`;
+    : `${esc(R.A.naam)} → ${esc(R.B.naam)}: <b>${nl(R.L, 2)} m</b>, ${Math.abs(R.dh) < 0.5 ? "even hoog" : `${R.dh < 0 ? "daalt" : "stijgt"} <b>${cmTxt(R.dh)} cm</b>`}<br>Afschot <b>${fmtAfschot(R.s)}</b> · X-as <b>${sg(R.X)}</b> · Y-as <b>${sg(R.Y)}</b><br>Richting waarin het water loopt: <b>${nl(R.hoek, 1)}°</b> <span class="hint">t.o.v. de X-as (rechts = 0°, tegen de klok in)</span><br><span class="hint">X = links–rechts, Y = onder–boven op de tekening; + = stijgt naar rechts / naar boven.</span>`;
 }
-$("hpA").addEventListener("change", e => { st.hpA = e.target.value || null; save(); renderHp(); scheduleOverlay(); });
-$("hpB").addEventListener("change", e => { st.hpB = e.target.value || null; save(); renderHp(); scheduleOverlay(); });
+$("hpA").addEventListener("change", e => { if (e.target.value !== "__tik") st.hpA = e.target.value || null; save(); renderHp(); scheduleOverlay(); });
+$("hpB").addEventListener("change", e => { if (e.target.value !== "__tik") st.hpB = e.target.value || null; save(); renderHp(); scheduleOverlay(); });
 function afBlock(it) {
   const A = it.af, R = A ? afLine(it) : null;
   if (!A || !A.open) return `<button type="button" class="ghost afbtn" data-act="af-open">Afschot${R && R.s != null ? ` · ${pctTxt(R.s)}% · ${R.verval >= 0 ? "verval" : "stijging"} ${cmTxt(R.verval)} cm` : ""}</button>`;
