@@ -339,6 +339,11 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
 #ov .afr { fill: #0b4f8a; font-weight: 500; }
 #ov .afv { fill: #0b4f8a; font-weight: 700; }
 #ov .afh.vl { fill: var(--warn); }
+#planZet button { padding: 6px 10px; font-size: 13px; }
+#planZet button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+#ov .sym { fill: #fff; stroke: #0b4f8a; stroke-width: calc(2px * var(--k)); pointer-events: none; }
+#ov .sym.nul { fill: #2e7d32; stroke: #fff; }
+#ov .sym.goot { fill: #0b4f8a; }
 .lzv { border-top: 1px solid var(--line); padding-top: 6px; margin-top: 4px; }
 .phin { display: grid; gap: 3px; font-size: 12.5px; font-weight: 500; margin-top: 6px; }
 .phin input { font: 500 14px var(--mono); padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); width: 100%; }
@@ -653,16 +658,17 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
         <summary><h2>Afschot</h2><span class="secsum" id="sum-afschot"></span></summary>
         <div class="secbody">
       <div class="sand">
-        <p class="hint" style="margin:0"><b>Langs een lijn</b> (riool, goot): tik bij een Afstand of Lengte in <b>Metingen</b> op <b>Afschot</b>. Hieronder: de hoogte van je <b>Uitzetmaat</b>-punten, gerekend vanaf het nulpunt. Hoogtes in cm t.o.v. 0-peil; afschot in % (bijv. 0,5%).</p>
+        <p class="hint" style="margin:0"><b>Langs een lijn</b> (riool, goot): tik bij een Afstand of Lengte in <b>Metingen</b> op <b>Afschot</b>. Hieronder: de hoogte van je <b>Uitzetmaat</b>-punten (rond een punt, schuin vlak of tussen 2 lijnen), of een heel <b>afschotplan</b> met 0-punt, kolken, putten en goten. Hoogtes in cm t.o.v. 0-peil; afschot in % (bijv. 0,5%).</p>
         <div class="seg" id="afpMode" role="group" aria-label="Hoogte van uitzetpunten">
-          <button type="button" data-afm="uit">Uit</button><button type="button" data-afm="rond">Vanaf nulpunt</button><button type="button" data-afm="vlak">Schuin vlak (X/Y)</button><button type="button" data-afm="lijnen">Tussen 2 lijnen</button><button type="button" data-afm="plan">Afschotplan (hoogtepunten)</button>
+          <button type="button" data-afm="uit">Uit</button><button type="button" data-afm="rond">Rond een punt (kolk)</button><button type="button" data-afm="vlak">Schuin vlak (X/Y)</button><button type="button" data-afm="lijnen">Tussen 2 lijnen</button><button type="button" data-afm="plan">Afschotplan (hoogtepunten)</button>
         </div>
         <div id="afpBody" hidden>
-          <label for="afpH0" id="afpH0L">Hoogte bij het nulpunt (cm)<input id="afpH0" type="text" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+          <label for="afpH0" id="afpH0L"><span id="afpH0T">Hoogte bij het nulpunt (cm)</span><input id="afpH0" type="text" inputmode="decimal" autocomplete="off" placeholder="0"></label>
           <div id="afpRond" class="sand">
+            <label for="afpMid">Middelpunt<select id="afpMid"></select></label>
             <label for="afpS">Afschot<input id="afpS" type="text" autocomplete="off" placeholder="bijv. 1%"></label>
             <div class="seg" id="afpDir" role="group" aria-label="Richting">
-              <button type="button" data-dir="hoog">Nulpunt is het hoogste punt</button><button type="button" data-dir="laag">Nulpunt is het laagste (put)</button>
+              <button type="button" data-dir="hoog">Middelpunt is het hoogst</button><button type="button" data-dir="laag">Middelpunt is het laagst (kolk/put)</button>
             </div>
           </div>
           <div id="afpVlak" class="sand">
@@ -688,7 +694,8 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
             <div class="afres" id="afpLRes"></div>
           </div>
           <div id="afpPlan" class="sand">
-            <p class="hint" style="margin:0">Zet met <b>Uitzetmaat</b> punten op hoeken, putten, kolken, goten en drempels, en geef ze in <b>Metingen</b> een <b>ontwerphoogte</b> (cm t.o.v. 0-peil). De app verbindt ze tot driehoeken; per driehoek zie je het afschot en waar het water heen loopt. Punten zonder hoogte krijgen hun hoogte uit het plan.</p>
+            <p class="hint" style="margin:0">Zet het <b>0-punt</b> (deur, drempel: krijgt vanzelf hoogte 0), de <b>kolken, putten en goten</b> en de <b>hoeken</b> met de knoppen hieronder, en geef ze in <b>Metingen</b> een <b>ontwerphoogte</b> (cm t.o.v. 0). De app verbindt ze tot driehoeken; per driehoek zie je het afschot en waar het water heen loopt. Punten zonder hoogte krijgen hun hoogte uit het plan.</p>
+            <div class="btns" id="planZet"><span class="hint" style="width:100%">Punt zetten (tik daarna op de tekening):</span><button type="button" class="ghost" data-zet="nul">0-punt</button><button type="button" class="ghost" data-zet="kolk">Kolk</button><button type="button" class="ghost" data-zet="put">Put</button><button type="button" class="ghost" data-zet="goot">Goot</button><button type="button" class="ghost" data-zet="rand">Hoek/rand</button><button type="button" class="ghost" data-zet="punt">Punt</button></div>
             <label for="afpGrens">Begrenzing<select id="afpGrens"></select></label>
             <label class="chk"><input type="checkbox" id="afpPijl"> Pijlen met afschot op de tekening</label>
             <label for="afpRaster">Hoogtes in een raster<select id="afpRaster"><option value="0">uit</option><option value="1">elke 1 m</option><option value="2">elke 2 m</option><option value="5">elke 5 m</option><option value="10">elke 10 m</option><option value="20">elke 20 m</option></select></label>
@@ -1946,7 +1953,7 @@ function drawOverlay() {
       const pp = nearestPile(p);
       if (pp && d2(p, pp) > 0.5) s += `<path class="plink" d="M${pp.x} ${pp.y}H${p.x}V${p.y}"/>`;
       s += `<path class="halo dot${on ? " on" : ""}" d="M${p.x} ${p.y}h0.01"/>`;
-      s += `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/>`;
+      s += isPlan() && it.soort ? soortSym(it.soort, p, k) : `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/>`;
       s += `<circle class="hit" data-sel="${it.id}" cx="${p.x}" cy="${p.y}" r="${14 * k}" style="cursor:pointer"/>`;
       labs.push({ x: p.x + 10 * k, y: p.y - 10 * k, n, t: d.short, anc: "start" });
       const plan = st.afp && st.afp.mode === "plan", ah = plan && it.h != null ? it.h : afpH(p);
@@ -2186,7 +2193,8 @@ function updateHint() {
   const v = vzActive() && VZ_HINTS[tool] ? VZ_HINTS[tool] : HINTS[tool];
   let t = Array.isArray(v) ? v[Math.min(draft.length, v.length - 1)] : v;
   if (loepOn() && !(tool === "calib" && draft.length >= 2)) t += " Houd je vinger vast voor een loep.";
-  if (tool === "set" && !st.origin) t = st.afp && st.afp.mode === "plan" ? "Tik de hoogtepunten van je afschotplan aan; geef ze in Metingen een ontwerphoogte." : "Zet eerst een nulpunt met het gereedschap Nulpunt.";
+  if (tool === "set" && isPlan()) t = planSoort && planSoort !== "punt" ? `Tik op de tekening waar ${planSoort === "nul" ? "het 0-punt" : "de " + SOORT[planSoort].n.toLowerCase()} komt. Hoogte geef je in Metingen.` : "Tik de hoogtepunten van je afschotplan aan; geef ze in Metingen een ontwerphoogte.";
+  else if (tool === "set" && !st.origin) t = "Zet eerst een nulpunt met het gereedschap Nulpunt.";
   if (MEASURE_TOOLS.includes(tool) && !st.mmPerPx) t += " Let op: nog niet geijkt, maten staan in pixels.";
   if (tool === "set") t = t.replace(/\bpaal\b/g, rk().ev);
   h.textContent = t;
@@ -2431,6 +2439,7 @@ $("ppList").addEventListener("click", e => {
 
 /* ---------- Acties ---------- */
 function setTool(t) {
+  planSoort = null;
   tool = t; draft = []; hover = null; $("calibbox").hidden = true; $("peilbox").hidden = true; peilCur = null;
   vzUpdate();
   renderAll();
@@ -2439,6 +2448,10 @@ function addItem(type, pts) {
   const count = st.items.filter(x => x.type === type).length + 1;
   const it = { id: st.seq++, type, pts: pts.map(p => ({ x: p.x, y: p.y })), name: `${TYPE_NAME[type]} ${count}` };
   autoName(it);
+  if (type === "set" && isPlan() && planSoort && planSoort !== "punt") {
+    it.soort = planSoort; it.name = soortNaam(planSoort);
+    if (planSoort === "nul") it.h = 0;
+  }
   st.items.push(it);
   sel = it.id; draft = []; hover = null; vzUpdate();
   save(); renderAll();
@@ -2701,7 +2714,7 @@ $("list").addEventListener("click", e => {
   const id = +li.dataset.id, it = st.items.find(x => x.id === id);
   const act = e.target.closest("[data-act]")?.dataset.act;
   if (act === "del") { st.items = st.items.filter(x => x.id !== id); st.items.forEach(o => { if (o.minus === id) delete o.minus; }); if (sel === id) sel = null; save(); renderAll(); return; }
-  if (act === "grp" || act === "ph" || /^af-[bse]$|^af-stap$/.test(act || "")) return;
+  if (act === "grp" || act === "ph" || act === "soort" || /^af-[bse]$|^af-stap$/.test(act || "")) return;
   if (act && act.startsWith("af-") && it) {
     if (act === "af-open") { it.af = Object.assign({ fix: "s", stap: 5 }, it.af || {}, { open: true }); }
     else if (act === "af-close") it.af.open = false;
@@ -2753,6 +2766,14 @@ $("list").addEventListener("input", e => {
   }
 });
 $("list").addEventListener("change", e => {
+  if (e.target.dataset.act === "soort") {
+    const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id); if (!it) return;
+    const v = e.target.value;
+    if (v === "punt") delete it.soort; else it.soort = v;
+    if (v === "nul" && it.h == null) it.h = 0;
+    if (SOORT_NAAM.test(it.name)) it.name = v === "punt" ? it.name.replace(SOORT_NAAM, "Punt$2") : soortNaam(v, it);
+    save(); renderAll(); return;
+  }
   if (e.target.dataset.act !== "af-stap") return;
   const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id);
   if (it && it.af) { it.af.stap = +e.target.value; save(); scheduleOverlay(); }
@@ -3426,6 +3447,22 @@ function afpLijnenH(p) {
   else t = d1 / Math.max(1e-6, d1 + d2v);                     // ertussen
   return A.h1 + (A.h2 - A.h1) * t;
 }
+// Soorten hoogtepunten in het afschotplan
+const SOORT = { punt: { n: "Punt", l: "Punt" }, nul: { n: "0-punt", l: "0-punt (deur, drempel)" }, kolk: { n: "Kolk", l: "Kolk" }, put: { n: "Put", l: "Put" }, goot: { n: "Goot", l: "Goot" }, rand: { n: "Hoek", l: "Hoek / rand" } };
+const AFVOER = ["kolk", "put", "goot"];
+let planSoort = null;
+const isPlan = () => !!(st.afp && st.afp.mode === "plan");
+function soortSym(sr, p, k) {
+  const r = 6 * k;
+  if (sr === "nul") return `<path class="sym nul" d="M${p.x - 7 * k} ${p.y - 12 * k}H${p.x + 7 * k}L${p.x} ${p.y}Z"/>`;
+  if (sr === "kolk") return `<rect class="sym" x="${p.x - r}" y="${p.y - r}" width="${2 * r}" height="${2 * r}"/><path class="sym" d="M${p.x - r} ${p.y}H${p.x + r}M${p.x} ${p.y - r}V${p.y + r}M${p.x - r} ${p.y - r / 2}H${p.x + r}M${p.x - r} ${p.y + r / 2}H${p.x + r}"/>`;
+  if (sr === "put") return `<circle class="sym" cx="${p.x}" cy="${p.y}" r="${7 * k}"/><path class="sym" d="M${p.x - 5 * k} ${p.y - 5 * k}L${p.x + 5 * k} ${p.y + 5 * k}M${p.x + 5 * k} ${p.y - 5 * k}L${p.x - 5 * k} ${p.y + 5 * k}"/>`;
+  if (sr === "goot") return `<rect class="sym goot" x="${p.x - 9 * k}" y="${p.y - 2.5 * k}" width="${18 * k}" height="${5 * k}"/>`;
+  if (sr === "rand") return `<path class="sym" d="M${p.x} ${p.y - r}L${p.x + r} ${p.y}L${p.x} ${p.y + r}L${p.x - r} ${p.y}Z"/>`;
+  return "";
+}
+const SOORT_NAAM = /^(Uitzetmaat|Punt|0-punt|Kolk|Put|Goot|Hoek)( \d+)?$/;
+function soortNaam(sr, skip) { const n = st.items.filter(x => x.type === "set" && x.soort === sr && x !== skip).length + 1; return SOORT[sr].n + (sr === "nul" && n === 1 ? "" : " " + n); }
 // Afschotplan: Delaunay-driehoeken tussen punten met een ontwerphoogte
 function delaunay(V0) {
   const n = V0.length; if (n < 3) return [];
@@ -3523,7 +3560,7 @@ function planVolume() {
 function planCard(it) {
   if (!(st.afp && st.afp.mode === "plan")) return "";
   const v = it.h == null ? "" : nl(it.h / 10, (it.h / 10) % 1 ? 1 : 0), ph = it.h == null ? planH(it.pts[0]) : null;
-  return `<label class="phin">Ontwerphoogte (cm t.o.v. 0-peil)<input data-act="ph" type="text" inputmode="decimal" autocomplete="off" value="${v}" placeholder="${ph != null ? "uit plan: " + (ph > 0 ? "+" : ph < 0 ? "−" : "") + cmTxt(ph) : "bijv. -5"}"></label>`;
+  return `<label class="phin">Soort<select data-act="soort">${Object.entries(SOORT).map(([k, o]) => `<option value="${k}"${(it.soort || "punt") === k ? " selected" : ""}>${o.l}</option>`).join("")}</select></label><label class="phin">Ontwerphoogte (cm t.o.v. 0-peil)<input data-act="ph" type="text" inputmode="decimal" autocomplete="off" value="${v}" placeholder="${ph != null ? "uit plan: " + (ph > 0 ? "+" : ph < 0 ? "−" : "") + cmTxt(ph) : "bijv. -5"}"></label>`;
 }
 // Dubbel-afschotlaser: de vlakken van het huidige afschot, als helling (fractie) langs het scherm (x rechts, y omlaag)
 function lzVlakken() {
@@ -3536,7 +3573,7 @@ function lzVlakken() {
     if (R && R.s != null) { const L = Math.hypot(R.q.x - R.p.x, R.q.y - R.p.y) || 1; out.push({ naam: "Vlak tussen de lijnen", gx: R.s * (R.q.x - R.p.x) / L, gy: R.s * (R.q.y - R.p.y) / L, scheef: !R.par }); }
   } else if (A.mode === "plan") {
     const T = planTin();
-    if (T) T.groups.forEach((G, i) => { const pts = [...G.pts]; out.push({ naam: `Vlak ${i + 1}`, gx: G.gx, gy: G.gy, pts, ref: pts.slice().sort((p, q) => q.h - p.h)[0] }); });
+    if (T) T.groups.forEach((G, i) => { const pts = [...G.pts]; out.push({ naam: `Vlak ${i + 1}`, gx: G.gx, gy: G.gy, pts, ref: pts.find(q => q.it.soort === "nul") || pts.slice().sort((p, q) => q.h - p.h)[0] }); });
   }
   return out;
 }
@@ -3565,13 +3602,19 @@ function lzRender() {
   out.innerHTML = html;
 }
 // Uitzetpunten: hoogte vanaf het nulpunt (rond), als schuin vlak (X/Y) of tussen twee lijnen
-function afpOn() { const A = st.afp; return !!(A && A.mode && A.mode !== "uit" && st.mmPerPx && (st.origin || A.mode === "lijnen" || A.mode === "plan")); }
+function afpOn() { const A = st.afp; return !!(A && A.mode && A.mode !== "uit" && st.mmPerPx && (st.origin || A.mode === "lijnen" || A.mode === "plan" || (A.mode === "rond" && A.mid != null))); }
 function afpH(p) {
   if (!afpOn()) return null;
   if (st.afp.mode === "lijnen") return afpLijnenH(p);
   if (st.afp.mode === "plan") return planH(p);
-  const A = st.afp, h0 = A.h0 || 0, X = (p.x - st.origin.x) * st.mmPerPx / 1000, Y = (st.origin.y - p.y) * st.mmPerPx / 1000;
-  if (A.mode === "rond") { if (A.s == null || !Number.isFinite(A.s)) return null; return h0 + (A.laag ? 1 : -1) * A.s * Math.hypot(X, Y) * 1000; }
+  const A = st.afp, h0 = A.h0 || 0;
+  if (A.mode === "rond") {
+    const M = A.mid != null ? st.items.find(x => x.id === A.mid && x.type === "set") : null, c = M ? M.pts[0] : st.origin;
+    if (!c || A.s == null || !Number.isFinite(A.s)) return null;
+    return h0 + (A.laag ? 1 : -1) * A.s * d2(p, c) * st.mmPerPx;
+  }
+  if (!st.origin) return null;
+  const X = (p.x - st.origin.x) * st.mmPerPx / 1000, Y = (st.origin.y - p.y) * st.mmPerPx / 1000;
   const sx = Number.isFinite(A.sx) ? A.sx : 0, sy = Number.isFinite(A.sy) ? A.sy : 0;
   if (!sx && !sy) return null;
   return h0 + (A.dx || -1) * sx * X * 1000 + (A.dy || -1) * sy * Y * 1000;
@@ -3580,6 +3623,12 @@ function renderAfp() {
   const A = st.afp || {}, mode = A.mode || "uit";
   document.querySelectorAll("#afpMode [data-afm]").forEach(b => b.setAttribute("aria-pressed", b.dataset.afm === mode));
   $("afpBody").hidden = mode === "uit";
+  $("afpH0T").textContent = mode === "rond" ? "Hoogte bij het middelpunt (cm)" : "Hoogte bij het X/Y-nulpunt (cm)";
+  if (mode === "rond") {
+    const sets = st.items.filter(it => it.type === "set").sort((a, b) => (AFVOER.includes(b.soort) ? 1 : 0) - (AFVOER.includes(a.soort) ? 1 : 0));
+    $("afpMid").innerHTML = `<option value="">het X/Y-nulpunt${st.origin ? "" : " (nog niet gezet)"}</option>` + sets.map(it => `<option value="${it.id}"${it.id === A.mid ? " selected" : ""}>${st.items.indexOf(it) + 1} · ${esc(it.name)}</option>`).join("");
+  }
+  document.querySelectorAll("#planZet [data-zet]").forEach(b => b.setAttribute("aria-pressed", tool === "set" && planSoort === b.dataset.zet));
   $("afpRond").hidden = mode !== "rond"; $("afpVlak").hidden = mode !== "vlak"; $("afpLijnen").hidden = mode !== "lijnen"; $("afpPlan").hidden = mode !== "plan"; $("afpH0L").hidden = mode === "lijnen" || mode === "plan";
   if (mode === "plan") {
     const areas = st.items.filter(it => it.type === "area" && it.pts.length > 2);
@@ -3599,7 +3648,13 @@ function renderAfp() {
       const laag = T.P.filter(q => nb.get(q) && [...nb.get(q)].every(w => w.h > q.h));
       let t = `${T.P.length} punten met hoogte · ${tr.length} driehoeken in ${T.groups.length} ${T.groups.length === 1 ? "vlak" : "vlakken"} · afschot ${ss.length ? (Math.min(...ss) === Math.max(...ss) ? pctTxt(ss[0]) + "%" : `${pctTxt(Math.min(...ss))}% tot ${pctTxt(Math.max(...ss))}%`) : "–"}`;
       if (vl) t += `<br><span style="color:var(--warn)">${vl} ${vl === 1 ? "driehoek is" : "driehoeken zijn"} flauwer dan 0,2% (oranje pijl): daar blijft water staan.</span>`;
-      if (laag.length) t += `<br>Laagste punten, hier loopt het water naartoe: <b>${laag.map(q => `${st.items.indexOf(q.it) + 1} · ${esc(q.it.name)} (${fmtPeil(q.h)})`).join(", ")}</b>. Zit daar een put of kolk?`;
+      const nm = q => `${esc(q.it.name)} (${fmtPeil(q.h)})`;
+      const goed = laag.filter(q => AFVOER.includes(q.it.soort)), plas = laag.filter(q => !AFVOER.includes(q.it.soort));
+      const hoger = T.P.filter(q => AFVOER.includes(q.it.soort) && nb.get(q) && [...nb.get(q)].some(w => w.h < q.h));
+      if (goed.length) t += `<br><span style="color:var(--ok)">Water loopt naar: <b>${goed.map(nm).join(", ")}</b> ✓</span>`;
+      if (plas.length) t += `<br><span style="color:var(--warn)">Plas: <b>${plas.map(nm).join(", ")}</b> ${plas.length === 1 ? "ligt" : "liggen"} het laagst maar ${plas.length === 1 ? "is" : "zijn"} geen kolk, put of goot.</span>`;
+      if (hoger.length) t += `<br><span style="color:var(--warn)">${hoger.map(nm).join(", ")}: er ligt een punt naast dat lager is, dus niet al het water komt hier.</span>`;
+      if (!T.P.some(q => q.it.soort === "nul")) t += `<br><span class="hint">Tip: zet het 0-punt (deur, drempel) in het plan, dan stel je de laser daarop af.</span>`;
       if (A.raster) { const pxs = A.raster * 1000 / st.mmPerPx, xs = T.P.map(q => q.x), ys = T.P.map(q => q.y); if ((Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys)) / (pxs * pxs) > 2500) t += `<br><span style="color:var(--warn)">Raster te fijn voor dit plan: kies een grotere stap.</span>`; }
       const V = metAhn && A.nap0 != null ? planVolume() : null;
       if (V) t += `<br>T.o.v. het AHN-maaiveld (${nl(V.m2, 0)} m²): afgraven <b>${nl(V.af, 1)} m³</b> · ophogen <b>${nl(V.op, 1)} m³</b>${V.dek < 0.98 ? ` <span class="hint">(maaiveld op ${nl(V.dek * 100, 0)}%, rest met gemiddelde)</span>` : ""}`;
@@ -3640,8 +3695,9 @@ function renderAfp() {
   if (mode !== "uit") {
     if (!st.mmPerPx) info = "IJk eerst de tekening.";
     else if (mode === "lijnen" || mode === "plan") info = "";
-    else if (!st.origin) info = "Zet eerst een nulpunt met het gereedschap <b>Nulpunt</b>.";
-    else if (mode === "rond") info = A.s == null ? "Vul het afschot in." : bad(A.sTxt, A.s) || `${fmtAfschot(A.s)}: elke meter van het nulpunt af ${pctTxt(A.s)} cm ${A.laag ? "hoger" : "lager"}.`;
+    else if (mode === "rond" && A.mid == null && !st.origin) info = "Kies een middelpunt (bijv. een kolk: zet die eerst met <b>Uitzetmaat</b>).";
+    else if (mode === "rond") info = A.s == null ? "Vul het afschot in." : bad(A.sTxt, A.s) || `${fmtAfschot(A.s)}: elke meter van het middelpunt af ${pctTxt(A.s)} cm ${A.laag ? "hoger" : "lager"}.`;
+    else if (!st.origin) info = "Zet eerst het X/Y-nulpunt met het gereedschap <b>Nulpunt</b> (het punt waar je X en Y vanaf meet).";
     else info = bad(A.sxTxt, A.sx) || bad(A.syTxt, A.sy) || ((Number.isFinite(A.sx) && A.sx) || (Number.isFinite(A.sy) && A.sy) ? [Number.isFinite(A.sx) && A.sx ? `X: ${fmtAfschot(A.sx)}, ${(A.dx || -1) < 0 ? "daalt" : "stijgt"} naar rechts` : "", Number.isFinite(A.sy) && A.sy ? `Y: ${fmtAfschot(A.sy)}, ${(A.dy || -1) < 0 ? "daalt" : "stijgt"} naar boven` : ""].filter(Boolean).join("<br>") : "Vul het afschot in X en/of Y in.");
     if (afpOn() && !sets.length) info += "<br>Zet punten met <b>Uitzetmaat</b>; bij elk punt komt de hoogte te staan.";
   }
@@ -3665,6 +3721,12 @@ $("afpS").addEventListener("input", e => afpSet(A => { A.sTxt = e.target.value; 
 $("afpSx").addEventListener("input", e => afpSet(A => { A.sxTxt = e.target.value; A.sx = parseAfschot(e.target.value); }));
 $("afpSy").addEventListener("input", e => afpSet(A => { A.syTxt = e.target.value; A.sy = parseAfschot(e.target.value); }));
 $("afpDx").addEventListener("change", e => afpSet(A => { A.dx = +e.target.value; }));
+$("afpMid").addEventListener("change", e => afpSet(A => { A.mid = e.target.value ? +e.target.value : null; }));
+$("planZet").addEventListener("click", e => {
+  const b = e.target.closest("[data-zet]"); if (!b) return;
+  setTool("set"); planSoort = b.dataset.zet; renderAll();
+  if (window.matchMedia("(max-width: 900px)").matches) $("view").scrollIntoView({ behavior: "smooth", block: "center" });
+});
 $("afpGrens").addEventListener("change", e => afpSet(A => { A.grens = e.target.value ? +e.target.value : null; }));
 $("afpPijl").addEventListener("change", e => afpSet(A => { A.pijl = e.target.checked; }));
 $("afpRaster").addEventListener("change", e => afpSet(A => { A.raster = +e.target.value; }));
