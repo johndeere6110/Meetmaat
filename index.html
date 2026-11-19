@@ -515,6 +515,16 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
           <span class="hint" id="calerr" style="color:var(--warn)"></span>
           <div class="btns"><button type="submit">IJken</button><button type="button" class="ghost" id="calcancel">Annuleren</button></div>
         </form>
+        <form class="calibbox" id="phbox" hidden>
+          <strong id="phttl">Hoogte</strong>
+          <label for="phv">Hoogte t.o.v. 0
+            <div class="unit"><input id="phv" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 8"><span>cm</span></div>
+          </label>
+          <div class="seg ppsign" id="phSign" role="group" aria-label="Onder of boven 0">
+            <button type="button" data-s="-1">− onder 0</button><button type="button" data-s="1">+ boven 0</button>
+          </div>
+          <div class="btns"><button type="submit">Opslaan</button><button type="button" class="ghost" id="phlater">Later</button></div>
+        </form>
         <form class="calibbox" id="peilbox" hidden>
           <strong id="peilttl">Peilmaat</strong>
           <label for="peilv">Diepte onder 0-peil
@@ -694,7 +704,7 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
             <div class="afres" id="afpLRes"></div>
           </div>
           <div id="afpPlan" class="sand">
-            <p class="hint" style="margin:0">Zet het <b>0-punt</b> (deur, drempel: krijgt vanzelf hoogte 0), de <b>kolken, putten en goten</b> en de <b>hoeken</b> met de knoppen hieronder, en geef ze in <b>Metingen</b> een <b>ontwerphoogte</b> (cm t.o.v. 0). De app verbindt ze tot driehoeken; per driehoek zie je het afschot en waar het water heen loopt. Punten zonder hoogte krijgen hun hoogte uit het plan.</p>
+            <p class="hint" style="margin:0">Zet het <b>0-punt</b> (deur, drempel: krijgt vanzelf hoogte 0), de <b>kolken, putten en goten</b> en de <b>hoeken</b> met de knoppen hieronder; na elk punt vul je meteen in hoeveel het onder (of boven) 0 ligt. Aanpassen kan later in <b>Metingen</b>. De app verbindt ze tot driehoeken; per driehoek zie je het afschot en waar het water heen loopt. Punten zonder hoogte krijgen hun hoogte uit het plan.</p>
             <div class="btns" id="planZet"><span class="hint" style="width:100%">Punt zetten (tik daarna op de tekening):</span><button type="button" class="ghost" data-zet="nul">0-punt</button><button type="button" class="ghost" data-zet="kolk">Kolk</button><button type="button" class="ghost" data-zet="put">Put</button><button type="button" class="ghost" data-zet="goot">Goot</button><button type="button" class="ghost" data-zet="rand">Hoek/rand</button><button type="button" class="ghost" data-zet="punt">Punt</button></div>
             <label for="afpGrens">Begrenzing<select id="afpGrens"></select></label>
             <label class="chk"><input type="checkbox" id="afpPijl"> Pijlen met afschot op de tekening</label>
@@ -2193,7 +2203,7 @@ function updateHint() {
   const v = vzActive() && VZ_HINTS[tool] ? VZ_HINTS[tool] : HINTS[tool];
   let t = Array.isArray(v) ? v[Math.min(draft.length, v.length - 1)] : v;
   if (loepOn() && !(tool === "calib" && draft.length >= 2)) t += " Houd je vinger vast voor een loep.";
-  if (tool === "set" && isPlan()) t = planSoort && planSoort !== "punt" ? `Tik op de tekening waar ${planSoort === "nul" ? "het 0-punt" : "de " + SOORT[planSoort].n.toLowerCase()} komt. Hoogte geef je in Metingen.` : "Tik de hoogtepunten van je afschotplan aan; geef ze in Metingen een ontwerphoogte.";
+  if (tool === "set" && isPlan()) t = planSoort && planSoort !== "punt" ? `Tik op de tekening waar ${planSoort === "nul" ? "het 0-punt" : "de " + SOORT[planSoort].n.toLowerCase()} komt; daarna vul je meteen de hoogte in.` : "Tik de hoogtepunten van je afschotplan aan; daarna vul je meteen de hoogte in.";
   else if (tool === "set" && !st.origin) t = "Zet eerst een nulpunt met het gereedschap Nulpunt.";
   if (MEASURE_TOOLS.includes(tool) && !st.mmPerPx) t += " Let op: nog niet geijkt, maten staan in pixels.";
   if (tool === "set") t = t.replace(/\bpaal\b/g, rk().ev);
@@ -2298,7 +2308,15 @@ function renderTotals() {
   el.hidden = false;
   el.innerHTML = `<div class="tth">Totalen per groep</div>` + G.map(g => `<div class="tt"><span class="ttn">${esc(g.name)}</span><span class="ttc">${g.n} meting${g.n === 1 ? "" : "en"}</span><span class="ttv">${[g.na ? fmtArea(g.a) : "", g.nl ? fmtLen(g.l) : ""].filter(Boolean).join(" · ")}</span></div>`).join("");
 }
-function renderAll() { drawOverlay(); renderList(); renderTotals(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); renderAfp(); renderAhn(); updateHint(); renderTools(); renderSums(); }
+// Onderdelen die bij deze tekening weinig doen (geen palen; ijking van een luchtfoto) onderaan in het zijpaneel
+const SIDE = document.querySelector("aside.side"), SIDE_ORDER = [...SIDE.children];
+function sideOrder() {
+  const lucht = !!(st.calib && st.calib.lucht);
+  const onder = el => (el.dataset.sec === "cal" && lucht) || (el.dataset.sec === "pal" && img.w && !piles.length);
+  const want = [...SIDE_ORDER.filter(e => !onder(e)), ...SIDE_ORDER.filter(onder)];
+  if (want.some((e, i) => SIDE.children[i] !== e)) want.forEach(e => SIDE.appendChild(e));
+}
+function renderAll() { sideOrder(); drawOverlay(); renderList(); renderTotals(); renderCal(); renderPileInfo(); renderSand(); renderPeil(); renderAfp(); renderAhn(); updateHint(); renderTools(); renderSums(); }
 // Korte stand per onderdeel in de kop, zodat je het niet hoeft open te klappen
 function renderSums() {
   const set = (k, t, warn) => { const e = $("sum-" + k); if (e) { e.textContent = t; e.classList.toggle("warn", !!warn); } };
@@ -2440,7 +2458,7 @@ $("ppList").addEventListener("click", e => {
 /* ---------- Acties ---------- */
 function setTool(t) {
   planSoort = null;
-  tool = t; draft = []; hover = null; $("calibbox").hidden = true; $("peilbox").hidden = true; peilCur = null;
+  tool = t; draft = []; hover = null; $("calibbox").hidden = true; $("peilbox").hidden = true; $("phbox").hidden = true; peilCur = null;
   vzUpdate();
   renderAll();
 }
@@ -2455,6 +2473,7 @@ function addItem(type, pts) {
   st.items.push(it);
   sel = it.id; draft = []; hover = null; vzUpdate();
   save(); renderAll();
+  if (type === "set" && isPlan() && it.h == null) phOpen(it);
 }
 function finish() {
   if (tool === "poly" && draft.length >= 2) addItem("poly", draft);
@@ -3557,6 +3576,36 @@ function planVolume() {
   planVolume.c = { sig, r };
   return r;
 }
+// Hoogte invullen meteen na het zetten van een hoogtepunt
+let phCur = null, phS = -1;
+const phLaatst = {};
+function phOpen(it) {
+  phCur = it.id;
+  const sr = it.soort || "punt", vorig = phLaatst[sr];
+  phS = vorig != null ? (vorig > 0 ? 1 : -1) : (sr === "punt" ? (phLaatst._s || -1) : -1);
+  $("phttl").textContent = it.name;
+  $("phv").value = vorig != null ? nl(Math.abs(vorig) / 10, (Math.abs(vorig) / 10) % 1 ? 1 : 0) : "";
+  document.querySelectorAll("#phSign [data-s]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.s === phS));
+  $("phbox").hidden = false;
+  $("phv").focus(); $("phv").select();
+}
+function phClose() { $("phbox").hidden = true; phCur = null; }
+$("phSign").addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (!b) return; phS = +b.dataset.s; document.querySelectorAll("#phSign [data-s]").forEach(x => x.setAttribute("aria-pressed", +x.dataset.s === phS)); $("phv").focus(); });
+$("phbox").addEventListener("submit", e => {
+  e.preventDefault();
+  const it = st.items.find(x => x.id === phCur), t = $("phv").value.trim();
+  if (it && t) {
+    const n = numIn(t);
+    if (n == null || isNaN(n)) { flashHint("Vul de hoogte in cm in, bijv. 8."); return; }
+    it.h = /^[-+−]/.test(t) ? n : phS * Math.abs(n);
+    phLaatst[it.soort || "punt"] = it.h; phLaatst._s = it.h > 0 ? 1 : -1;
+    save(); renderAll(); planChanged();
+    toast(`${it.name}: ${fmtPeil(it.h)}`);
+  }
+  phClose();
+});
+$("phlater").addEventListener("click", phClose);
+$("phv").addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); phClose(); } });
 function planCard(it) {
   if (!(st.afp && st.afp.mode === "plan")) return "";
   const v = it.h == null ? "" : nl(it.h / 10, (it.h / 10) % 1 ? 1 : 0), ph = it.h == null ? planH(it.pts[0]) : null;
