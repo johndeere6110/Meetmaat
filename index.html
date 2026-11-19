@@ -490,6 +490,7 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
           <span class="tmh">Nieuwe tekening</span>
           <label class="mi filebtn">PDF of foto openen<small>ook een .meetmaat-bestand</small><input id="file" type="file" aria-label="PDF of foto openen"></label>
           <button type="button" class="mi" id="luchtBtn">Luchtfoto ophalen<small>adres of je locatie, meteen op schaal</small></button>
+          <button type="button" class="mi" id="luchtBijBtn" hidden>Deze luchtfoto bijschuiven of draaien<small>zelfde plek, metingen gaan mee</small></button>
           <button type="button" class="mi" id="leegBtn">Leeg vel op schaal<small>zonder tekening, met een raster</small></button>
           <span class="tmf">Je huidige tekening blijft bewaard: open hetzelfde bestand later weer, dan staan je metingen er nog.</span>
         </div>
@@ -2190,7 +2191,7 @@ function renderCal() {
     const ga = st.geo && st.geo.a ? st.geo.a * 180 / Math.PI : 0;
     c.innerHTML = `<span class="big">Op schaal via de luchtfoto</span><span>${ga ? `${nl(Math.abs(ga), 2)}° ${ga > 0 ? "rechtsom" : "linksom"} gedraaid · ` : "Noord boven · "}1 pixel = ${nl(st.mmPerPx / 10, 1)} cm · nauwkeurigheid ±${fmtMM(Math.max(st.mmPerPx, 10))} per punt (plus hoe de foto zelf ligt)</span>
       <span class="hint">De luchtfoto van PDOK heeft een vaste schaal, ijken is niet nodig. Daken en hoge dingen kunnen iets scheef staan; meet op de grond.</span>
-      <div class="btns"><button type="button" class="ghost" data-cal="clear">IJking verwijderen</button></div>`;
+      <div class="btns"><button type="button" class="ghost" data-cal="lucht">Bijschuiven of draaien</button><button type="button" class="ghost" data-cal="clear">IJking verwijderen</button></div>`;
     return;
   }
   c.innerHTML = `<span class="big">${sc ? `Geijkt op schaal 1:${sc}` : st.calib && st.calib.auto ? `Automatisch geijkt op ${st.calib.n} maatlijnen` : `IJkmaat ${st.calib ? fmtMM(st.calib.mm) : "–"}`}</span>
@@ -2863,6 +2864,7 @@ $("calinfo").addEventListener("click", e => {
     toast(lastAuto.scale ? `Geijkt op schaal 1:${lastAuto.scale}` : `Automatisch geijkt op ${lastAuto.n} maatlijnen`);
     return;
   }
+  if (b.dataset.cal === "lucht") { luchtDialog(true); return; }
   if (b.dataset.cal === "clear") {
     if (!calArmed) { b.textContent = "Zeker? Tik nogmaals"; calArmed = setTimeout(() => { calArmed = null; renderCal(); }, 3000); return; }
     clearTimeout(calArmed); calArmed = null;
@@ -3261,23 +3263,31 @@ $("luchtRecht").addEventListener("click", e => {
 });
 // Staat er al een luchtfoto open, dan begint het venster op die plek (om bij te schuiven)
 const luchtCur = () => st.geo && st.geo.crs === "EPSG:28992" && img.w ? st.geo : null;
-$("luchtBtn").addEventListener("click", () => {
+// Luchtfoto-venster: "nieuw" = nieuwe luchtfoto (ergens anders), "bij" = de open luchtfoto bijschuiven/draaien
+function luchtDialog(bij) {
   const d = $("luchtDlg"); try { d.showModal(); } catch (e) { d.setAttribute("open", ""); }
-  const g = luchtCur();
+  const g = bij ? luchtCur() : null;
+  $("luchtTitle").textContent = g ? "Luchtfoto bijschuiven of draaien" : "Nieuwe luchtfoto";
   $("luchtMeeL").hidden = !(g && (st.items.length || st.pp.length || st.origin));
-  luchtRechtKnoppen();
-  if (g) {
+  $("luchtMsg").textContent = "";
+  if (g) luchtRechtKnoppen(); else { $("luchtRechtBox").hidden = true; luchtLines = []; luchtLineSel = null; }
+  if (!g) {
+    luchtPlek = null; luchtSetPlek(null); luchtSetHoek(0);
+    $("luchtQ").value = ""; $("luchtRes").innerHTML = "";
+    setTimeout(() => $("luchtQ").focus(), 50);
+    return;
+  }
+  {
     const G = geoNorm(g, img.w, img.h), wm = img.w * G.s;
     const opts = [...$("luchtSize").options].map(o => +o.value);
     $("luchtSize").value = String(opts.reduce((a, b) => Math.abs(b - wm) < Math.abs(a - wm) ? b : a));
     luchtSetHoek(G.a * 180 / Math.PI);
     luchtSetPlek({ x: G.cx, y: G.cy, naam: (st.title || "open luchtfoto").replace(/^Luchtfoto /, "") });
     $("luchtMsg").textContent = "Dit is de open luchtfoto. Schuif of draai hem bij en tik op Luchtfoto openen.";
-  } else {
-    if (luchtPlek) luchtPreview();
-    setTimeout(() => $("luchtQ").focus(), 50);
   }
-});
+}
+$("luchtBtn").addEventListener("click", () => luchtDialog(false));
+$("luchtBijBtn").addEventListener("click", () => { tekMenu(false); luchtDialog(true); });
 $("luchtClose").addEventListener("click", () => $("luchtDlg").close());
 async function luchtZoek() {
   const q = $("luchtQ").value.trim(); if (!q) return;
@@ -4356,7 +4366,7 @@ async function openFile(f, fromStore) {
 }
 // Menu "Tekening": nieuwe tekening uit een bestand, luchtfoto of leeg vel
 function tekMenu(open) { $("tekMenu").hidden = !open; $("tekBtn").setAttribute("aria-expanded", open); }
-$("tekBtn").addEventListener("click", e => { e.stopPropagation(); tekMenu($("tekMenu").hidden); });
+$("tekBtn").addEventListener("click", e => { e.stopPropagation(); $("luchtBijBtn").hidden = !luchtCur(); tekMenu($("tekMenu").hidden); });
 document.addEventListener("click", e => { if (!$("tekMenu").hidden && !e.target.closest(".tekwrap")) tekMenu(false); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("tekMenu").hidden) tekMenu(false); });
 $("file").addEventListener("change", () => tekMenu(false));
