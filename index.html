@@ -3779,7 +3779,7 @@ function lzVlakken() {
   } else if (A.mode === "plan") {
     const T = planTin();
     const LG = T ? planLaser() : null;
-    if (LG) LG.forEach(g => out.push({ naam: g.naam, gx: g.gx, gy: g.gy, pts: g.pts, ref: g.ref, dev: planMerge() > 0 ? g.dev : null, vlakken: planMerge() > 0 ? g.vlakken : null }));
+    if (LG) LG.forEach(g => out.push({ naam: g.naam, gx: g.gx, gy: g.gy, pts: g.pts, ref: g.ref, tris: g.tris, dev: planMerge() > 0 ? g.dev : null, vlakken: planMerge() > 0 ? g.vlakken : null }));
   }
   return out;
 }
@@ -3854,6 +3854,39 @@ function lzZet(p, naam) {
   save(); renderAll();
   toast(`${naam} gezet en gekozen als laserplek. Richt nu de X-as (of maak een richtpunt).`);
 }
+// Beste draaiing: één richting voor de X-as waarbij de vlakken samen zo weinig mogelijk "dubbel afschot" nodig hebben
+function lzGewicht(v) {
+  if (!v.tris || !v.tris.length) return 1;
+  return v.tris.reduce((s0, t) => s0 + Math.abs((t.b.x - t.a.x) * (t.c.y - t.a.y) - (t.c.x - t.a.x) * (t.b.y - t.a.y)) / 2, 0) || 1;
+}
+const lzKosten = (V, ux, uy) => V.reduce((s0, v) => { const X = v.gx * ux + v.gy * uy, Y = -v.gx * uy + v.gy * ux; return s0 + v.w * Math.min(Math.abs(X), Math.abs(Y)); }, 0);
+const lzEnkel = (V, ux, uy) => V.filter(v => { const X = v.gx * ux + v.gy * uy, Y = -v.gx * uy + v.gy * ux; return Math.min(Math.abs(X), Math.abs(Y)) < 0.0005; }).length;
+function lzBesteDraai(V0) {
+  const V = V0.filter(v => Math.hypot(v.gx, v.gy) > 1e-5).map(v => Object.assign({ w: lzGewicht(v) }, v));
+  if (!V.length) return null;
+  let best = null;
+  for (let a = 0; a < 90; a += 0.25) { const r = a * Math.PI / 180, c = lzKosten(V, Math.cos(r), Math.sin(r)); if (!best || c < best.c) best = { a: r, c }; }
+  // fijn bijstellen
+  for (let d = -0.25; d <= 0.25; d += 0.01) { const r = best.a + d * Math.PI / 180, c = lzKosten(V, Math.cos(r), Math.sin(r)); if (c < best.c) best = { a: r, c }; }
+  // van de 4 haakse standen: die waarbij het grootste vlak langs X naar beneden loopt
+  const groot = V.slice().sort((p, q) => q.w - p.w)[0];
+  let keuze = null;
+  for (let k = 0; k < 4; k++) {
+    const r = best.a + k * Math.PI / 2, ux = Math.cos(r), uy = Math.sin(r), X = groot.gx * ux + groot.gy * uy, Y = -groot.gx * uy + groot.gy * ux;
+    const sc = (Math.abs(X) >= Math.abs(Y) ? 2 : 0) + (X < 0 ? 1 : 0);
+    if (!keuze || sc > keuze.sc) keuze = { ux, uy, sc };
+  }
+  return { ux: keuze.ux, uy: keuze.uy, enkel: lzEnkel(V, keuze.ux, keuze.uy), n: V.length, V };
+}
+// Afronden op 0,05% en hoeveel het vlak dan hooguit afwijkt van het ontwerp (gerekend vanaf het afstelpunt)
+function lzRond(v, X, Y, u) {
+  const st5 = 0.0005, Xr = Math.round(X / st5) * st5, Yr = Math.round(Y / st5) * st5;
+  if (Math.abs(Xr - X) < 1e-7 && Math.abs(Yr - Y) < 1e-7) return null;
+  const ref = v.ref || (v.pts && v.pts[0]), m = st.mmPerPx / 1000;
+  let dev = 0;
+  if (ref && v.pts) v.pts.forEach(q => { const dx = (q.x - ref.x) * m, dy = (q.y - ref.y) * m, du = dx * u.x + dy * u.y, dv = -dx * u.y + dy * u.x; dev = Math.max(dev, Math.abs((Xr - X) * du + (Yr - Y) * dv) * 1000); });
+  return { Xr, Yr, dev: v.pts ? dev : null };
+}
 function lzRender() {
   const A = st.afp || {}, box = $("afpLaser"), on = ["vlak", "lijnen", "plan"].includes(A.mode);
   box.hidden = !on; if (!on) return;
@@ -3874,6 +3907,13 @@ function lzRender() {
     plek += `<br><span class="hint">De app weet niet waar auto's, containers of hekken staan: check of je vanaf die plek overal zicht hebt.</span></div>`;
   }
   const sg = v => (v > 0.00005 ? "+" : v < -0.00005 ? "−" : "") + pctTxt(v) + "%";
+  const BD = lzBesteDraai(V);
+  if (BD && BD.n > 0) {
+    const nu = D.u ? lzEnkel(BD.V, D.u.x, D.u.y) : null;
+    plek += `<div class="lzv"><b>Beste draaiing</b> (één richting voor alles)<br>Zo gericht hebben <b>${BD.enkel} van de ${BD.n}</b> ${BD.n === 1 ? "vlak" : "vlakken"} maar één afschot (X of Y op 0)${nu != null ? `; nu ${nu} van de ${BD.n}` : ""}.`
+      + (D.S ? ` <button type="button" class="ghost lzbest" data-lzdraai="1">Richtpunt in die richting</button>` : `<br><span class="hint">Zet eerst de laser, dan maakt hij een richtpunt in die richting.</span>`)
+      + (BD.enkel < BD.n ? `<br><span class="hint">Omdat niet alles evenwijdig is, kan niet elk vlak met één afschot; de grote vlakken tellen het zwaarst.</span>` : "") + `</div>`;
+  }
   let html = plek + (!D.S ? `<span class="hint">Kies eerst waar de laser staat, of zet hem met "Laser hier zetten".</span>` : D.fout ? `<span>${D.fout}</span>` : !D.u ? `<span class="hint">Kies waar je de X-as op richt (een punt, of langs een lijn zoals een gevel of goot), of maak hieronder een richtpunt langs het afschot.</span>`
     : `<span>Laser op <b>${esc(D.S.name)}</b>, X-as gericht <b>${esc(D.naam)}</b>${D.L ? ` (${nl(D.L * st.mmPerPx / 1000, 2)} m)` : ""}.</span>`);
   let teSteil = false, enkel = 0;
@@ -3885,6 +3925,8 @@ function lzRender() {
       const X = v.gx * D.u.x + v.gy * D.u.y, Y = v.gx * -D.u.y + v.gy * D.u.x;
       if (Math.abs(X) > 0.1 || Math.abs(Y) > 0.1) teSteil = true;
       html += `<br>X-as <b>${sg(X)}</b> · Y-as <b>${sg(Y)}</b>`;
+      const R = lzRond(v, X, Y, D.u);
+      if (R) html += `<br><span${R.dev != null && R.dev > 10 ? ' style="color:var(--warn)"' : ' class="hint"'}>Afgerond: X ${sg(R.Xr)} · Y ${sg(R.Yr)}${R.dev != null ? ` (hooguit ${nl(R.dev / 10, 1)} cm anders)` : ""}</span>`;
     }
     if (sl > 1e-5) {
       const fx = -v.gx / sl, fy = -v.gy / sl;                    // richting waarin het water loopt
@@ -3910,6 +3952,11 @@ function lzRender() {
 $("lzRes").addEventListener("click", e => {
   const w = e.target.closest("[data-lzw]");
   if (w) { afpSet(A => { A.lzWaar = w.dataset.lzw; }); return; }
+  if (e.target.closest("[data-lzdraai]")) {
+    const D = lzRichting(), BD = lzBesteDraai(lzVlakken());
+    if (D.S && BD) maakRichtpunt(D.S, BD.ux, BD.uy, "Richtpunt (beste draaiing)", "in de beste richting");
+    return;
+  }
   const pl = e.target.closest("[data-lzplek]");
   if (pl) {
     const PL = lzPlekken(); if (!PL) return;
@@ -3920,17 +3967,22 @@ $("lzRes").addEventListener("click", e => {
   const b = e.target.closest("[data-lzbest]"); if (!b) return;
   const v = lzVlakken()[+b.dataset.lzbest], D = lzRichting(); if (!v || !D.S) return;
   const sl = Math.hypot(v.gx, v.gy); if (sl < 1e-5) return;
-  const a = D.S.pts[0], m = 1000 / st.mmPerPx;
+  maakRichtpunt(D.S, -v.gx / sl, -v.gy / sl, `Richtpunt ${v.naam === "Schuin vlak" || v.naam === "Vlak tussen de lijnen" ? "" : v.naam}`.trim(), "langs het afschot");
+});
+// Richtpunt op 20 m van de laser in een richting (korter, of de andere kant op, als dat buiten de tekening valt); bestaand punt met dezelfde naam wordt verplaatst
+function maakRichtpunt(S, ux, uy, naam, waarlangs) {
+  const a = S.pts[0], m = 1000 / st.mmPerPx;
   const ruimte = (ux, uy) => { let t = Infinity; if (ux > 0) t = Math.min(t, (img.w - a.x) / ux); if (ux < 0) t = Math.min(t, -a.x / ux); if (uy > 0) t = Math.min(t, (img.h - a.y) / uy); if (uy < 0) t = Math.min(t, -a.y / uy); return t * 0.95; };
-  let ux = -v.gx / sl, uy = -v.gy / sl, L = Math.min(20 * m, ruimte(ux, uy)), omhoog = false;
+  let L = Math.min(20 * m, ruimte(ux, uy)), omhoog = false;
   if (L < 5 * m) { const L2 = Math.min(20 * m, ruimte(-ux, -uy)); if (L2 > L) { ux = -ux; uy = -uy; L = L2; omhoog = true; } }
   if (!(L > 0.5 * m)) { toast("Er is geen ruimte op de tekening voor een richtpunt in die richting."); return; }
-  const it = { id: st.seq++, type: "set", soort: "richt", pts: [{ x: a.x + ux * L, y: a.y + uy * L }], name: `Richtpunt ${v.naam === "Schuin vlak" || v.naam === "Vlak tussen de lijnen" ? "" : v.naam}`.trim() };
-  st.items.push(it);
+  let it = st.items.find(x => x.type === "set" && x.soort === "richt" && x.name === naam);
+  if (it) it.pts = [{ x: a.x + ux * L, y: a.y + uy * L }];
+  else { it = { id: st.seq++, type: "set", soort: "richt", pts: [{ x: a.x + ux * L, y: a.y + uy * L }], name: naam }; st.items.push(it); }
   st.afp.lzR = it.id;
   save(); renderAll();
-  toast(`${it.name}: ${nl(L / m, 1)} m van de laser, ${omhoog ? "omhoog" : "omlaag"} langs het afschot. Zet hem uit en richt de X-as erop.`);
-});
+  toast(`${it.name}: ${nl(L / m, 1)} m van de laser${omhoog ? ", andere kant op (geen ruimte)" : ""}, ${waarlangs}. Zet hem uit en richt de X-as erop.`);
+}
 // Uitzetpunten: hoogte vanaf het nulpunt (rond), als schuin vlak (X/Y) of tussen twee lijnen
 function afpOn() { const A = st.afp; return !!(A && A.mode && A.mode !== "uit" && st.mmPerPx && (st.origin || A.mode === "lijnen" || A.mode === "plan" || (A.mode === "rond" && A.mid != null))); }
 function afpH(p) {
