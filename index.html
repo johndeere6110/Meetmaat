@@ -355,6 +355,7 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
 #ov .plz { stroke: #0b4f8a; stroke-width: calc(12px * var(--k)); opacity: .3; pointer-events: none; }
 #ov .plz.nul { stroke: #2e7d32; }
 #ov .sym.rp { stroke: #6a1b9a; fill: none; }
+#ov .sym.lzc { fill: #6a1b9a; }
 button.lzbest { padding: 4px 10px; font-size: 12.5px; margin-top: 4px; }
 .lzv { border-top: 1px solid var(--line); padding-top: 6px; margin-top: 4px; }
 .phin { display: grid; gap: 3px; font-size: 12.5px; font-weight: 500; margin-top: 6px; }
@@ -2002,10 +2003,10 @@ function drawOverlay() {
       const pp = nearestPile(p);
       if (pp && d2(p, pp) > 0.5) s += `<path class="plink" d="M${pp.x} ${pp.y}H${p.x}V${p.y}"/>`;
       s += `<path class="halo dot${on ? " on" : ""}" d="M${p.x} ${p.y}h0.01"/>`;
-      s += (isPlan() || it.soort === "richt") && it.soort ? soortSym(it.soort, p, k) : `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/>`;
+      s += (isPlan() || it.soort === "richt" || it.soort === "laser") && it.soort ? soortSym(it.soort, p, k) : `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/>`;
       s += `<circle class="hit" data-sel="${it.id}" cx="${p.x}" cy="${p.y}" r="${14 * k}" style="cursor:pointer"/>`;
       labs.push({ x: p.x + 10 * k, y: p.y - 10 * k, n, t: d.short, anc: "start" });
-      const plan = st.afp && st.afp.mode === "plan", ah = it.soort === "richt" ? null : plan && it.h != null ? it.h : afpH(p);
+      const plan = st.afp && st.afp.mode === "plan", ah = it.soort === "richt" || it.soort === "laser" ? null : plan && it.h != null ? it.h : afpH(p);
       if (ah != null) s += label(p.x + 10 * k * zm, p.y + 16 * k * zm, plan && it.h == null ? `(${fmtPeil(ah)})` : fmtPeil(ah), plan && it.h != null ? "afv" : "afh", "start");
     } else {
       const closed = it.type === "area";
@@ -3550,7 +3551,7 @@ function afpLijnenH(p) {
   return A.h1 + (A.h2 - A.h1) * t;
 }
 // Soorten hoogtepunten in het afschotplan
-const SOORT = { richt: { n: "Richtpunt", l: "Richtpunt (laser)" }, punt: { n: "Punt", l: "Punt" }, nul: { n: "0-punt", l: "0-punt (deur, drempel)" }, kolk: { n: "Kolk", l: "Kolk" }, put: { n: "Put", l: "Put" }, goot: { n: "Goot", l: "Goot" }, rand: { n: "Hoek", l: "Hoek / rand" } };
+const SOORT = { laser: { n: "Laser", l: "Laserplek" }, richt: { n: "Richtpunt", l: "Richtpunt (laser)" }, punt: { n: "Punt", l: "Punt" }, nul: { n: "0-punt", l: "0-punt (deur, drempel)" }, kolk: { n: "Kolk", l: "Kolk" }, put: { n: "Put", l: "Put" }, goot: { n: "Goot", l: "Goot" }, rand: { n: "Hoek", l: "Hoek / rand" } };
 const AFVOER = ["kolk", "put", "goot"];
 let planSoort = null, planLijn = null;
 const isPlan = () => !!(st.afp && st.afp.mode === "plan");
@@ -3560,11 +3561,12 @@ function soortSym(sr, p, k) {
   if (sr === "kolk") return `<rect class="sym" x="${p.x - r}" y="${p.y - r}" width="${2 * r}" height="${2 * r}"/><path class="sym" d="M${p.x - r} ${p.y}H${p.x + r}M${p.x} ${p.y - r}V${p.y + r}M${p.x - r} ${p.y - r / 2}H${p.x + r}M${p.x - r} ${p.y + r / 2}H${p.x + r}"/>`;
   if (sr === "put") return `<circle class="sym" cx="${p.x}" cy="${p.y}" r="${7 * k}"/><path class="sym" d="M${p.x - 5 * k} ${p.y - 5 * k}L${p.x + 5 * k} ${p.y + 5 * k}M${p.x + 5 * k} ${p.y - 5 * k}L${p.x - 5 * k} ${p.y + 5 * k}"/>`;
   if (sr === "goot") return `<rect class="sym goot" x="${p.x - 9 * k}" y="${p.y - 2.5 * k}" width="${18 * k}" height="${5 * k}"/>`;
+  if (sr === "laser") return `<path class="sym rp" d="M${p.x} ${p.y - 9 * k}L${p.x - 8 * k} ${p.y + 7 * k}M${p.x} ${p.y - 9 * k}L${p.x + 8 * k} ${p.y + 7 * k}M${p.x} ${p.y - 9 * k}V${p.y + 8 * k}"/><circle class="sym rp lzc" cx="${p.x}" cy="${p.y - 9 * k}" r="${3.5 * k}"/>`;
   if (sr === "richt") return `<circle class="sym rp" cx="${p.x}" cy="${p.y}" r="${7 * k}"/><path class="sym rp" d="M${p.x - 11 * k} ${p.y}H${p.x + 11 * k}M${p.x} ${p.y - 11 * k}V${p.y + 11 * k}"/>`;
   if (sr === "rand") return `<path class="sym" d="M${p.x} ${p.y - r}L${p.x + r} ${p.y}L${p.x} ${p.y + r}L${p.x - r} ${p.y}Z"/>`;
   return "";
 }
-const SOORT_NAAM = /^(Uitzetmaat|Punt|0-punt|Kolk|Put|Goot|Hoek|Richtpunt)( \d+)?$/;
+const SOORT_NAAM = /^(Uitzetmaat|Punt|0-punt|Kolk|Put|Goot|Hoek|Richtpunt|Laser)( \d+)?$/;
 function soortNaam(sr, skip) { const n = st.items.filter(x => x.type === "set" && x.soort === sr && x !== skip).length + 1; return SOORT[sr].n + (sr === "nul" && n === 1 ? "" : " " + n); }
 // Afschotplan: Delaunay-driehoeken tussen punten met een ontwerphoogte
 function delaunay(V0) {
@@ -3797,6 +3799,37 @@ function lzRichting() {
   const L = d2(R.pts[0], a);
   return { S, u: { x: (R.pts[0].x - a.x) / L, y: (R.pts[0].y - a.y) / L }, naam: `op ${R.name}`, rn: R.name, eind: R.pts[0], L };
 }
+// Beste laseropstelling: een plek op het plein vanwaar het verste punt zo dichtbij mogelijk is
+function lzPlek(pts, tris) {
+  const c = [];
+  tris.forEach(t => {
+    if (!t.in) return;
+    c.push({ x: t.cx, y: t.cy });
+    [[t.a, t.b], [t.b, t.c], [t.c, t.a]].forEach(([u, w]) => c.push({ x: ((u.x + w.x) / 2 + t.cx) / 2, y: ((u.y + w.y) / 2 + t.cy) / 2 }));
+    [t.a, t.b, t.c].forEach(u => c.push({ x: (u.x + t.cx * 2) / 3, y: (u.y + t.cy * 2) / 3 }));
+  });
+  let b = null;
+  for (const q of c) {
+    let mx = 0;
+    for (const v of pts) { const d = d2(q, v); if (d > mx) { mx = d; if (b && mx >= b.d) break; } }
+    if (!b || mx < b.d) b = { p: q, d: mx };
+  }
+  return b ? { p: b.p, d: b.d * st.mmPerPx / 1000 } : null;
+}
+function lzPlekken() {
+  const T = planTin(), LG = T && T.tris.length ? planLaser() : null;
+  if (!LG) return null;
+  return { alles: lzPlek(T.P, T.tris), per: LG.map(g => ({ g, b: lzPlek(g.pts, g.tris) })) };
+}
+function lzZet(p, naam) {
+  let it = st.items.find(x => x.type === "set" && x.soort === "laser" && x.name === naam);
+  if (it) it.pts = [{ x: p.x, y: p.y }];
+  else { it = { id: st.seq++, type: "set", soort: "laser", name: naam, pts: [{ x: p.x, y: p.y }] }; st.items.push(it); }
+  st.afp.lzS = it.id;
+  if (st.afp.lzR === it.id) st.afp.lzR = null;
+  save(); renderAll();
+  toast(`${naam} gezet en gekozen als laserplek. Richt nu de X-as (of maak een richtpunt).`);
+}
 function lzRender() {
   const A = st.afp || {}, box = $("afpLaser"), on = ["vlak", "lijnen", "plan"].includes(A.mode);
   box.hidden = !on; if (!on) return;
@@ -3807,14 +3840,21 @@ function lzRender() {
     + (lijnen.length ? `<optgroup label="Langs een lijn">${lijnen.map(it => `<option value="l:${it.id}"${"l:" + it.id === A.lzR ? " selected" : ""}>langs ${nr(it)} · ${esc(it.name)}</option>`).join("")}</optgroup>` : "");
   const out = $("lzRes"), V = lzVlakken(), D = lzRichting();
   if (!V.length) { out.innerHTML = ""; return; }
+  const PL = A.mode === "plan" ? lzPlekken() : null, ver = d => d > 100 ? ` <span style="color:var(--warn)">ver: hoe verder, hoe groter de fout (vaak ±1,5 mm per 30 m, dus ±5 mm op 100 m)</span>` : "";
+  let plek = "";
+  if (PL && PL.alles) {
+    plek = `<div class="lzv"><b>Beste opstelplek</b><br>Eén plek voor het hele plan: verste punt <b>${nl(PL.alles.d, 0)} m</b>.${ver(PL.alles.d)} <button type="button" class="ghost lzbest" data-lzplek="alles">Laser hier zetten</button>`;
+    if (PL.per.length > 1) plek += `<br><span class="hint">Vanaf daar zet je per laservlak alleen het afschot om; de laser hoeft niet te verhuizen. Liever per vlak verplaatsen? Zie de knop bij elk laservlak.</span>`;
+    plek += `<br><span class="hint">De app weet niet waar auto's, containers of hekken staan: check of je vanaf die plek overal zicht hebt.</span></div>`;
+  }
   const sg = v => (v > 0.00005 ? "+" : v < -0.00005 ? "−" : "") + pctTxt(v) + "%";
-  let html = !D.S ? `<span class="hint">Kies eerst waar de laser staat.</span>` : D.fout ? `<span>${D.fout}</span>` : !D.u ? `<span class="hint">Kies waar je de X-as op richt (een punt, of langs een lijn zoals een gevel of goot), of maak hieronder een richtpunt langs het afschot.</span>`
-    : `<span>Laser op <b>${esc(D.S.name)}</b>, X-as gericht <b>${esc(D.naam)}</b>${D.L ? ` (${nl(D.L * st.mmPerPx / 1000, 2)} m)` : ""}.</span>`;
+  let html = plek + (!D.S ? `<span class="hint">Kies eerst waar de laser staat, of zet hem met "Laser hier zetten".</span>` : D.fout ? `<span>${D.fout}</span>` : !D.u ? `<span class="hint">Kies waar je de X-as op richt (een punt, of langs een lijn zoals een gevel of goot), of maak hieronder een richtpunt langs het afschot.</span>`
+    : `<span>Laser op <b>${esc(D.S.name)}</b>, X-as gericht <b>${esc(D.naam)}</b>${D.L ? ` (${nl(D.L * st.mmPerPx / 1000, 2)} m)` : ""}.</span>`);
   let teSteil = false, enkel = 0;
   V.forEach((v, i) => {
     const sl = Math.hypot(v.gx, v.gy);
     if (D.u && sl > 1e-5) { const c = Math.abs(D.u.x * -v.gx / sl + D.u.y * -v.gy / sl); if (c > 0.9998 || c < 0.0175) enkel++; } else if (sl <= 1e-5) enkel++;
-    html += `<div class="lzv"><b>${esc(v.naam)}</b>${v.vlakken ? ` <span class="hint">(vlak ${v.vlakken.join(", ")})</span>` : v.pts ? ` <span class="hint">(${[...new Set(v.pts.map(q => q.it.name))].map(esc).join(", ")})</span>` : ""}${v.dev != null ? `<br><span class="hint">Grootste afwijking van het ontwerp: ${nl(v.dev / 10, 1)} cm</span>` : ""}${v.scheef ? ` <span style="color:var(--warn)">(lijnen niet evenwijdig: gemiddeld vlak)</span>` : ""}`;
+    html += `<div class="lzv"><b>${esc(v.naam)}</b>${v.vlakken ? (v.vlakken.length > 1 ? ` <span class="hint">(uit ${v.vlakken.length} stukjes)</span>` : "") : v.pts ? ` <span class="hint">(${[...new Set(v.pts.map(q => q.it.name))].map(esc).join(", ")})</span>` : ""}${v.dev != null ? `<br><span class="hint">Grootste afwijking van het ontwerp: ${nl(v.dev / 10, 1)} cm</span>` : ""}${v.scheef ? ` <span style="color:var(--warn)">(lijnen niet evenwijdig: gemiddeld vlak)</span>` : ""}`;
     if (D.u) {
       const X = v.gx * D.u.x + v.gy * D.u.y, Y = v.gx * -D.u.y + v.gy * D.u.x;
       if (Math.abs(X) > 0.1 || Math.abs(Y) > 0.1) teSteil = true;
@@ -3829,6 +3869,11 @@ function lzRender() {
       else html += `<br><span class="hint">Mooier: richt de X-as langs de pijl, dan X ${sg(-sl)} · Y 0% (één afschot instellen)${afw != null ? `. Nu sta je ${nl(afw, afw < 10 ? 1 : 0)}° ernaast` : ""}.</span>${D.S ? ` <button type="button" class="ghost lzbest" data-lzbest="${i}">Richtpunt maken</button>` : ""}`;
     } else html += `<br><span class="hint">Dit vlak is waterpas: X 0% · Y 0%.</span>`;
     if (v.ref) html += `<br><span class="hint">Ontvanger afstellen op ${esc(v.ref.it.name)} (ontwerp ${fmtPeil(v.ref.h)})</span>`;
+    const pv = PL && PL.per.length > 1 ? PL.per[i] : null;
+    if (pv && pv.b) {
+      const nu = D.S ? Math.max(...pv.g.pts.map(q => d2(D.S.pts[0], q))) * st.mmPerPx / 1000 : null;
+      html += `<br><span class="hint">Beste plek voor dit vlak: verste punt ${nl(pv.b.d, 0)} m${nu != null ? ` (vanaf ${esc(D.S.name)} nu ${nl(nu, 0)} m)` : ""}.</span> <button type="button" class="ghost lzbest" data-lzplek="${i}">Laser hier</button>`;
+    }
     html += `</div>`;
   });
   if (D.u && V.length > 1 && enkel === V.length) html += `<span style="color:var(--ok)">Handig: met deze richting heeft elk vlak maar één afschot (alleen X of alleen Y).</span>`;
@@ -3837,6 +3882,13 @@ function lzRender() {
 }
 // Richtpunt langs het afschot maken: 20 m van de laser (korter of de andere kant op als dat buiten de tekening valt)
 $("lzRes").addEventListener("click", e => {
+  const pl = e.target.closest("[data-lzplek]");
+  if (pl) {
+    const PL = lzPlekken(); if (!PL) return;
+    if (pl.dataset.lzplek === "alles") { if (PL.alles) lzZet(PL.alles.p, "Laser"); }
+    else { const x = PL.per[+pl.dataset.lzplek]; if (x && x.b) lzZet(x.b.p, `Laser ${x.g.lg}`); }
+    return;
+  }
   const b = e.target.closest("[data-lzbest]"); if (!b) return;
   const v = lzVlakken()[+b.dataset.lzbest], D = lzRichting(); if (!v || !D.S) return;
   const sl = Math.hypot(v.gx, v.gy); if (sl < 1e-5) return;
@@ -3958,7 +4010,7 @@ function renderAfp() {
   }
   $("afpInfo").innerHTML = info;
   $("afpList").innerHTML = afpOn() ? sets.map(it => {
-    if (it.soort === "richt") return "";
+    if (it.soort === "richt" || it.soort === "laser") return "";
     const p = it.pts[0], vast = mode === "plan" && it.h != null, h = vast ? it.h : afpH(p); if (h == null) return "";
     const X = st.origin ? (p.x - st.origin.x) * st.mmPerPx : 0, Y = st.origin ? (st.origin.y - p.y) * st.mmPerPx : 0;
     return `<li><div class="pph"><b>${st.items.indexOf(it) + 1} · ${esc(it.name)}</b><span class="ppv">${fmtPeil(h)}</span>${vast ? `<span class="ppm">ontwerp</span>` : mode === "plan" ? `<span class="ppm">uit plan</span>` : ""}</div>${st.origin ? `<span class="ppm">X ${sgn(X)}${fmtMM(Math.abs(X))} · Y ${sgn(Y)}${fmtMM(Math.abs(Y))} · ${nl(Math.hypot(X, Y) / 1000, 2)} m van het nulpunt</span>` : ""}</li>`;
