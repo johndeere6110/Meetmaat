@@ -3800,9 +3800,30 @@ function lzRichting() {
   return { S, u: { x: (R.pts[0].x - a.x) / L, y: (R.pts[0].y - a.y) / L }, naam: `op ${R.name}`, rn: R.name, eind: R.pts[0], L };
 }
 // Beste laseropstelling: een plek op het plein vanwaar het verste punt zo dichtbij mogelijk is
+// Plekken waar een laser niet in de weg staat: 1,5 m uit de gevel/goot (hoogtelijnen) en uit de rand van het plan, aan de pleinkant
+function lzRandKand() {
+  const T = planTin(); if (!T) return [];
+  if (lzRandKand.c && lzRandKand.c.sig === planTin.c.sig) return lzRandKand.c.r;
+  const m = 1000 / st.mmPerPx, off = 1.5 * m, r = [];
+  const langs = (a, b, n, wie, kant) => {
+    const L = d2(a, b); if (L < 1e-6) return;
+    const nx = -(b.y - a.y) / L, ny = (b.x - a.x) / L, stap = Math.max(1 * m, L / 400);
+    for (let d = stap / 2; d < L; d += stap) {
+      const x = a.x + (b.x - a.x) * d / L, y = a.y + (b.y - a.y) * d / L;
+      for (const sg of kant) { const q = { x: x + nx * off * sg, y: y + ny * off * sg }; if (planH(q) != null) r.push({ x: q.x, y: q.y, bij: wie }); }
+    }
+  };
+  st.items.filter(it => it.pl && it.pl.b != null).forEach(it => { for (let i = 1; i < it.pts.length; i++) langs(it.pts[i - 1], it.pts[i], 0, it.name, [1, -1]); });
+  // buitenrand van het plan
+  const ed = new Map(), kk = (u, w) => u.x < w.x || (u.x === w.x && u.y < w.y) ? [u.x, u.y, w.x, w.y].join() : [w.x, w.y, u.x, u.y].join();
+  T.tris.forEach(t => { if (!t.in) return; [[t.a, t.b], [t.b, t.c], [t.c, t.a]].forEach(([u, w]) => { const key = kk(u, w), e = ed.get(key); if (e) e.n++; else ed.set(key, { u, w, n: 1 }); }); });
+  ed.forEach(e => { if (e.n === 1 && !(e.u.lijn && e.w.lijn && e.u.it === e.w.it)) langs(e.u, e.w, 0, "de rand", [1, -1]); });
+  lzRandKand.c = { sig: planTin.c.sig, r };
+  return r;
+}
 function lzPlek(pts, tris) {
-  const c = [];
-  tris.forEach(t => {
+  const rand = (st.afp.lzWaar || "rand") === "rand", c = rand ? lzRandKand() : [];
+  if (!c.length) tris.forEach(t => {
     if (!t.in) return;
     c.push({ x: t.cx, y: t.cy });
     [[t.a, t.b], [t.b, t.c], [t.c, t.a]].forEach(([u, w]) => c.push({ x: ((u.x + w.x) / 2 + t.cx) / 2, y: ((u.y + w.y) / 2 + t.cy) / 2 }));
@@ -3814,7 +3835,7 @@ function lzPlek(pts, tris) {
     for (const v of pts) { const d = d2(q, v); if (d > mx) { mx = d; if (b && mx >= b.d) break; } }
     if (!b || mx < b.d) b = { p: q, d: mx };
   }
-  return b ? { p: b.p, d: b.d * st.mmPerPx / 1000 } : null;
+  return b ? { p: b.p, d: b.d * st.mmPerPx / 1000, bij: b.p.bij } : null;
 }
 function lzPlekken() {
   const T = planTin(), LG = T && T.tris.length ? planLaser() : null;
@@ -3843,7 +3864,9 @@ function lzRender() {
   const PL = A.mode === "plan" ? lzPlekken() : null, ver = d => d > 100 ? ` <span style="color:var(--warn)">ver: hoe verder, hoe groter de fout (vaak ±1,5 mm per 30 m, dus ±5 mm op 100 m)</span>` : "";
   let plek = "";
   if (PL && PL.alles) {
-    plek = `<div class="lzv"><b>Beste opstelplek</b><br>Eén plek voor het hele plan: verste punt <b>${nl(PL.alles.d, 0)} m</b>.${ver(PL.alles.d)} <button type="button" class="ghost lzbest" data-lzplek="alles">Laser hier zetten</button>`;
+    const waar = (A.lzWaar || "rand") === "rand";
+    plek = `<div class="lzv"><b>Beste opstelplek</b><div class="seg" id="lzWaar" role="group" aria-label="Waar mag de laser staan" style="margin:6px 0"><button type="button" data-lzw="rand" aria-pressed="${waar}">Aan de kant (gevel, goot, rand)</button><button type="button" data-lzw="overal" aria-pressed="${!waar}">Overal op het plein</button></div>`
+      + `Eén plek voor het hele plan${PL.alles.bij ? `: <b>bij ${esc(PL.alles.bij)}</b> (1,5 m ervandaan)` : ""}, verste punt <b>${nl(PL.alles.d, 0)} m</b>.${ver(PL.alles.d)} <button type="button" class="ghost lzbest" data-lzplek="alles">Laser hier zetten</button>`;
     if (PL.per.length > 1) plek += `<br><span class="hint">Vanaf daar zet je per laservlak alleen het afschot om; de laser hoeft niet te verhuizen. Liever per vlak verplaatsen? Zie de knop bij elk laservlak.</span>`;
     plek += `<br><span class="hint">De app weet niet waar auto's, containers of hekken staan: check of je vanaf die plek overal zicht hebt.</span></div>`;
   }
@@ -3872,7 +3895,7 @@ function lzRender() {
     const pv = PL && PL.per.length > 1 ? PL.per[i] : null;
     if (pv && pv.b) {
       const nu = D.S ? Math.max(...pv.g.pts.map(q => d2(D.S.pts[0], q))) * st.mmPerPx / 1000 : null;
-      html += `<br><span class="hint">Beste plek voor dit vlak: verste punt ${nl(pv.b.d, 0)} m${nu != null ? ` (vanaf ${esc(D.S.name)} nu ${nl(nu, 0)} m)` : ""}.</span> <button type="button" class="ghost lzbest" data-lzplek="${i}">Laser hier</button>`;
+      html += `<br><span class="hint">Beste plek voor dit vlak${pv.b.bij ? ` (bij ${esc(pv.b.bij)})` : ""}: verste punt ${nl(pv.b.d, 0)} m${nu != null ? ` (vanaf ${esc(D.S.name)} nu ${nl(nu, 0)} m)` : ""}.</span> <button type="button" class="ghost lzbest" data-lzplek="${i}">Laser hier</button>`;
     }
     html += `</div>`;
   });
@@ -3882,6 +3905,8 @@ function lzRender() {
 }
 // Richtpunt langs het afschot maken: 20 m van de laser (korter of de andere kant op als dat buiten de tekening valt)
 $("lzRes").addEventListener("click", e => {
+  const w = e.target.closest("[data-lzw]");
+  if (w) { afpSet(A => { A.lzWaar = w.dataset.lzw; }); return; }
   const pl = e.target.closest("[data-lzplek]");
   if (pl) {
     const PL = lzPlekken(); if (!PL) return;
