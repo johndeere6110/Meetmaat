@@ -358,6 +358,12 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
 #ov .plz { stroke: #0b4f8a; stroke-width: calc(12px * var(--k)); opacity: .3; pointer-events: none; }
 #ov .plz.nul { stroke: #2e7d32; }
 #ov .plz.aansl { stroke: #8d6e63; opacity: .45; }
+.lzbar { position: absolute; z-index: 5; left: 10px; right: 10px; top: 10px; background: var(--panel); border: 2px solid #6a1b9a; border-radius: 8px; padding: 10px 12px; display: grid; gap: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.3); font-size: 14px; line-height: 1.45; max-width: 560px; }
+.lzbar .grootX { font: 700 20px var(--mono); }
+.lzbarknop { display: flex; gap: 8px; }
+.lzbarknop button { flex: 1; min-height: 44px; }
+.lzbarknop #lzNext { flex: 2; background: #6a1b9a; border-color: #6a1b9a; color: #fff; }
+#ov .lzact { fill: rgba(106,27,154,.22); stroke: #6a1b9a; stroke-width: calc(2px * var(--k)); pointer-events: none; }
 #ov .phring { fill: none; stroke: var(--accent); stroke-width: calc(4px * var(--k)); pointer-events: none; }
 #ov .sym.rp { stroke: #6a1b9a; fill: none; }
 #ov .sym.lzc { fill: #6a1b9a; }
@@ -578,6 +584,10 @@ button.lzbest { padding: 4px 10px; font-size: 12.5px; margin-top: 4px; }
         </form>
         <div class="vz" id="vz" hidden aria-hidden="true"><svg viewBox="-32 -32 64 64"><circle r="14" class="vzh"/><path class="vzh" d="M0 -30v18M0 12v18M-30 0h18M12 0h18"/><circle r="14" class="vzl"/><path class="vzl" d="M0 -30v18M0 12v18M-30 0h18M12 0h18"/><circle r="1.8" class="vzd"/></svg></div>
         <div class="loupe" id="loupe" hidden aria-hidden="true"><canvas id="loupecv" width="140" height="140"></canvas></div>
+        <div class="lzbar" id="lzbar" hidden>
+          <div id="lzbarTxt"></div>
+          <div class="lzbarknop"><button type="button" class="ghost" id="lzPrev" aria-label="Vorig laservlak">◀</button><button type="button" id="lzNext">Volgende ▶</button><button type="button" class="ghost" id="lzStop">Klaar</button></div>
+        </div>
         <div class="vzbar ptbar" id="ptbar" hidden>
           <button type="button" class="big" id="ptDel">Punt wissen</button>
           <button type="button" class="ghost" id="ptClose">Klaar</button>
@@ -2117,14 +2127,14 @@ function drawOverlay() {
   const TIN = planTin();
   if (TIN && TIN.tris.length) planLaser();
   if (TIN && TIN.tris.length) {
-    const A = st.afp, LG = planLaser() || [], meer = LG.length > 1;
+    const A = st.afp, LG = planLaser() || [], meer = LG.filter(g => !g.klein).length > 1;
     // alleen de randen en de grenzen tussen laservlakken (niet elke driehoek)
     const ed = new Map(), kk = (u, w) => u.x < w.x || (u.x === w.x && u.y < w.y) ? [u.x, u.y, w.x, w.y].join() : [w.x, w.y, u.x, u.y].join();
     TIN.tris.forEach(t => { if (!t.in) return; [[t.a, t.b], [t.b, t.c], [t.c, t.a]].forEach(([u, w]) => { const key = kk(u, w), e = ed.get(key); if (e) e.lg.push(t.lg); else ed.set(key, { u, w, lg: [t.lg] }); }); });
     let tp = "";
     ed.forEach(e => { if (e.lg.length === 1 || e.lg[0] !== e.lg[1]) tp += `M${e.u.x} ${e.u.y}L${e.w.x} ${e.w.y}`; });
     s += `<path class="tin" d="${tp}"/>`;
-    if (A.pijl !== false) LG.forEach(g => {
+    if (A.pijl !== false) LG.filter(g => !g.klein).forEach(g => {
       // midden van het laservlak (gewogen naar oppervlak) en het afschot van dat vlak
       let ax = 0, ay = 0, am = 0;
       g.tris.forEach(t => { if (!t.in) return; const ar = Math.abs((t.b.x - t.a.x) * (t.c.y - t.a.y) - (t.c.x - t.a.x) * (t.b.y - t.a.y)) / 2; ax += t.cx * ar; ay += t.cy * ar; am += ar; });
@@ -2149,6 +2159,11 @@ function drawOverlay() {
         }
       }
     }
+  }
+  // Stap voor stap: het actieve laservlak inkleuren
+  if (lzStap != null && st.afp && st.afp.mode === "plan") {
+    const v = lzVlakken()[lzStap];
+    if (v && v.tris) s += `<path class="lzact" d="${v.tris.filter(t => t.in).map(t => `M${t.a.x} ${t.a.y}L${t.b.x} ${t.b.y}L${t.c.x} ${t.c.y}Z`).join("")}"/>`;
   }
   // Laser: X-as van laserplek naar richtpunt
   if (st.afp && ["vlak", "lijnen", "plan"].includes(st.afp.mode) && st.afp.lzS != null && st.afp.lzR != null) {
@@ -2644,7 +2659,7 @@ $("calcancel").addEventListener("click", () => { draft = []; $("calibbox").hidde
 const ptrs = new Map();
 let G = null, selPt = null;        // selPt: aangetikt punt van een meting ({ id, j }), om te wissen
 view.addEventListener("pointerdown", e => {
-  if (e.target.closest(".zoom, .calibbox, .banner, .vzbar")) return;   // .ptbar is ook een .vzbar
+  if (e.target.closest(".zoom, .calibbox, .banner, .vzbar, .lzbar")) return;   // .ptbar is ook een .vzbar
   if (!img.w) return;
   view.setPointerCapture(e.pointerId);
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -3711,8 +3726,17 @@ function planLaser() {
     G.splice(best.j, 1);
     G[best.i] = { v: [...A.v, ...B.v].sort((x, y) => x - y), tris: [...A.tris, ...B.tris], pts: new Set([...A.pts, ...B.pts]) };
   }
-  const LET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const r = G.map((g, i) => { const f = planFit([...g.pts]); const naam = tol > 0 ? `Laservlak ${LET[i] || i + 1}` : `Vlak ${g.v[0]}`; g.tris.forEach(t => { t.lg = tol > 0 ? (LET[i] || String(i + 1)) : "V" + g.v[0]; }); return Object.assign({ naam, lg: tol > 0 ? (LET[i] || String(i + 1)) : "V" + g.v[0], vlakken: g.v, pts: [...g.pts], tris: g.tris }, f || { gx: 0, gy: 0, ref: null, dev: 0 }); });
+  const LET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", m2 = (st.mmPerPx / 1000) ** 2;
+  // oppervlak en midden per vlak; volgorde van links naar rechts; stukjes < 2 m² krijgen geen letter (die werk je met de hand bij)
+  G.forEach(g => { let ax = 0, ay = 0, am = 0; g.tris.forEach(t => { if (!t.in) return; const ar = Math.abs((t.b.x - t.a.x) * (t.c.y - t.a.y) - (t.c.x - t.a.x) * (t.b.y - t.a.y)) / 2; ax += t.cx * ar; ay += t.cy * ar; am += ar; }); g.opp = am * m2; g.cx = am ? ax / am : 0; g.cy = am ? ay / am : 0; g.klein = g.opp < 2; });
+  G.sort((p, q) => p.klein - q.klein || p.cx - q.cx || p.cy - q.cy);
+  let n = 0;
+  const r = G.map(g => {
+    const f = planFit([...g.pts]), lg = g.klein ? "" : tol > 0 ? (LET[n] || String(n + 1)) : "V" + (n + 1);
+    if (!g.klein) n++;
+    g.tris.forEach(t => { t.lg = lg; });
+    return Object.assign({ naam: g.klein ? "klein stukje" : tol > 0 ? `Laservlak ${lg}` : `Vlak ${lg.slice(1)}`, lg, klein: g.klein, opp: g.opp, cx: g.cx, cy: g.cy, vlakken: g.v, pts: [...g.pts], tris: g.tris }, f || { gx: 0, gy: 0, ref: null, dev: 0 });
+  });
   planLaser.c = { sig, r };
   return r;
 }
@@ -3825,7 +3849,7 @@ function lzVlakken() {
   } else if (A.mode === "plan") {
     const T = planTin();
     const LG = T ? planLaser() : null;
-    if (LG) LG.forEach(g => out.push({ naam: g.naam, gx: g.gx, gy: g.gy, pts: g.pts, ref: g.ref, tris: g.tris, dev: planMerge() > 0 ? g.dev : null, vlakken: planMerge() > 0 ? g.vlakken : null }));
+    if (LG) LG.filter(g => !g.klein).forEach(g => out.push({ opp: g.opp, naam: g.naam, gx: g.gx, gy: g.gy, pts: g.pts, ref: g.ref, tris: g.tris, dev: planMerge() > 0 ? g.dev : null, vlakken: planMerge() > 0 ? g.vlakken : null }));
   }
   return out;
 }
@@ -3900,6 +3924,35 @@ function lzZet(p, naam) {
   save(); renderAll();
   toast(`${naam} gezet en gekozen als laserplek. Richt nu de X-as (of maak een richtpunt).`);
 }
+// Stap voor stap: per laservlak wat je doet, met het vlak ingekleurd op de tekening
+let lzStap = null;
+function lzStapToon(i, zoom) {
+  const V = lzVlakken();
+  if (!V.length) { lzStapStop(); return; }
+  lzStap = Math.max(0, Math.min(V.length - 1, i));
+  const v = V[lzStap], D = lzRichting(), sg = x => (x > 0.00005 ? "+" : x < -0.00005 ? "−" : "") + pctTxt(x) + "%";
+  const sl = Math.hypot(v.gx, v.gy);
+  let t = `<div><b>${esc(v.naam)}</b> · stap ${lzStap + 1} van ${V.length}${v.opp ? ` · ${nl(v.opp, 0)} m²` : ""}</div>`;
+  t += `<div>1. Laser: ${D.S ? `op <b>${esc(D.S.name)}</b>` : `<span style="color:var(--warn)">kies eerst een laserplek (paneel Afschot)</span>`}</div>`;
+  if (D.u) {
+    const X = v.gx * D.u.x + v.gy * D.u.y, Y = -v.gx * D.u.y + v.gy * D.u.x, R = lzRond(v, X, Y, D.u);
+    const toon = R && R.dev != null && R.dev <= 3 ? R : null;      // afgerond als dat hooguit 3 mm scheelt
+    t += `<div>2. X-as richten op <b>${esc(D.rn)}</b></div><div>3. Intikken: <span class="grootX">X ${sg(toon ? toon.Xr : X)} · Y ${sg(toon ? toon.Yr : Y)}</span>${toon ? ` <span class="hint">(afgerond, hooguit ${nl(toon.dev, 0)} mm)</span>` : ""}</div>`;
+  } else if (sl > 1e-5) t += `<div>2. X-as langs de pijl van dit vlak richten (maak een richtpunt in het paneel)</div><div>3. Intikken: <span class="grootX">X ${sg(-sl)} · Y 0%</span></div>`;
+  else t += `<div>2–3. Dit vlak is waterpas: <span class="grootX">X 0% · Y 0%</span></div>`;
+  t += `<div>4. Ontvanger: ${v.ref ? `baak op <b>${esc(v.ref.it.name)}</b> (ontwerp ${fmtPeil(v.ref.h)}), schuiven tot hij piept` : "baak op een punt met bekende hoogte in dit vlak, schuiven tot hij piept"}</div>`;
+  if (v.dev != null && v.dev > 2) t += `<div class="hint">Dit laservlak wijkt hooguit ${nl(v.dev / 10, 1)} cm af van het ontwerp.</div>`;
+  $("lzbarTxt").innerHTML = t;
+  $("lzPrev").disabled = lzStap === 0;
+  $("lzNext").textContent = lzStap === V.length - 1 ? "Klaar ✓" : "Volgende ▶";
+  $("lzbar").hidden = false;
+  if (zoom && v.pts && v.pts.length) showPts(v.pts.map(q => ({ x: q.x, y: q.y })));
+  scheduleOverlay();
+}
+function lzStapStop() { lzStap = null; $("lzbar").hidden = true; scheduleOverlay(); }
+$("lzPrev").addEventListener("click", () => lzStapToon(lzStap - 1, true));
+$("lzNext").addEventListener("click", () => { const n = lzVlakken().length; if (lzStap >= n - 1) lzStapStop(); else lzStapToon(lzStap + 1, true); });
+$("lzStop").addEventListener("click", lzStapStop);
 // Beste draaiing: één richting voor de X-as waarbij de vlakken samen zo weinig mogelijk "dubbel afschot" nodig hebben
 function lzGewicht(v) {
   if (!v.tris || !v.tris.length) return 1;
@@ -3960,7 +4013,8 @@ function lzRender() {
       + (D.S ? ` <button type="button" class="ghost lzbest" data-lzdraai="1">Richtpunt in die richting</button>` : `<br><span class="hint">Zet eerst de laser, dan maakt hij een richtpunt in die richting.</span>`)
       + (BD.enkel < BD.n ? `<br><span class="hint">Omdat niet alles evenwijdig is, kan niet elk vlak met één afschot; de grote vlakken tellen het zwaarst.</span>` : "") + `</div>`;
   }
-  let html = plek + (!D.S ? `<span class="hint">Kies eerst waar de laser staat, of zet hem met "Laser hier zetten".</span>` : D.fout ? `<span>${D.fout}</span>` : !D.u ? `<span class="hint">Kies waar je de X-as op richt (een punt, of langs een lijn zoals een gevel of goot), of maak hieronder een richtpunt langs het afschot.</span>`
+  const stapKnop = V.length ? `<div class="btns"><button type="button" class="lzbest" data-lzstap="1" style="background:#6a1b9a;border-color:#6a1b9a;color:#fff;padding:8px 12px;font-size:14px">Stap voor stap op de tekening (${V.length} ${V.length === 1 ? "vlak" : "vlakken"})</button></div>` : "";
+  let html = stapKnop + plek + (!D.S ? `<span class="hint">Kies eerst waar de laser staat, of zet hem met "Laser hier zetten".</span>` : D.fout ? `<span>${D.fout}</span>` : !D.u ? `<span class="hint">Kies waar je de X-as op richt (een punt, of langs een lijn zoals een gevel of goot), of maak hieronder een richtpunt langs het afschot.</span>`
     : `<span>Laser op <b>${esc(D.S.name)}</b>, X-as gericht <b>${esc(D.naam)}</b>${D.L ? ` (${nl(D.L * st.mmPerPx / 1000, 2)} m)` : ""}.</span>`);
   let teSteil = false, enkel = 0;
   V.forEach((v, i) => {
@@ -3998,6 +4052,11 @@ function lzRender() {
 $("lzRes").addEventListener("click", e => {
   const w = e.target.closest("[data-lzw]");
   if (w) { afpSet(A => { A.lzWaar = w.dataset.lzw; }); return; }
+  if (e.target.closest("[data-lzstap]")) {
+    lzStapToon(0, true);
+    if (window.matchMedia("(max-width: 900px)").matches) $("view").scrollIntoView({ block: "start" });
+    return;
+  }
   if (e.target.closest("[data-lzdraai]")) {
     const D = lzRichting(), BD = lzBesteDraai(lzVlakken());
     if (D.S && BD) maakRichtpunt(D.S, BD.ux, BD.uy, "Richtpunt (beste draaiing)", "in de beste richting");
@@ -4078,8 +4137,17 @@ function renderAfp() {
       const nL = new Set(T.P.filter(q => q.lijn).map(q => q.it)).size, nP = T.P.filter(q => !q.lijn).length;
       let t = `${nP} ${nP === 1 ? "punt" : "punten"}${nL ? ` en ${nL} ${nL === 1 ? "hoogtelijn" : "hoogtelijnen"}` : ""} met hoogte · ${tr.length} driehoeken in ${T.groups.length} ${T.groups.length === 1 ? "vlak" : "vlakken"} · afschot ${ss.length ? (Math.min(...ss) === Math.max(...ss) ? pctTxt(ss[0]) + "%" : `${pctTxt(Math.min(...ss))}% tot ${pctTxt(Math.max(...ss))}%`) : "–"}`;
       const LG = planLaser();
-      if (planMerge() > 0 && LG) t += `<br>Voor de laser: <b>${LG.length} ${LG.length === 1 ? "laservlak" : "laservlakken"}</b> in plaats van ${T.groups.length} (max ${nl(planMerge() / 10, 1)} cm afwijking; grootste: ${nl(Math.max(...LG.map(g => g.dev)) / 10, 1)} cm)${A.merge == null ? " · automatisch, omdat er hoogtelijnen in zitten" : ""}.`;
-      else if (T.groups.length > 3) t += `<br><span class="hint">Veel vlakken = vaak de laser opnieuw instellen. Kies hieronder bij Laservlakken "samenvoegen" om er minder te krijgen.</span>`;
+      const LGg = LG ? LG.filter(g => !g.klein) : [], LGk = LG ? LG.filter(g => g.klein) : [];
+      if (planMerge() > 0 && LG) t += `<br>Voor de laser: <b>${LGg.length} ${LGg.length === 1 ? "laservlak" : "laservlakken"}</b> in plaats van ${T.groups.length} (max ${nl(planMerge() / 10, 1)} cm afwijking; grootste: ${nl(Math.max(...LG.map(g => g.dev)) / 10, 1)} cm)${A.merge == null ? " · automatisch, omdat er hoogtelijnen in zitten" : ""}.`;
+      if (LGk.length) t += `<br><span class="hint">${LGk.length} ${LGk.length === 1 ? "klein stukje" : "kleine stukjes"} (samen ${nl(LGk.reduce((a, g) => a + g.opp, 0), 1)} m²) zonder letter: die werk je met de hand bij.</span>`;
+      // controle: twee punten met een andere hoogte vlak naast elkaar (meestal een tikfout of een lijn die op het verkeerde punt eindigt)
+      const fout = [], mm = st.mmPerPx / 1000, gezien = new Set();
+      T.tris.forEach(tr => [[tr.a, tr.b], [tr.b, tr.c], [tr.c, tr.a]].forEach(([u, w]) => {
+        const L = d2(u, w) * mm, dh = Math.abs(u.h - w.h) / 1000, key = [u.it.id, w.it.id].sort().join("-");
+        if (L < 3 && dh / Math.max(L, 0.01) > 0.08 && !gezien.has(key)) { gezien.add(key); fout.push(`<b>${esc(u.it.name)}</b> (${fmtPeil(u.h)}) en <b>${esc(w.it.name)}</b> (${fmtPeil(w.h)}): ${nl(L, 1)} m uit elkaar, ${cmTxt(u.h - w.h)} cm verschil`); }
+      }));
+      if (fout.length) t += `<br><span style="color:var(--warn)">Controleer: ${fout.slice(0, 4).join("; ")}${fout.length > 4 ? ` (en nog ${fout.length - 4})` : ""}. Dat geeft een heel steil stukje; meestal een tikfout of een lijn die net naast het punt eindigt.</span>`;
+      if (planMerge() === 0 && T.groups.length > 3) t += `<br><span class="hint">Veel vlakken = vaak de laser opnieuw instellen. Kies hieronder bij Laservlakken "samenvoegen" om er minder te krijgen.</span>`;
       if (vl) t += `<br><span style="color:var(--warn)">${vl} ${vl === 1 ? "driehoek is" : "driehoeken zijn"} flauwer dan 0,2% (oranje pijl): daar blijft water staan.</span>`;
       const nm = q => `${esc(q.it.name)} (${fmtPeil(q.h)})`, uniek = arr => arr.filter((q, i) => arr.findIndex(o => o.it === q.it) === i);
       const goed = uniek(laag.filter(q => AFVOER.includes(q.it.soort))), plas = uniek(laag.filter(q => !AFVOER.includes(q.it.soort)));
@@ -4146,7 +4214,7 @@ function renderAfp() {
   const LR = mode === "lijnen" ? afpLijnenCalc() : null;
   sum.textContent = [mode === "rond" && A.s ? "vanaf nulpunt" : mode === "vlak" ? "schuin vlak" : LR && LR.s != null ? `2 lijnen ${pctTxt(LR.s)}%` : mode === "plan" ? (() => { const LG = planTin() ? planLaser() : null; return LG ? `plan · ${LG.length} ${planMerge() > 0 ? "laservlakken" : "vlakken"}` : "plan"; })() : "", lijnen ? `${lijnen} ${lijnen === 1 ? "lijn" : "lijnen"}` : ""].filter(Boolean).join(" · ");
 }
-function afpSet(f) { st.afp = Object.assign({ mode: "uit" }, st.afp || {}); f(st.afp); save(); renderAfp(); renderList(); scheduleOverlay(); planChanged(); }
+function afpSet(f) { st.afp = Object.assign({ mode: "uit" }, st.afp || {}); f(st.afp); save(); renderAfp(); renderList(); scheduleOverlay(); planChanged(); if (lzStap != null) lzStapToon(lzStap, false); }
 function planChanged() { if (ahnReady() && ahnModeOf() === "peil") { clearTimeout(planChanged.tm); planChanged.tm = setTimeout(() => { ahnOverlay(); renderAhn(); }, 300); } }
 $("afpMode").addEventListener("click", e => { const b = e.target.closest("[data-afm]"); if (b) afpSet(A => { A.mode = b.dataset.afm; }); });
 $("afpDir").addEventListener("click", e => { const b = e.target.closest("[data-dir]"); if (b) afpSet(A => { A.laag = b.dataset.dir === "laag"; }); });
@@ -4480,6 +4548,7 @@ async function ahnGet() {
 }
 // Bij een andere tekening: oude hoogtes weg; was er bij deze luchtfoto al om hoogtes gevraagd, dan opnieuw ophalen
 function ahnSync() {
+  if (typeof lzStapStop === "function" && lzStap != null) lzStapStop();
   if (ahn && ahn.key !== img.key) { ahn = null; ahnCache.clear(); }
   ahnProbe = ahnHover = null;
   ahnOverlay(); renderAhn();
