@@ -325,6 +325,11 @@ a.btn.ghostlink { background: transparent; color: var(--ink); text-decoration: n
 .afres b { font-weight: 700; }
 button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
 #ov .afh { fill: #0b4f8a; }
+#afpMode { display: grid; grid-template-columns: 1fr 1fr; overflow: visible; }
+#afpMode button { border-right: 0; white-space: normal; }
+#afpMode button:nth-child(odd) { border-right: 1px solid var(--line); }
+#afpMode button:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+#ov .afl { stroke: #0b4f8a; stroke-width: calc(2px * var(--k)); stroke-dasharray: calc(6px * var(--k)) calc(4px * var(--k)); pointer-events: none; }
 .sand .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .sand label { display: grid; gap: 3px; font-size: 12.5px; font-weight: 500; align-content: start; }
 .sand input, .sand select, .sand textarea { width: 100%; min-width: 0; font: 500 14px/1.35 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
@@ -637,10 +642,10 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
       <div class="sand">
         <p class="hint" style="margin:0"><b>Langs een lijn</b> (riool, goot): tik bij een Afstand of Lengte in <b>Metingen</b> op <b>Afschot</b>. Hieronder: de hoogte van je <b>Uitzetmaat</b>-punten, gerekend vanaf het nulpunt. Hoogtes in cm t.o.v. 0-peil; afschot als 0,5%, 1:200 of 5 mm/m.</p>
         <div class="seg" id="afpMode" role="group" aria-label="Hoogte van uitzetpunten">
-          <button type="button" data-afm="uit">Uit</button><button type="button" data-afm="rond">Vanaf nulpunt</button><button type="button" data-afm="vlak">Schuin vlak (X/Y)</button>
+          <button type="button" data-afm="uit">Uit</button><button type="button" data-afm="rond">Vanaf nulpunt</button><button type="button" data-afm="vlak">Schuin vlak (X/Y)</button><button type="button" data-afm="lijnen">Tussen 2 lijnen</button>
         </div>
         <div id="afpBody" hidden>
-          <label for="afpH0">Hoogte bij het nulpunt (cm)<input id="afpH0" type="text" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+          <label for="afpH0" id="afpH0L">Hoogte bij het nulpunt (cm)<input id="afpH0" type="text" inputmode="decimal" autocomplete="off" placeholder="0"></label>
           <div id="afpRond" class="sand">
             <label for="afpS">Afschot<input id="afpS" type="text" autocomplete="off" placeholder="bijv. 1% of 1:100"></label>
             <div class="seg" id="afpDir" role="group" aria-label="Richting">
@@ -656,6 +661,18 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
               <label for="afpSy">Afschot Y (onder–boven)<input id="afpSy" type="text" autocomplete="off" placeholder="bijv. 0,5% of leeg"></label>
               <label for="afpDy">Richting<select id="afpDy"><option value="-1">daalt naar boven</option><option value="1">stijgt naar boven</option></select></label>
             </div>
+          </div>
+          <div id="afpLijnen" class="sand">
+            <p class="hint" style="margin:0">Kies twee gemeten lijnen (Afstand of Lengte), bijv. bovenkant en onderkant talud, of gevel en goot, en geef elk een hoogte.</p>
+            <div class="row2">
+              <label for="afpL1">Lijn 1<select id="afpL1"></select></label>
+              <label for="afpH1">Hoogte (cm)<input id="afpH1" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 0"></label>
+            </div>
+            <div class="row2">
+              <label for="afpL2">Lijn 2<select id="afpL2"></select></label>
+              <label for="afpH2">Hoogte (cm)<input id="afpH2" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. -30"></label>
+            </div>
+            <div class="afres" id="afpLRes"></div>
           </div>
           <p class="hint" id="afpInfo" style="margin:0"></p>
           <ul class="pplist" id="afpList"></ul>
@@ -1995,6 +2012,17 @@ function drawOverlay() {
       s += vzActive() ? label(l.x + 34 * k, l.y - 26 * k, val, "mkc", "start") : label(l.x + 12 * k, l.y + 18 * k, val, "mkc", "start");
     }
   }
+  // Afschot tussen twee lijnen: haakse stippellijn met het afschot erbij
+  if (st.afp && st.afp.mode === "lijnen") {
+    const R = afpLijnenCalc();
+    if (R) {
+      s += `<path class="afl" d="M${R.p.x} ${R.p.y}L${R.q.x} ${R.q.y}"/>`;
+      const mx = (R.p.x + R.q.x) / 2, my = (R.p.y + R.q.y) / 2;
+      const t = R.s != null ? `${nl(Math.abs(R.s) * 100, 2)}% · ${cmTxt(R.dh)} cm over ${nl(R.D, 2)} m` : `${nl(R.D, 2)} m`;
+      s += label(mx + 8 * k * zm, my, t, "afh", "start");
+      [[R.L1, st.afp.h1], [R.L2, st.afp.h2]].forEach(([L, h]) => { if (h == null) return; const m = lijnMid(L); s += label(m.x, m.y - 10 * k * zm, fmtPeil(h), "afh", "middle"); });
+    }
+  }
   // Hoogte (AHN) op de plek waar je tikt, onder de muis of onder het vizier
   const pr = ahnProbePt();
   if (pr) {
@@ -3273,10 +3301,59 @@ function afBlock(it) {
     <div class="btns"><button type="button" class="ghost" data-act="af-rev">Begin aan de andere kant</button><button type="button" class="ghost" data-act="af-close">Klaar</button><button type="button" class="ghost" data-act="af-del">Afschot weg</button></div>
   </div>`;
 }
-// Uitzetpunten: hoogte vanaf het nulpunt (rond) of als schuin vlak (X/Y)
-function afpOn() { const A = st.afp; return !!(A && A.mode && A.mode !== "uit" && st.origin && st.mmPerPx); }
+// Afstand van een punt tot een gebroken lijn; haaks = alleen als de loodlijn op een stuk valt
+function nearPoly(p, pts, haaks) {
+  let best = null;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1;
+    let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2;
+    if (haaks && (t < -1e-6 || t > 1 + 1e-6)) continue;
+    t = Math.max(0, Math.min(1, t));
+    const q = { x: a.x + t * dx, y: a.y + t * dy }, d = Math.hypot(p.x - q.x, p.y - q.y);
+    if (!best || d < best.d) best = { d, q, a, b };
+  }
+  return best;
+}
+const sideOf = (n, p) => Math.sign((n.b.x - n.a.x) * (p.y - n.a.y) - (n.b.y - n.a.y) * (p.x - n.a.x));
+function lijnPts(id) { const it = st.items.find(x => x.id === id && (x.type === "dist" || x.type === "poly")); return it && it.pts.length > 1 ? it.pts : null; }
+function lijnMid(pts) { const L = polyLen(pts); let acc = 0; for (let i = 1; i < pts.length; i++) { const s0 = d2(pts[i - 1], pts[i]); if (acc + s0 >= L / 2) { const t = (L / 2 - acc) / (s0 || 1); return { x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t }; } acc += s0; } return pts[0]; }
+// Tussen twee lijnen: haakse afstanden (langs lijn 1) → afstand en afschot
+function afpLijnenCalc() {
+  const A = st.afp || {}, L1 = lijnPts(A.l1), L2 = lijnPts(A.l2);
+  if (!L1 || !L2 || A.l1 === A.l2 || !st.mmPerPx) return null;
+  const ds = [], tot = polyLen(L1), mpp = st.mmPerPx / 1000;
+  let best = null;
+  for (let k = 0; k <= 60; k++) {
+    let want = tot * k / 60, acc = 0, p = L1[L1.length - 1];
+    for (let i = 1; i < L1.length; i++) { const s0 = d2(L1[i - 1], L1[i]); if (acc + s0 >= want) { const t = (want - acc) / (s0 || 1); p = { x: L1[i - 1].x + (L1[i].x - L1[i - 1].x) * t, y: L1[i - 1].y + (L1[i].y - L1[i - 1].y) * t }; break; } acc += s0; }
+    const n = nearPoly(p, L2, true);
+    if (n) { ds.push(n.d); if (!best || Math.abs(k - 30) < Math.abs(best.k - 30)) best = { k, p, q: n.q }; }
+  }
+  let dmin, dmax, mean;
+  if (ds.length) { dmin = Math.min(...ds); dmax = Math.max(...ds); mean = ds.reduce((a, b) => a + b, 0) / ds.length; }
+  else { const n = nearPoly(lijnMid(L1), L2, false); dmin = dmax = mean = n.d; best = { p: lijnMid(L1), q: n.q }; }
+  const R = { D: mean * mpp, Dmin: dmin * mpp, Dmax: dmax * mpp, par: dmax - dmin <= Math.max(0.05 * dmax, 0.1 / mpp), haaks: !!ds.length, p: best.p, q: best.q, L1, L2 };
+  if (A.h1 != null && A.h2 != null && R.D > 0) { R.dh = A.h2 - A.h1; R.s = R.dh / 1000 / R.D; R.smin = R.dh / 1000 / R.Dmax; R.smax = R.dh / 1000 / R.Dmin; }
+  return R;
+}
+// Hoogte van een punt op het vlak tussen de lijnen (ook erbuiten: doorgetrokken)
+function afpLijnenH(p) {
+  const A = st.afp, L1 = lijnPts(A.l1), L2 = lijnPts(A.l2);
+  if (!L1 || !L2 || A.l1 === A.l2 || A.h1 == null || A.h2 == null) return null;
+  const n1 = nearPoly(p, L1, false), n2 = nearPoly(p, L2, false), d1 = n1.d, d2v = n2.d;
+  const m1 = lijnMid(L1), m2 = lijnMid(L2);
+  const s1 = sideOf(n1, p) === sideOf(n1, m2) || d1 < 1e-6, s2 = sideOf(n2, p) === sideOf(n2, m1) || d2v < 1e-6;
+  let t;
+  if (s1 && !s2) t = d1 / Math.max(1e-6, d1 - d2v);          // voorbij lijn 2
+  else if (!s1 && s2) t = -d1 / Math.max(1e-6, d2v - d1);    // achter lijn 1
+  else t = d1 / Math.max(1e-6, d1 + d2v);                     // ertussen
+  return A.h1 + (A.h2 - A.h1) * t;
+}
+// Uitzetpunten: hoogte vanaf het nulpunt (rond), als schuin vlak (X/Y) of tussen twee lijnen
+function afpOn() { const A = st.afp; return !!(A && A.mode && A.mode !== "uit" && st.mmPerPx && (st.origin || A.mode === "lijnen")); }
 function afpH(p) {
   if (!afpOn()) return null;
+  if (st.afp.mode === "lijnen") return afpLijnenH(p);
   const A = st.afp, h0 = A.h0 || 0, X = (p.x - st.origin.x) * st.mmPerPx / 1000, Y = (st.origin.y - p.y) * st.mmPerPx / 1000;
   if (A.mode === "rond") { if (A.s == null || !Number.isFinite(A.s)) return null; return h0 + (A.laag ? 1 : -1) * A.s * Math.hypot(X, Y) * 1000; }
   const sx = Number.isFinite(A.sx) ? A.sx : 0, sy = Number.isFinite(A.sy) ? A.sy : 0;
@@ -3287,7 +3364,28 @@ function renderAfp() {
   const A = st.afp || {}, mode = A.mode || "uit";
   document.querySelectorAll("#afpMode [data-afm]").forEach(b => b.setAttribute("aria-pressed", b.dataset.afm === mode));
   $("afpBody").hidden = mode === "uit";
-  $("afpRond").hidden = mode !== "rond"; $("afpVlak").hidden = mode !== "vlak";
+  $("afpRond").hidden = mode !== "rond"; $("afpVlak").hidden = mode !== "vlak"; $("afpLijnen").hidden = mode !== "lijnen"; $("afpH0L").hidden = mode === "lijnen";
+  if (mode === "lijnen") {
+    const ls = st.items.filter(it => (it.type === "dist" || it.type === "poly") && it.pts.length > 1);
+    const opt = cur => ls.length ? `<option value="">kies een lijn</option>` + ls.map(it => `<option value="${it.id}"${it.id === cur ? " selected" : ""}>${st.items.indexOf(it) + 1} · ${esc(it.name)}</option>`).join("") : `<option value="">Meet eerst twee lijnen (Afstand of Lengte)</option>`;
+    $("afpL1").innerHTML = opt(A.l1); $("afpL2").innerHTML = opt(A.l2);
+    const v = mm => mm == null ? "" : nl(mm / 10, (mm / 10) % 1 ? 1 : 0);
+    if (document.activeElement !== $("afpH1")) $("afpH1").value = v(A.h1);
+    if (document.activeElement !== $("afpH2")) $("afpH2").value = v(A.h2);
+    const R = afpLijnenCalc(), out = $("afpLRes");
+    if (!st.mmPerPx) out.innerHTML = "IJk eerst de tekening.";
+    else if (A.l1 != null && A.l1 === A.l2) out.innerHTML = "Kies twee verschillende lijnen.";
+    else if (!R) out.innerHTML = "";
+    else {
+      const afst = R.par ? `Afstand haaks tussen de lijnen: <b>${nl(R.D, 2)} m</b>` : `De lijnen lopen niet evenwijdig: haaks <b>${nl(R.Dmin, 2)} tot ${nl(R.Dmax, 2)} m</b> uit elkaar`;
+      let t = afst + (R.haaks ? "" : " (ze liggen niet naast elkaar: kortste afstand)");
+      if (R.s != null) {
+        const daalt = R.dh < 0, wat = Math.abs(R.dh) < 0.5 ? "even hoog" : `${daalt ? "daalt" : "stijgt"} <b>${cmTxt(R.dh)} cm</b> van lijn 1 naar lijn 2`;
+        t += `<br>${wat}<br>` + (R.par ? `Afschot <b>${fmtAfschot(R.s)}</b>` : `Afschot <b>${nl(Math.abs(R.smin) * 100, 2)}% tot ${nl(Math.abs(R.smax) * 100, 2)}%</b> (gemiddeld ${fmtAfschot(R.s)})`);
+      } else t += "<br>Vul bij beide lijnen een hoogte in.";
+      out.innerHTML = t;
+    }
+  }
   document.querySelectorAll("#afpDir [data-dir]").forEach(b => b.setAttribute("aria-pressed", (b.dataset.dir === "laag") === !!A.laag));
   const keep = (id, val) => { if (document.activeElement !== $(id)) $(id).value = val; };
   keep("afpH0", A.h0 ? nl(A.h0 / 10, (A.h0 / 10) % 1 ? 1 : 0) : "");
@@ -3298,6 +3396,7 @@ function renderAfp() {
   const bad = (txt, v) => txt && !Number.isFinite(v) ? ` "${esc(txt)}" snap ik niet: schrijf bijv. 1%, 1:100 of 10 mm/m.` : "";
   if (mode !== "uit") {
     if (!st.mmPerPx) info = "IJk eerst de tekening.";
+    else if (mode === "lijnen") info = "";
     else if (!st.origin) info = "Zet eerst een nulpunt met het gereedschap <b>Nulpunt</b>.";
     else if (mode === "rond") info = A.s == null ? "Vul het afschot in." : bad(A.sTxt, A.s) || `${fmtAfschot(A.s)} · elke meter van het nulpunt af ${A.laag ? "hoger" : "lager"}.`;
     else info = bad(A.sxTxt, A.sx) || bad(A.syTxt, A.sy) || ((Number.isFinite(A.sx) && A.sx) || (Number.isFinite(A.sy) && A.sy) ? [Number.isFinite(A.sx) && A.sx ? `X: ${fmtAfschot(A.sx)}, ${(A.dx || -1) < 0 ? "daalt" : "stijgt"} naar rechts` : "", Number.isFinite(A.sy) && A.sy ? `Y: ${fmtAfschot(A.sy)}, ${(A.dy || -1) < 0 ? "daalt" : "stijgt"} naar boven` : ""].filter(Boolean).join("<br>") : "Vul het afschot in X en/of Y in.");
@@ -3306,12 +3405,13 @@ function renderAfp() {
   $("afpInfo").innerHTML = info;
   $("afpList").innerHTML = afpOn() ? sets.map(it => {
     const p = it.pts[0], h = afpH(p); if (h == null) return "";
-    const X = (p.x - st.origin.x) * st.mmPerPx, Y = (st.origin.y - p.y) * st.mmPerPx;
-    return `<li><div class="pph"><b>${st.items.indexOf(it) + 1} · ${esc(it.name)}</b><span class="ppv">${fmtPeil(h)}</span></div><span class="ppm">X ${sgn(X)}${fmtMM(Math.abs(X))} · Y ${sgn(Y)}${fmtMM(Math.abs(Y))} · ${nl(Math.hypot(X, Y) / 1000, 2)} m van het nulpunt</span></li>`;
+    const X = st.origin ? (p.x - st.origin.x) * st.mmPerPx : 0, Y = st.origin ? (st.origin.y - p.y) * st.mmPerPx : 0;
+    return `<li><div class="pph"><b>${st.items.indexOf(it) + 1} · ${esc(it.name)}</b><span class="ppv">${fmtPeil(h)}</span></div>${st.origin ? `<span class="ppm">X ${sgn(X)}${fmtMM(Math.abs(X))} · Y ${sgn(Y)}${fmtMM(Math.abs(Y))} · ${nl(Math.hypot(X, Y) / 1000, 2)} m van het nulpunt</span>` : ""}</li>`;
   }).join("") : "";
   const sum = $("sum-afschot");
   const lijnen = st.items.filter(it => it.af && afLine(it) && afLine(it).s != null).length;
-  sum.textContent = [mode === "rond" && A.s ? "vanaf nulpunt" : mode === "vlak" ? "schuin vlak" : "", lijnen ? `${lijnen} ${lijnen === 1 ? "lijn" : "lijnen"}` : ""].filter(Boolean).join(" · ");
+  const LR = mode === "lijnen" ? afpLijnenCalc() : null;
+  sum.textContent = [mode === "rond" && A.s ? "vanaf nulpunt" : mode === "vlak" ? "schuin vlak" : LR && LR.s != null ? `2 lijnen ${nl(Math.abs(LR.s) * 100, 1)}%` : "", lijnen ? `${lijnen} ${lijnen === 1 ? "lijn" : "lijnen"}` : ""].filter(Boolean).join(" · ");
 }
 function afpSet(f) { st.afp = Object.assign({ mode: "uit" }, st.afp || {}); f(st.afp); save(); renderAfp(); renderList(); scheduleOverlay(); }
 $("afpMode").addEventListener("click", e => { const b = e.target.closest("[data-afm]"); if (b) afpSet(A => { A.mode = b.dataset.afm; }); });
@@ -3321,6 +3421,10 @@ $("afpS").addEventListener("input", e => afpSet(A => { A.sTxt = e.target.value; 
 $("afpSx").addEventListener("input", e => afpSet(A => { A.sxTxt = e.target.value; A.sx = parseAfschot(e.target.value); }));
 $("afpSy").addEventListener("input", e => afpSet(A => { A.syTxt = e.target.value; A.sy = parseAfschot(e.target.value); }));
 $("afpDx").addEventListener("change", e => afpSet(A => { A.dx = +e.target.value; }));
+$("afpL1").addEventListener("change", e => afpSet(A => { A.l1 = e.target.value ? +e.target.value : null; }));
+$("afpL2").addEventListener("change", e => afpSet(A => { A.l2 = e.target.value ? +e.target.value : null; }));
+$("afpH1").addEventListener("input", e => afpSet(A => { const v = numIn(e.target.value); A.h1 = v == null || isNaN(v) ? null : v; }));
+$("afpH2").addEventListener("input", e => afpSet(A => { const v = numIn(e.target.value); A.h2 = v == null || isNaN(v) ? null : v; }));
 $("afpDy").addEventListener("change", e => afpSet(A => { A.dy = +e.target.value; }));
 
 /* ---------- Hoogtes uit het AHN (PDOK WCS, maaiveld per 0,5 m, t.o.v. NAP) ---------- */
