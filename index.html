@@ -357,6 +357,8 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
 #ov .sym.goot { fill: #0b4f8a; }
 #ov .plz { stroke: #0b4f8a; stroke-width: calc(12px * var(--k)); opacity: .3; pointer-events: none; }
 #ov .plz.nul { stroke: #2e7d32; }
+#ov .plz.aansl { stroke: #8d6e63; opacity: .45; }
+#ov .phring { fill: none; stroke: var(--accent); stroke-width: calc(4px * var(--k)); pointer-events: none; }
 #ov .sym.rp { stroke: #6a1b9a; fill: none; }
 #ov .sym.lzc { fill: #6a1b9a; }
 button.lzbest { padding: 4px 10px; font-size: 12.5px; margin-top: 4px; }
@@ -747,7 +749,7 @@ button.lzbest { padding: 4px 10px; font-size: 12.5px; margin-top: 4px; }
           </div>
           <div id="afpPlan" class="sand">
             <p class="hint" style="margin:0">Zet het <b>0-punt</b> (deur, drempel: krijgt vanzelf hoogte 0), de <b>kolken, putten en goten</b> en de <b>hoeken</b> met de knoppen hieronder; na elk punt vul je meteen in hoeveel het onder (of boven) 0 ligt. Aanpassen kan later in <b>Metingen</b>. De app verbindt ze tot driehoeken; per driehoek zie je het afschot en waar het water heen loopt. Punten zonder hoogte krijgen hun hoogte uit het plan.</p>
-            <div class="btns" id="planZet"><span class="hint" style="width:100%">Punt zetten (tik daarna op de tekening):</span><button type="button" class="ghost" data-zet="nul">0-punt</button><button type="button" class="ghost" data-zet="kolk">Kolk</button><button type="button" class="ghost" data-zet="put">Put</button><button type="button" class="ghost" data-zet="goot">Goot</button><button type="button" class="ghost" data-zet="rand">Hoek/rand</button><button type="button" class="ghost" data-zet="punt">Punt</button><button type="button" class="ghost" data-zet="l:nul">0-lijn (gevel)</button><button type="button" class="ghost" data-zet="l:lijn">Lijn met hoogte</button></div>
+            <div class="btns" id="planZet"><span class="hint" style="width:100%">Punt zetten (tik daarna op de tekening):</span><button type="button" class="ghost" data-zet="nul">0-punt</button><button type="button" class="ghost" data-zet="kolk">Kolk</button><button type="button" class="ghost" data-zet="put">Put</button><button type="button" class="ghost" data-zet="goot">Goot</button><button type="button" class="ghost" data-zet="rand">Hoek/rand</button><button type="button" class="ghost" data-zet="punt">Punt</button><button type="button" class="ghost" data-zet="l:nul">0-lijn (gevel)</button><button type="button" class="ghost" data-zet="l:lijn">Lijn met hoogte</button><button type="button" class="ghost" data-zet="l:aansl">Aansluiting (bestaand)</button></div>
             <label for="afpGrens">Begrenzing<select id="afpGrens"></select></label>
             <label class="chk"><input type="checkbox" id="afpPijl"> Pijlen met afschot op de tekening</label>
             <label for="afpMerge">Laservlakken<select id="afpMerge"><option value="0">elk vlak apart (exact)</option><option value="5">samenvoegen, max 0,5 cm afwijking</option><option value="10">samenvoegen, max 1 cm afwijking</option><option value="20">samenvoegen, max 2 cm afwijking</option></select></label>
@@ -2014,7 +2016,12 @@ function drawOverlay() {
     } else {
       const closed = it.type === "area";
       const dd = P(it.pts) + (closed ? " Z" : "");
-      if (it.pl && isPlan()) {
+      if (it.pl && isPlan() && Array.isArray(it.pl.v)) {
+        s += `<path class="plz aansl" d="${dd}"/>`;
+        s += label(it.pts[0].x - 8 * k * zm, it.pts[0].y - 8 * k * zm, it.name, "afv", "end");
+        it.pts.forEach((q, j) => { if (it.pl.v[j] != null) s += label(q.x + 6 * k * zm, q.y + 16 * k * zm, fmtPeil(it.pl.v[j]), "afv", "start"); });
+        if (phCur === it.id && phIdx != null && it.pts[phIdx]) { const q = it.pts[phIdx]; s += `<circle class="phring" cx="${q.x}" cy="${q.y}" r="${14 * k}"/>`; }
+      } else if (it.pl && isPlan()) {
         s += `<path class="plz${it.soort === "nul" ? " nul" : ""}" d="${dd}"/>`;
         if (it.pl.b != null) s += label(it.pts[0].x - 8 * k * zm, it.pts[0].y - 8 * k * zm, `${it.name}: ${fmtPeil(it.pl.b)}${it.pl.e != null && it.pl.e !== it.pl.b ? " → " + fmtPeil(it.pl.e) : ""}`, "afv", "end");
       }
@@ -2261,7 +2268,8 @@ function updateHint() {
   const v = vzActive() && VZ_HINTS[tool] ? VZ_HINTS[tool] : HINTS[tool];
   let t = Array.isArray(v) ? v[Math.min(draft.length, v.length - 1)] : v;
   if (loepOn() && !(tool === "calib" && draft.length >= 2)) t += " Houd je vinger vast voor een loep.";
-  if (tool === "poly" && isPlan() && planLijn) t = planLijn === "nul" ? "Teken de 0-lijn langs de gevel (ook de hak meenemen) en tik op Klaar of Enter. De hele lijn ligt op 0." : "Teken de lijn en tik op Klaar of Enter; daarna vul je de hoogte in.";
+  if (tool === "poly" && isPlan() && planLijn === "aansl") t = "Teken de bestaande rand (stelcon, band, put) met een punt op elke plek waar je de hoogte gemeten hebt, en tik op Klaar of Enter. Daarna vul je per punt de hoogte in.";
+  else if (tool === "poly" && isPlan() && planLijn) t = planLijn === "nul" ? "Teken de 0-lijn langs de gevel (ook de hak meenemen) en tik op Klaar of Enter. De hele lijn ligt op 0." : "Teken de lijn en tik op Klaar of Enter; daarna vul je de hoogte in.";
   else if (tool === "set" && isPlan()) t = planSoort && planSoort !== "punt" ? `Tik op de tekening waar ${planSoort === "nul" ? "het 0-punt" : "de " + SOORT[planSoort].n.toLowerCase()} komt; daarna vul je meteen de hoogte in.` : "Tik de hoogtepunten van je afschotplan aan; daarna vul je meteen de hoogte in.";
   else if (tool === "set" && !st.origin) t = "Zet eerst een nulpunt met het gereedschap Nulpunt.";
   if (MEASURE_TOOLS.includes(tool) && !st.mmPerPx) t += " Let op: nog niet geijkt, maten staan in pixels.";
@@ -2526,8 +2534,11 @@ function addItem(type, pts) {
   const count = st.items.filter(x => x.type === type).length + 1;
   const it = { id: st.seq++, type, pts: pts.map(p => ({ x: p.x, y: p.y })), name: `${TYPE_NAME[type]} ${count}` };
   autoName(it);
-  if ((type === "poly" || type === "dist") && isPlan() && planLijn) {
-    const nn = st.items.filter(x => x.pl && (planLijn === "nul") === (x.soort === "nul")).length + 1;
+  if ((type === "poly" || type === "dist") && isPlan() && planLijn === "aansl") {
+    const nn = st.items.filter(x => x.pl && Array.isArray(x.pl.v)).length + 1;
+    it.pl = { v: it.pts.map(() => null) }; it.name = `Aansluiting ${nn}`; planLijn = null;
+  } else if ((type === "poly" || type === "dist") && isPlan() && planLijn) {
+    const nn = st.items.filter(x => x.pl && !Array.isArray(x.pl.v) && (planLijn === "nul") === (x.soort === "nul")).length + 1;
     if (planLijn === "nul") { it.pl = { b: 0, e: null }; it.soort = "nul"; it.name = nn === 1 ? "0-lijn" : `0-lijn ${nn}`; }
     else { it.pl = { b: null, e: null }; it.name = `Hoogtelijn ${nn}`; }
     planLijn = null;
@@ -2540,7 +2551,8 @@ function addItem(type, pts) {
   sel = it.id; draft = []; hover = null; vzUpdate();
   save(); renderAll();
   if (type === "set" && isPlan() && it.h == null) phOpen(it);
-  if (it.pl && it.pl.b == null) phOpen(it);
+  if (it.pl && Array.isArray(it.pl.v)) phOpen(it, 0);
+  else if (it.pl && it.pl.b == null) phOpen(it);
   if (it.pl) planChanged();
 }
 function finish() {
@@ -2803,7 +2815,7 @@ $("list").addEventListener("click", e => {
   if (act === "del") { st.items = st.items.filter(x => x.id !== id); st.items.forEach(o => { if (o.minus === id) delete o.minus; }); if (sel === id) sel = null; save(); renderAll(); return; }
   if (act === "pl-on" && it) { it.pl = { b: null, e: null }; save(); renderAll(); phOpen(it); return; }
   if (act === "pl-off" && it) { delete it.pl; if (it.soort === "nul") delete it.soort; save(); renderAll(); planChanged(); return; }
-  if (act === "grp" || act === "ph" || act === "soort" || act === "pl-b" || act === "pl-e" || /^af-[bse]$|^af-stap$/.test(act || "")) return;
+  if (act === "grp" || act === "ph" || act === "soort" || act === "pl-b" || act === "pl-e" || act === "pl-v" || /^af-[bse]$|^af-stap$/.test(act || "")) return;
   if (act && act.startsWith("af-") && it) {
     if (act === "af-open") { it.af = Object.assign({ fix: "s", stap: 5 }, it.af || {}, { open: true }); }
     else if (act === "af-close") it.af.open = false;
@@ -2819,6 +2831,12 @@ $("list").addEventListener("click", e => {
 });
 $("list").addEventListener("input", e => {
   const aa = e.target.dataset.act;
+  if (aa === "pl-v") {
+    const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id); if (!it || !it.pl || !Array.isArray(it.pl.v)) return;
+    const n = numIn(e.target.value); it.pl.v[+e.target.dataset.i] = n == null || isNaN(n) ? null : n;
+    save(); renderAfp(); scheduleOverlay(); planChanged();
+    return;
+  }
   if (aa === "pl-b" || aa === "pl-e") {
     const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id); if (!it || !it.pl) return;
     const n = numIn(e.target.value), v = n == null || isNaN(n) ? null : n;
@@ -3556,7 +3574,7 @@ function afpLijnenH(p) {
 // Soorten hoogtepunten in het afschotplan
 const SOORT = { laser: { n: "Laser", l: "Laserplek" }, richt: { n: "Richtpunt", l: "Richtpunt (laser)" }, punt: { n: "Punt", l: "Punt" }, nul: { n: "0-punt", l: "0-punt (deur, drempel)" }, kolk: { n: "Kolk", l: "Kolk" }, put: { n: "Put", l: "Put" }, goot: { n: "Goot", l: "Goot" }, rand: { n: "Hoek", l: "Hoek / rand" } };
 const AFVOER = ["kolk", "put", "goot"];
-let planSoort = null, planLijn = null;
+let planSoort = null, planLijn = null, phIdx = null;
 const isPlan = () => !!(st.afp && st.afp.mode === "plan");
 function soortSym(sr, p, k) {
   const r = 6 * k;
@@ -3571,6 +3589,21 @@ function soortSym(sr, p, k) {
 }
 const SOORT_NAAM = /^(Uitzetmaat|Punt|0-punt|Kolk|Put|Goot|Hoek|Richtpunt|Laser)( \d+)?$/;
 function soortNaam(sr, skip) { const n = st.items.filter(x => x.type === "set" && x.soort === sr && x !== skip).length + 1; return SOORT[sr].n + (sr === "nul" && n === 1 ? "" : " " + n); }
+// Hoogtelijnen: bekende hoogtes langs de lijn (afstand, mm). Aansluiting: per knikpunt; anders begin/eind.
+function plBekend(it) {
+  if (!it.pl) return [];
+  if (Array.isArray(it.pl.v) && it.pl.v.length !== it.pts.length) { const v = it.pl.v.slice(0, it.pts.length); while (v.length < it.pts.length) v.push(null); it.pl.v = v; }
+  const d = [0]; for (let i = 1; i < it.pts.length; i++) d.push(d[i - 1] + d2(it.pts[i - 1], it.pts[i]));
+  if (Array.isArray(it.pl.v)) return it.pl.v.map((h, i) => h == null ? null : { d: d[i], h }).filter(Boolean);
+  if (it.pl.b == null) return [];
+  return [{ d: 0, h: it.pl.b }, { d: d[d.length - 1], h: it.pl.e != null ? it.pl.e : it.pl.b }];
+}
+const plOk = it => (it.type === "poly" || it.type === "dist") && it.pts && it.pts.length > 1 && plBekend(it).length > 0;
+function plHop(K, d) {
+  if (K.length === 1 || d <= K[0].d) return K[0].h;
+  for (let i = 1; i < K.length; i++) if (d <= K[i].d) { const a = K[i - 1], b = K[i]; return b.d > a.d ? a.h + (b.h - a.h) * (d - a.d) / (b.d - a.d) : b.h; }
+  return K[K.length - 1].h;
+}
 // Afschotplan: Delaunay-driehoeken tussen punten met een ontwerphoogte
 function delaunay(V0) {
   const n = V0.length; if (n < 3) return [];
@@ -3600,17 +3633,17 @@ function planTin() {
   const A = st.afp;
   if (!A || A.mode !== "plan" || !st.mmPerPx) return null;
   const vp = st.items.filter(it => it.type === "set" && it.h != null && it.pts && it.pts.length);
-  const vl = st.items.filter(it => (it.type === "poly" || it.type === "dist") && it.pl && it.pl.b != null && it.pts.length > 1);
+  const vl = st.items.filter(plOk);
   const g = A.grens != null ? st.items.find(x => x.id === A.grens && x.type === "area") : null;
-  const sig = vp.map(it => `${it.id}:${it.pts[0].x.toFixed(2)},${it.pts[0].y.toFixed(2)},${it.h}`).join("|") + "|L" + vl.map(it => `${it.id}:${it.pl.b},${it.pl.e}:` + it.pts.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(";")).join("|") + "|" + (g ? g.pts.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(";") : "") + "|" + st.mmPerPx;
+  const sig = vp.map(it => `${it.id}:${it.pts[0].x.toFixed(2)},${it.pts[0].y.toFixed(2)},${it.h}`).join("|") + "|L" + vl.map(it => `${it.id}:${JSON.stringify(plBekend(it).map(k => k.h))}:` + it.pts.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(";")).join("|") + "|" + (g ? g.pts.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(";") : "") + "|" + st.mmPerPx;
   if (planTin.c && planTin.c.sig === sig) return planTin.c.t;
   const P = [];
   vp.forEach(it => { const q = it.pts[0]; if (!P.some(o => Math.abs(o.x - q.x) < 0.01 && Math.abs(o.y - q.y) < 0.01)) P.push({ x: q.x, y: q.y, h: it.h, it }); });
   // hoogtelijnen (0-lijn langs de gevel, goot …): knikpunten plus om de 2 m een punt, hoogte naar verhouding van begin tot eind
   const stap = 2000 / st.mmPerPx;
   vl.forEach(it => {
-    const L = polyLen(it.pts), hb = it.pl.b, he = it.pl.e != null ? it.pl.e : it.pl.b;
-    const add = (x, y, d) => { if (!P.some(o => Math.abs(o.x - x) < 0.5 && Math.abs(o.y - y) < 0.5)) P.push({ x, y, h: hb + (he - hb) * (L ? d / L : 0), it, lijn: true }); };
+    const K = plBekend(it);
+    const add = (x, y, d) => { if (!P.some(o => Math.abs(o.x - x) < 0.5 && Math.abs(o.y - y) < 0.5)) P.push({ x, y, h: plHop(K, d), it, lijn: true }); };
     let acc = 0;
     add(it.pts[0].x, it.pts[0].y, 0);
     for (let i = 1; i < it.pts.length; i++) {
@@ -3659,7 +3692,7 @@ function planFit(pts) {
   return { gx: a, gy: b, ref, dev };
 }
 // Samenvoegen: zelf gekozen, anders automatisch 1 cm zodra er hoogtelijnen in het plan zitten
-function planMerge() { const A = st.afp || {}; if (A.merge != null) return A.merge; return st.items.some(it => it.pl && it.pl.b != null) ? 10 : 0; }
+function planMerge() { const A = st.afp || {}; if (A.merge != null) return A.merge; return st.items.some(plOk) ? 10 : 0; }
 function planLaser() {
   const T = planTin(); if (!T || !T.groups.length) return null;
   const tol = planMerge(), sig = planTin.c.sig + "|" + tol;
@@ -3724,17 +3757,19 @@ function planVolume() {
 // Hoogte invullen meteen na het zetten van een hoogtepunt
 let phCur = null, phS = -1, phT = 0;
 const phLaatst = {};
-function phOpen(it) {
-  phCur = it.id; phT = Date.now();
-  const sr = it.type === "set" ? it.soort || "punt" : "lijn", vorig = phLaatst[sr];
+function phOpen(it, idx) {
+  phCur = it.id; phT = Date.now(); phIdx = idx != null ? idx : null;
+  const sr = it.type === "set" ? it.soort || "punt" : phIdx != null ? "aansl" : "lijn";
+  const vorig = phIdx > 0 && it.pl.v[phIdx - 1] != null ? it.pl.v[phIdx - 1] : phIdx != null && it.pl.v[phIdx] != null ? it.pl.v[phIdx] : phLaatst[sr];
   phS = vorig != null ? (vorig > 0 ? 1 : -1) : (sr === "punt" ? (phLaatst._s || -1) : -1);
-  $("phttl").textContent = it.name;
+  $("phttl").textContent = phIdx != null ? `${it.name}: punt ${phIdx + 1} van ${it.pts.length}` : it.name;
+  scheduleOverlay();
   $("phv").value = vorig != null ? nl(Math.abs(vorig) / 10, (Math.abs(vorig) / 10) % 1 ? 1 : 0) : "";
   document.querySelectorAll("#phSign [data-s]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.s === phS));
   $("phbox").hidden = false;
   $("phv").focus(); $("phv").select();
 }
-function phClose() { $("phbox").hidden = true; phCur = null; }
+function phClose() { $("phbox").hidden = true; phCur = null; phIdx = null; scheduleOverlay(); }
 $("phSign").addEventListener("click", e => { const b = e.target.closest("[data-s]"); if (!b) return; phS = +b.dataset.s; document.querySelectorAll("#phSign [data-s]").forEach(x => x.setAttribute("aria-pressed", +x.dataset.s === phS)); $("phv").focus(); });
 $("phbox").addEventListener("submit", e => {
   e.preventDefault();
@@ -3744,7 +3779,15 @@ $("phbox").addEventListener("submit", e => {
     const n = numIn(t);
     if (n == null || isNaN(n)) { flashHint("Vul de hoogte in cm in, bijv. 8."); return; }
     const h = /^[-+−]/.test(t) ? n : phS * Math.abs(n);
-    if (it.type === "set") it.h = h; else it.pl = Object.assign({ e: null }, it.pl || {}, { b: h });
+    if (it.type === "set") it.h = h;
+    else if (phIdx != null && it.pl && Array.isArray(it.pl.v)) {
+      it.pl.v[phIdx] = h; phLaatst.aansl = h; phLaatst._s = h > 0 ? 1 : -1;
+      save(); renderAll(); planChanged();
+      if (phIdx + 1 < it.pts.length) { phOpen(it, phIdx + 1); return; }
+      toast(`${it.name}: alle ${it.pts.length} punten hebben een hoogte`);
+      phClose(); return;
+    }
+    else it.pl = Object.assign({ e: null }, it.pl || {}, { b: h });
     phLaatst[it.type === "set" ? it.soort || "punt" : "lijn"] = h; phLaatst._s = h > 0 ? 1 : -1;
     save(); renderAll(); planChanged();
     toast(`${it.name}: ${fmtPeil(h)}`);
@@ -3757,6 +3800,9 @@ function plCard(it) {
   if (!isPlan()) return "";
   if (!it.pl) return `<button type="button" class="ghost afbtn" data-act="pl-on">Als hoogtelijn in het afschotplan</button>`;
   const v = mm => mm == null ? "" : nl(mm / 10, (mm / 10) % 1 ? 1 : 0);
+  if (Array.isArray(it.pl.v)) return `<div class="sand afs"><b>Aansluiting (bestaand) in het afschotplan</b><span class="hint">Hoogte per punt in cm t.o.v. 0; ertussen loopt hij gelijkmatig door.</span><div class="row3">`
+    + it.pts.map((q, j) => `<label>Punt ${j + 1}<input data-act="pl-v" data-i="${j}" type="text" inputmode="decimal" autocomplete="off" value="${v(it.pl.v[j])}" placeholder="?"></label>`).join("")
+    + `</div><div class="btns"><button type="button" class="ghost" data-act="pl-off">Uit het plan halen</button></div></div>`;
   return `<div class="sand afs"><b>${it.soort === "nul" ? "0-lijn" : "Hoogtelijn"} in het afschotplan</b><div class="row2">
     <label>Hoogte begin (cm)<input data-act="pl-b" type="text" inputmode="decimal" autocomplete="off" value="${v(it.pl.b)}" placeholder="bijv. 0"></label>
     <label>Hoogte eind (cm)<input data-act="pl-e" type="text" inputmode="decimal" autocomplete="off" value="${v(it.pl.e)}" placeholder="gelijk aan begin"></label></div>
@@ -3816,7 +3862,7 @@ function lzRandKand() {
       for (const sg of kant) { const q = { x: x + nx * off * sg, y: y + ny * off * sg }; if (planH(q) != null) r.push({ x: q.x, y: q.y, bij: wie }); }
     }
   };
-  st.items.filter(it => it.pl && it.pl.b != null).forEach(it => { for (let i = 1; i < it.pts.length; i++) langs(it.pts[i - 1], it.pts[i], 0, it.name, [1, -1]); });
+  st.items.filter(plOk).forEach(it => { for (let i = 1; i < it.pts.length; i++) langs(it.pts[i - 1], it.pts[i], 0, it.name, [1, -1]); });
   // buitenrand van het plan
   const ed = new Map(), kk = (u, w) => u.x < w.x || (u.x === w.x && u.y < w.y) ? [u.x, u.y, w.x, w.y].join() : [w.x, w.y, u.x, u.y].join();
   T.tris.forEach(t => { if (!t.in) return; [[t.a, t.b], [t.b, t.c], [t.c, t.a]].forEach(([u, w]) => { const key = kk(u, w), e = ed.get(key); if (e) e.n++; else ed.set(key, { u, w, n: 1 }); }); });
