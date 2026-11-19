@@ -348,6 +348,9 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
 #ov .afv { fill: #0b4f8a; font-weight: 700; }
 #ov .afh.vl { fill: var(--warn); }
 #planZet button { padding: 6px 10px; font-size: 13px; }
+#lzWaar { display: grid; grid-template-columns: 1fr 1fr; overflow: visible; }
+#lzWaar button { white-space: normal; }
+.side > * { min-width: 0; }            /* één te breed element mag het zijpaneel niet oprekken */
 #planZet button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
 #ov .sym { fill: #fff; stroke: #0b4f8a; stroke-width: calc(2px * var(--k)); pointer-events: none; }
 #ov .sym.nul { fill: #2e7d32; stroke: #fff; }
