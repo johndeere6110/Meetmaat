@@ -352,6 +352,8 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
 #ov .sym { fill: #fff; stroke: #0b4f8a; stroke-width: calc(2px * var(--k)); pointer-events: none; }
 #ov .sym.nul { fill: #2e7d32; stroke: #fff; }
 #ov .sym.goot { fill: #0b4f8a; }
+#ov .plz { stroke: #0b4f8a; stroke-width: calc(12px * var(--k)); opacity: .3; pointer-events: none; }
+#ov .plz.nul { stroke: #2e7d32; }
 #ov .sym.rp { stroke: #6a1b9a; fill: none; }
 button.lzbest { padding: 4px 10px; font-size: 12.5px; margin-top: 4px; }
 .lzv { border-top: 1px solid var(--line); padding-top: 6px; margin-top: 4px; }
@@ -741,9 +743,10 @@ button.lzbest { padding: 4px 10px; font-size: 12.5px; margin-top: 4px; }
           </div>
           <div id="afpPlan" class="sand">
             <p class="hint" style="margin:0">Zet het <b>0-punt</b> (deur, drempel: krijgt vanzelf hoogte 0), de <b>kolken, putten en goten</b> en de <b>hoeken</b> met de knoppen hieronder; na elk punt vul je meteen in hoeveel het onder (of boven) 0 ligt. Aanpassen kan later in <b>Metingen</b>. De app verbindt ze tot driehoeken; per driehoek zie je het afschot en waar het water heen loopt. Punten zonder hoogte krijgen hun hoogte uit het plan.</p>
-            <div class="btns" id="planZet"><span class="hint" style="width:100%">Punt zetten (tik daarna op de tekening):</span><button type="button" class="ghost" data-zet="nul">0-punt</button><button type="button" class="ghost" data-zet="kolk">Kolk</button><button type="button" class="ghost" data-zet="put">Put</button><button type="button" class="ghost" data-zet="goot">Goot</button><button type="button" class="ghost" data-zet="rand">Hoek/rand</button><button type="button" class="ghost" data-zet="punt">Punt</button></div>
+            <div class="btns" id="planZet"><span class="hint" style="width:100%">Punt zetten (tik daarna op de tekening):</span><button type="button" class="ghost" data-zet="nul">0-punt</button><button type="button" class="ghost" data-zet="kolk">Kolk</button><button type="button" class="ghost" data-zet="put">Put</button><button type="button" class="ghost" data-zet="goot">Goot</button><button type="button" class="ghost" data-zet="rand">Hoek/rand</button><button type="button" class="ghost" data-zet="punt">Punt</button><button type="button" class="ghost" data-zet="l:nul">0-lijn (gevel)</button><button type="button" class="ghost" data-zet="l:lijn">Lijn met hoogte</button></div>
             <label for="afpGrens">Begrenzing<select id="afpGrens"></select></label>
             <label class="chk"><input type="checkbox" id="afpPijl"> Pijlen met afschot op de tekening</label>
+            <label for="afpMerge">Laservlakken<select id="afpMerge"><option value="0">elk vlak apart (exact)</option><option value="5">samenvoegen, max 0,5 cm afwijking</option><option value="10">samenvoegen, max 1 cm afwijking</option><option value="20">samenvoegen, max 2 cm afwijking</option></select></label>
             <label for="afpRaster">Hoogtes in een raster<select id="afpRaster"><option value="0">uit</option><option value="1">elke 1 m</option><option value="2">elke 2 m</option><option value="5">elke 5 m</option><option value="10">elke 10 m</option><option value="20">elke 20 m</option></select></label>
             <label for="afpNap0" id="afpNapL" hidden>0-peil = NAP (m), om met het AHN te vergelijken<input id="afpNap0" type="text" inputmode="decimal" autocomplete="off" placeholder="bijv. 0,45"></label>
             <div class="afres" id="afpPlanRes"></div>
@@ -2002,11 +2005,15 @@ function drawOverlay() {
       s += (isPlan() || it.soort === "richt") && it.soort ? soortSym(it.soort, p, k) : `<circle class="pt" cx="${p.x}" cy="${p.y}" r="${5 * k}"/><circle class="ptc" cx="${p.x}" cy="${p.y}" r="${1.3 * k}"/>`;
       s += `<circle class="hit" data-sel="${it.id}" cx="${p.x}" cy="${p.y}" r="${14 * k}" style="cursor:pointer"/>`;
       labs.push({ x: p.x + 10 * k, y: p.y - 10 * k, n, t: d.short, anc: "start" });
-      const plan = st.afp && st.afp.mode === "plan", ah = plan && it.h != null ? it.h : afpH(p);
+      const plan = st.afp && st.afp.mode === "plan", ah = it.soort === "richt" ? null : plan && it.h != null ? it.h : afpH(p);
       if (ah != null) s += label(p.x + 10 * k * zm, p.y + 16 * k * zm, plan && it.h == null ? `(${fmtPeil(ah)})` : fmtPeil(ah), plan && it.h != null ? "afv" : "afh", "start");
     } else {
       const closed = it.type === "area";
       const dd = P(it.pts) + (closed ? " Z" : "");
+      if (it.pl && isPlan()) {
+        s += `<path class="plz${it.soort === "nul" ? " nul" : ""}" d="${dd}"/>`;
+        if (it.pl.b != null) s += label(it.pts[0].x - 8 * k * zm, it.pts[0].y - 8 * k * zm, `${it.name}: ${fmtPeil(it.pl.b)}${it.pl.e != null && it.pl.e !== it.pl.b ? " → " + fmtPeil(it.pl.e) : ""}`, "afv", "end");
+      }
       if (closed && it.minus != null) s += `<path class="hole" d="${dd}"/>`;
       else if (closed) s += `<path class="fill" d="${dd}"/>`;
       if (it.holes) it.holes.forEach(h => { s += `<path class="hole" d="${P(h)} Z"/>`; });
@@ -2097,21 +2104,28 @@ function drawOverlay() {
   }
   // Afschotplan: driehoeken, pijlen met afschot, hoogtes in een raster
   const TIN = planTin();
+  if (TIN && TIN.tris.length) planLaser();
   if (TIN && TIN.tris.length) {
-    const A = st.afp, ed = new Set(), meer = TIN.groups.length > 1;
+    const A = st.afp, LG = planLaser() || [], meer = LG.length > 1;
+    // alleen de randen en de grenzen tussen laservlakken (niet elke driehoek)
+    const ed = new Map(), kk = (u, w) => u.x < w.x || (u.x === w.x && u.y < w.y) ? [u.x, u.y, w.x, w.y].join() : [w.x, w.y, u.x, u.y].join();
+    TIN.tris.forEach(t => { if (!t.in) return; [[t.a, t.b], [t.b, t.c], [t.c, t.a]].forEach(([u, w]) => { const key = kk(u, w), e = ed.get(key); if (e) e.lg.push(t.lg); else ed.set(key, { u, w, lg: [t.lg] }); }); });
     let tp = "";
-    TIN.tris.forEach(t => { if (!t.in) return; [[t.a, t.b], [t.b, t.c], [t.c, t.a]].forEach(([u, w]) => { const key = u.x < w.x || (u.x === w.x && u.y < w.y) ? [u.x, u.y, w.x, w.y].join() : [w.x, w.y, u.x, u.y].join(); if (ed.has(key)) return; ed.add(key); tp += `M${u.x} ${u.y}L${w.x} ${w.y}`; }); });
+    ed.forEach(e => { if (e.lg.length === 1 || e.lg[0] !== e.lg[1]) tp += `M${e.u.x} ${e.u.y}L${e.w.x} ${e.w.y}`; });
     s += `<path class="tin" d="${tp}"/>`;
-    if (A.pijl !== false) TIN.tris.forEach(t => {
-      if (!t.in) return;
-      const vl = t.s < 0.002 ? " vl" : "", nm = meer ? `V${t.grp} · ` : "";
-      if (t.s < 0.0002) { s += label(t.cx, t.cy, nm + "vlak", "afh" + vl, "middle"); return; }
-      const g = Math.hypot(t.gx, t.gy), ux = -t.gx / g, uy = -t.gy / g, L = 13 * k * zm, hd = 6 * k * zm;
-      const x1 = t.cx - ux * L, y1 = t.cy - uy * L, x2 = t.cx + ux * L, y2 = t.cy + uy * L;
+    if (A.pijl !== false) LG.forEach(g => {
+      // midden van het laservlak (gewogen naar oppervlak) en het afschot van dat vlak
+      let ax = 0, ay = 0, am = 0;
+      g.tris.forEach(t => { if (!t.in) return; const ar = Math.abs((t.b.x - t.a.x) * (t.c.y - t.a.y) - (t.c.x - t.a.x) * (t.b.y - t.a.y)) / 2; ax += t.cx * ar; ay += t.cy * ar; am += ar; });
+      if (!am) return;
+      const cx = ax / am, cy = ay / am, sl = Math.hypot(g.gx, g.gy), vl = sl < 0.002 ? " vl" : "", nm = meer ? `${g.lg} · ` : "";
+      if (sl < 0.0002) { s += label(cx, cy, nm + "vlak", "afh" + vl, "middle"); return; }
+      const ux = -g.gx / sl, uy = -g.gy / sl, L = 16 * k * zm, hd = 7 * k * zm;
+      const x1 = cx - ux * L, y1 = cy - uy * L, x2 = cx + ux * L, y2 = cy + uy * L;
       s += `<path class="halo" d="M${x1} ${y1}L${x2} ${y2}"/><path class="pijl${vl}" d="M${x1} ${y1}L${x2} ${y2}"/>`;
       s += `<path class="pijlt${vl}" d="M${x2 + ux * hd} ${y2 + uy * hd}L${x2 - uy * hd * 0.6} ${y2 + ux * hd * 0.6}L${x2 + uy * hd * 0.6} ${y2 - ux * hd * 0.6}Z"/>`;
       const zij = Math.abs(uy) > 0.5;
-      s += label(t.cx + (zij ? 12 * k * zm : 0), t.cy + (zij ? 4 * k * zm : -12 * k * zm), nm + pctTxt(t.s) + "%", "afh" + vl, zij ? "start" : "middle");
+      s += label(cx + (zij ? 14 * k * zm : 0), cy + (zij ? 4 * k * zm : -14 * k * zm), nm + pctTxt(sl) + "%", "afh" + vl, zij ? "start" : "middle");
     });
     if (A.raster) {
       const step = A.raster * 1000 / st.mmPerPx, o = st.origin || { x: 0, y: 0 };
@@ -2168,7 +2182,7 @@ function renderList() {
         <button type="button" data-act="show">Toon</button><button type="button" data-act="del" aria-label="Meting ${i + 1} verwijderen">✕</button></div>
       <input class="nm" type="text" data-act="name" list="codelist" value="${esc(it.name)}" aria-label="Naam van meting ${i + 1}">
       ${it.type !== "set" ? `<input class="grp" type="text" data-act="grp" list="grplist" value="${esc(it.grp || "")}" placeholder="Groep, bijv. gras" aria-label="Groep van meting ${i + 1}">` : ""}
-      <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div>${(() => { const t = ahnLine(it); return t ? `<div class="subv ahnv">${esc(t)}</div>` : ""; })()}${it.type === "set" && !(st.afp && st.afp.mode === "plan") && afpH(it.pts[0]) != null ? `<div class="subv ahnv">Hoogte (afschot) ${fmtPeil(afpH(it.pts[0]))}</div>` : ""}${it.type === "set" ? planCard(it) : ""}${it.type === "dist" || it.type === "poly" ? afBlock(it) : ""}${d.cmp ? `<div class="cmp ${d.cmpCls}">${d.cmp}</div>` : ""}${(() => {
+      <div class="val">${esc(d.main)}</div><div class="subv">${esc(d.sub)}</div>${(() => { const t = ahnLine(it); return t ? `<div class="subv ahnv">${esc(t)}</div>` : ""; })()}${it.type === "set" && !(st.afp && st.afp.mode === "plan") && afpH(it.pts[0]) != null ? `<div class="subv ahnv">Hoogte (afschot) ${fmtPeil(afpH(it.pts[0]))}</div>` : ""}${it.type === "set" ? planCard(it) : ""}${it.type === "dist" || it.type === "poly" ? plCard(it) + afBlock(it) : ""}${d.cmp ? `<div class="cmp ${d.cmpCls}">${d.cmp}</div>` : ""}${(() => {
         const par = it.minus != null ? st.items.find(o => o.id === it.minus) : parentArea(it);
         return par ? `<button type="button" class="ghost minus" data-act="minus" data-par="${par.id}" aria-pressed="${it.minus === par.id}">${it.minus === par.id ? `Wordt afgetrokken van ${esc(par.name)}` : `Aftrekken van ${esc(par.name)}`}</button>` : "";
       })()}</li>`;
@@ -2243,7 +2257,8 @@ function updateHint() {
   const v = vzActive() && VZ_HINTS[tool] ? VZ_HINTS[tool] : HINTS[tool];
   let t = Array.isArray(v) ? v[Math.min(draft.length, v.length - 1)] : v;
   if (loepOn() && !(tool === "calib" && draft.length >= 2)) t += " Houd je vinger vast voor een loep.";
-  if (tool === "set" && isPlan()) t = planSoort && planSoort !== "punt" ? `Tik op de tekening waar ${planSoort === "nul" ? "het 0-punt" : "de " + SOORT[planSoort].n.toLowerCase()} komt; daarna vul je meteen de hoogte in.` : "Tik de hoogtepunten van je afschotplan aan; daarna vul je meteen de hoogte in.";
+  if (tool === "poly" && isPlan() && planLijn) t = planLijn === "nul" ? "Teken de 0-lijn langs de gevel (ook de hak meenemen) en tik op Klaar of Enter. De hele lijn ligt op 0." : "Teken de lijn en tik op Klaar of Enter; daarna vul je de hoogte in.";
+  else if (tool === "set" && isPlan()) t = planSoort && planSoort !== "punt" ? `Tik op de tekening waar ${planSoort === "nul" ? "het 0-punt" : "de " + SOORT[planSoort].n.toLowerCase()} komt; daarna vul je meteen de hoogte in.` : "Tik de hoogtepunten van je afschotplan aan; daarna vul je meteen de hoogte in.";
   else if (tool === "set" && !st.origin) t = "Zet eerst een nulpunt met het gereedschap Nulpunt.";
   if (MEASURE_TOOLS.includes(tool) && !st.mmPerPx) t += " Let op: nog niet geijkt, maten staan in pixels.";
   if (tool === "set") t = t.replace(/\bpaal\b/g, rk().ev);
@@ -2498,7 +2513,7 @@ $("ppList").addEventListener("click", e => {
 
 /* ---------- Acties ---------- */
 function setTool(t) {
-  planSoort = null;
+  planSoort = null; planLijn = null;
   tool = t; draft = []; hover = null; $("calibbox").hidden = true; $("peilbox").hidden = true; $("phbox").hidden = true; peilCur = null;
   vzUpdate();
   renderAll();
@@ -2507,6 +2522,12 @@ function addItem(type, pts) {
   const count = st.items.filter(x => x.type === type).length + 1;
   const it = { id: st.seq++, type, pts: pts.map(p => ({ x: p.x, y: p.y })), name: `${TYPE_NAME[type]} ${count}` };
   autoName(it);
+  if ((type === "poly" || type === "dist") && isPlan() && planLijn) {
+    const nn = st.items.filter(x => x.pl && (planLijn === "nul") === (x.soort === "nul")).length + 1;
+    if (planLijn === "nul") { it.pl = { b: 0, e: null }; it.soort = "nul"; it.name = nn === 1 ? "0-lijn" : `0-lijn ${nn}`; }
+    else { it.pl = { b: null, e: null }; it.name = `Hoogtelijn ${nn}`; }
+    planLijn = null;
+  }
   if (type === "set" && isPlan() && planSoort && planSoort !== "punt") {
     it.soort = planSoort; it.name = soortNaam(planSoort);
     if (planSoort === "nul") it.h = 0;
@@ -2515,6 +2536,8 @@ function addItem(type, pts) {
   sel = it.id; draft = []; hover = null; vzUpdate();
   save(); renderAll();
   if (type === "set" && isPlan() && it.h == null) phOpen(it);
+  if (it.pl && it.pl.b == null) phOpen(it);
+  if (it.pl) planChanged();
 }
 function finish() {
   if (tool === "poly" && draft.length >= 2) addItem("poly", draft);
@@ -2774,7 +2797,9 @@ $("list").addEventListener("click", e => {
   const id = +li.dataset.id, it = st.items.find(x => x.id === id);
   const act = e.target.closest("[data-act]")?.dataset.act;
   if (act === "del") { st.items = st.items.filter(x => x.id !== id); st.items.forEach(o => { if (o.minus === id) delete o.minus; }); if (sel === id) sel = null; save(); renderAll(); return; }
-  if (act === "grp" || act === "ph" || act === "soort" || /^af-[bse]$|^af-stap$/.test(act || "")) return;
+  if (act === "pl-on" && it) { it.pl = { b: null, e: null }; save(); renderAll(); phOpen(it); return; }
+  if (act === "pl-off" && it) { delete it.pl; if (it.soort === "nul") delete it.soort; save(); renderAll(); planChanged(); return; }
+  if (act === "grp" || act === "ph" || act === "soort" || act === "pl-b" || act === "pl-e" || /^af-[bse]$|^af-stap$/.test(act || "")) return;
   if (act && act.startsWith("af-") && it) {
     if (act === "af-open") { it.af = Object.assign({ fix: "s", stap: 5 }, it.af || {}, { open: true }); }
     else if (act === "af-close") it.af.open = false;
@@ -2790,6 +2815,14 @@ $("list").addEventListener("click", e => {
 });
 $("list").addEventListener("input", e => {
   const aa = e.target.dataset.act;
+  if (aa === "pl-b" || aa === "pl-e") {
+    const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id); if (!it || !it.pl) return;
+    const n = numIn(e.target.value), v = n == null || isNaN(n) ? null : n;
+    if (aa === "pl-b") it.pl.b = v; else it.pl.e = v;
+    if (it.soort === "nul" && (it.pl.b !== 0 || (it.pl.e != null && it.pl.e !== 0))) delete it.soort;
+    save(); renderAfp(); scheduleOverlay(); planChanged();
+    return;
+  }
   if (aa === "ph") {
     const it = st.items.find(x => x.id === +e.target.closest("li.m").dataset.id); if (!it) return;
     const n = numIn(e.target.value); if (n == null || isNaN(n)) delete it.h; else it.h = n;
@@ -3519,7 +3552,7 @@ function afpLijnenH(p) {
 // Soorten hoogtepunten in het afschotplan
 const SOORT = { richt: { n: "Richtpunt", l: "Richtpunt (laser)" }, punt: { n: "Punt", l: "Punt" }, nul: { n: "0-punt", l: "0-punt (deur, drempel)" }, kolk: { n: "Kolk", l: "Kolk" }, put: { n: "Put", l: "Put" }, goot: { n: "Goot", l: "Goot" }, rand: { n: "Hoek", l: "Hoek / rand" } };
 const AFVOER = ["kolk", "put", "goot"];
-let planSoort = null;
+let planSoort = null, planLijn = null;
 const isPlan = () => !!(st.afp && st.afp.mode === "plan");
 function soortSym(sr, p, k) {
   const r = 6 * k;
@@ -3562,18 +3595,36 @@ function planTin() {
   const A = st.afp;
   if (!A || A.mode !== "plan" || !st.mmPerPx) return null;
   const vp = st.items.filter(it => it.type === "set" && it.h != null && it.pts && it.pts.length);
+  const vl = st.items.filter(it => (it.type === "poly" || it.type === "dist") && it.pl && it.pl.b != null && it.pts.length > 1);
   const g = A.grens != null ? st.items.find(x => x.id === A.grens && x.type === "area") : null;
-  const sig = vp.map(it => `${it.id}:${it.pts[0].x.toFixed(2)},${it.pts[0].y.toFixed(2)},${it.h}`).join("|") + "|" + (g ? g.pts.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(";") : "") + "|" + st.mmPerPx;
+  const sig = vp.map(it => `${it.id}:${it.pts[0].x.toFixed(2)},${it.pts[0].y.toFixed(2)},${it.h}`).join("|") + "|L" + vl.map(it => `${it.id}:${it.pl.b},${it.pl.e}:` + it.pts.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(";")).join("|") + "|" + (g ? g.pts.map(q => q.x.toFixed(1) + "," + q.y.toFixed(1)).join(";") : "") + "|" + st.mmPerPx;
   if (planTin.c && planTin.c.sig === sig) return planTin.c.t;
   const P = [];
   vp.forEach(it => { const q = it.pts[0]; if (!P.some(o => Math.abs(o.x - q.x) < 0.01 && Math.abs(o.y - q.y) < 0.01)) P.push({ x: q.x, y: q.y, h: it.h, it }); });
+  // hoogtelijnen (0-lijn langs de gevel, goot …): knikpunten plus om de 2 m een punt, hoogte naar verhouding van begin tot eind
+  const stap = 2000 / st.mmPerPx;
+  vl.forEach(it => {
+    const L = polyLen(it.pts), hb = it.pl.b, he = it.pl.e != null ? it.pl.e : it.pl.b;
+    const add = (x, y, d) => { if (!P.some(o => Math.abs(o.x - x) < 0.5 && Math.abs(o.y - y) < 0.5)) P.push({ x, y, h: hb + (he - hb) * (L ? d / L : 0), it, lijn: true }); };
+    let acc = 0;
+    add(it.pts[0].x, it.pts[0].y, 0);
+    for (let i = 1; i < it.pts.length; i++) {
+      const a = it.pts[i - 1], b = it.pts[i], Ls = d2(a, b), n = Math.max(1, Math.round(Ls / stap));
+      for (let j = 1; j <= n; j++) add(a.x + (b.x - a.x) * j / n, a.y + (b.y - a.y) * j / n, acc + Ls * j / n);
+      acc += Ls;
+    }
+  });
   const tris = delaunay(P).map(([i, j, k]) => {
     const a = P[i], b = P[j], c = P[k], dxb = b.x - a.x, dyb = b.y - a.y, dxc = c.x - a.x, dyc = c.y - a.y, det = dxb * dyc - dxc * dyb;
     if (Math.abs(det) < 1e-6) return null;
     const gx = ((b.h - a.h) * dyc - (c.h - a.h) * dyb) / det, gy = (dxb * (c.h - a.h) - dxc * (b.h - a.h)) / det;
+    if (a.lijn && b.lijn && c.lijn && a.it === b.it && b.it === c.it) return null;   // alle hoeken op dezelfde hoogtelijn: in/langs het gebouw
     const t = { a, b, c, gx, gy, cx: (a.x + b.x + c.x) / 3, cy: (a.y + b.y + c.y) / 3, s: Math.hypot(gx, gy) / st.mmPerPx,
       x0: Math.min(a.x, b.x, c.x), x1: Math.max(a.x, b.x, c.x), y0: Math.min(a.y, b.y, c.y), y1: Math.max(a.y, b.y, c.y) };
     t.in = !g || inPoly({ x: t.cx, y: t.cy }, g.pts);
+    // flinterdunne driehoek (punten bijna op één lijn, bijv. langs een gevel): weglaten
+    const la = d2(b, c), lb = d2(a, c), lc = d2(a, b), hoek = (x, y, z) => Math.acos(Math.max(-1, Math.min(1, (y * y + z * z - x * x) / (2 * y * z || 1)))) * 180 / Math.PI;
+    if (Math.min(hoek(la, lb, lc), hoek(lb, la, lc), hoek(lc, la, lb)) < 3) return null;
     return t;
   }).filter(Boolean);
   // driehoeken die in hetzelfde vlak liggen samen nemen (voor de laser)
@@ -3588,6 +3639,44 @@ function planTin() {
   const t = { P, tris, groups, grens: g ? g.pts : null };
   planTin.c = { sig, t };
   return t;
+}
+// Laservlakken: aangrenzende vlakken samenvoegen zolang het ontwerp nergens meer dan "tol" mm afwijkt.
+// Het laservlak gaat precies door het afstelpunt (0-punt, anders het hoogste punt).
+function planFit(pts) {
+  const m = st.mmPerPx / 1000, ref = pts.find(q => q.it.soort === "nul") || pts.slice().sort((p, q) => q.h - p.h)[0];
+  let sxx = 0, sxy = 0, syy = 0, sxh = 0, syh = 0;
+  pts.forEach(q => { const dx = (q.x - ref.x) * m, dy = (q.y - ref.y) * m, dh = (q.h - ref.h) / 1000; sxx += dx * dx; sxy += dx * dy; syy += dy * dy; sxh += dx * dh; syh += dy * dh; });
+  const det = sxx * syy - sxy * sxy;
+  if (Math.abs(det) < 1e-12) return null;
+  const a = (sxh * syy - syh * sxy) / det, b = (syh * sxx - sxh * sxy) / det;
+  let dev = 0;
+  pts.forEach(q => { const dx = (q.x - ref.x) * m, dy = (q.y - ref.y) * m; dev = Math.max(dev, Math.abs((q.h - ref.h) - (a * dx + b * dy) * 1000)); });
+  return { gx: a, gy: b, ref, dev };
+}
+// Samenvoegen: zelf gekozen, anders automatisch 1 cm zodra er hoogtelijnen in het plan zitten
+function planMerge() { const A = st.afp || {}; if (A.merge != null) return A.merge; return st.items.some(it => it.pl && it.pl.b != null) ? 10 : 0; }
+function planLaser() {
+  const T = planTin(); if (!T || !T.groups.length) return null;
+  const tol = planMerge(), sig = planTin.c.sig + "|" + tol;
+  if (planLaser.c && planLaser.c.sig === sig) return planLaser.c.r;
+  let G = T.groups.map((g, i) => ({ v: [i + 1], tris: [...g.tris], pts: new Set(g.pts) }));
+  const deelt = (A, B) => { let n = 0; for (const q of A.pts) if (B.pts.has(q) && ++n >= 2) return true; return false; };
+  if (tol > 0) for (;;) {
+    let best = null;
+    for (let i = 0; i < G.length; i++) for (let j = i + 1; j < G.length; j++) {
+      if (!deelt(G[i], G[j])) continue;
+      const f = planFit([...new Set([...G[i].pts, ...G[j].pts])]);
+      if (f && f.dev <= tol && (!best || f.dev < best.f.dev)) best = { i, j, f };
+    }
+    if (!best) break;
+    const A = G[best.i], B = G[best.j];
+    G.splice(best.j, 1);
+    G[best.i] = { v: [...A.v, ...B.v].sort((x, y) => x - y), tris: [...A.tris, ...B.tris], pts: new Set([...A.pts, ...B.pts]) };
+  }
+  const LET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const r = G.map((g, i) => { const f = planFit([...g.pts]); const naam = tol > 0 ? `Laservlak ${LET[i] || i + 1}` : `Vlak ${g.v[0]}`; g.tris.forEach(t => { t.lg = tol > 0 ? (LET[i] || String(i + 1)) : "V" + g.v[0]; }); return Object.assign({ naam, lg: tol > 0 ? (LET[i] || String(i + 1)) : "V" + g.v[0], vlakken: g.v, pts: [...g.pts], tris: g.tris }, f || { gx: 0, gy: 0, ref: null, dev: 0 }); });
+  planLaser.c = { sig, r };
+  return r;
 }
 function planH(p) {
   const T = planTin(); if (!T) return null;
@@ -3628,11 +3717,11 @@ function planVolume() {
   return r;
 }
 // Hoogte invullen meteen na het zetten van een hoogtepunt
-let phCur = null, phS = -1;
+let phCur = null, phS = -1, phT = 0;
 const phLaatst = {};
 function phOpen(it) {
-  phCur = it.id;
-  const sr = it.soort || "punt", vorig = phLaatst[sr];
+  phCur = it.id; phT = Date.now();
+  const sr = it.type === "set" ? it.soort || "punt" : "lijn", vorig = phLaatst[sr];
   phS = vorig != null ? (vorig > 0 ? 1 : -1) : (sr === "punt" ? (phLaatst._s || -1) : -1);
   $("phttl").textContent = it.name;
   $("phv").value = vorig != null ? nl(Math.abs(vorig) / 10, (Math.abs(vorig) / 10) % 1 ? 1 : 0) : "";
@@ -3645,18 +3734,29 @@ $("phSign").addEventListener("click", e => { const b = e.target.closest("[data-s
 $("phbox").addEventListener("submit", e => {
   e.preventDefault();
   const it = st.items.find(x => x.id === phCur), t = $("phv").value.trim();
+  if (!t && Date.now() - phT < 600) return;          // de Enter waarmee je de lijn afmaakte, telt niet
   if (it && t) {
     const n = numIn(t);
     if (n == null || isNaN(n)) { flashHint("Vul de hoogte in cm in, bijv. 8."); return; }
-    it.h = /^[-+−]/.test(t) ? n : phS * Math.abs(n);
-    phLaatst[it.soort || "punt"] = it.h; phLaatst._s = it.h > 0 ? 1 : -1;
+    const h = /^[-+−]/.test(t) ? n : phS * Math.abs(n);
+    if (it.type === "set") it.h = h; else it.pl = Object.assign({ e: null }, it.pl || {}, { b: h });
+    phLaatst[it.type === "set" ? it.soort || "punt" : "lijn"] = h; phLaatst._s = h > 0 ? 1 : -1;
     save(); renderAll(); planChanged();
-    toast(`${it.name}: ${fmtPeil(it.h)}`);
+    toast(`${it.name}: ${fmtPeil(h)}`);
   }
   phClose();
 });
 $("phlater").addEventListener("click", phClose);
 $("phv").addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); phClose(); } });
+function plCard(it) {
+  if (!isPlan()) return "";
+  if (!it.pl) return `<button type="button" class="ghost afbtn" data-act="pl-on">Als hoogtelijn in het afschotplan</button>`;
+  const v = mm => mm == null ? "" : nl(mm / 10, (mm / 10) % 1 ? 1 : 0);
+  return `<div class="sand afs"><b>${it.soort === "nul" ? "0-lijn" : "Hoogtelijn"} in het afschotplan</b><div class="row2">
+    <label>Hoogte begin (cm)<input data-act="pl-b" type="text" inputmode="decimal" autocomplete="off" value="${v(it.pl.b)}" placeholder="bijv. 0"></label>
+    <label>Hoogte eind (cm)<input data-act="pl-e" type="text" inputmode="decimal" autocomplete="off" value="${v(it.pl.e)}" placeholder="gelijk aan begin"></label></div>
+    <div class="btns"><button type="button" class="ghost" data-act="pl-off">Uit het plan halen</button></div></div>`;
+}
 function planCard(it) {
   if (!(st.afp && st.afp.mode === "plan")) return "";
   const v = it.h == null ? "" : nl(it.h / 10, (it.h / 10) % 1 ? 1 : 0), ph = it.h == null ? planH(it.pts[0]) : null;
@@ -3673,7 +3773,8 @@ function lzVlakken() {
     if (R && R.s != null) { const L = Math.hypot(R.q.x - R.p.x, R.q.y - R.p.y) || 1; out.push({ naam: "Vlak tussen de lijnen", gx: R.s * (R.q.x - R.p.x) / L, gy: R.s * (R.q.y - R.p.y) / L, scheef: !R.par }); }
   } else if (A.mode === "plan") {
     const T = planTin();
-    if (T) T.groups.forEach((G, i) => { const pts = [...G.pts]; out.push({ naam: `Vlak ${i + 1}`, gx: G.gx, gy: G.gy, pts, ref: pts.find(q => q.it.soort === "nul") || pts.slice().sort((p, q) => q.h - p.h)[0] }); });
+    const LG = T ? planLaser() : null;
+    if (LG) LG.forEach(g => out.push({ naam: g.naam, gx: g.gx, gy: g.gy, pts: g.pts, ref: g.ref, dev: planMerge() > 0 ? g.dev : null, vlakken: planMerge() > 0 ? g.vlakken : null }));
   }
   return out;
 }
@@ -3713,7 +3814,7 @@ function lzRender() {
   V.forEach((v, i) => {
     const sl = Math.hypot(v.gx, v.gy);
     if (D.u && sl > 1e-5) { const c = Math.abs(D.u.x * -v.gx / sl + D.u.y * -v.gy / sl); if (c > 0.9998 || c < 0.0175) enkel++; } else if (sl <= 1e-5) enkel++;
-    html += `<div class="lzv"><b>${esc(v.naam)}</b>${v.pts ? ` <span class="hint">(${v.pts.map(q => esc(q.it.name)).join(", ")})</span>` : ""}${v.scheef ? ` <span style="color:var(--warn)">(lijnen niet evenwijdig: gemiddeld vlak)</span>` : ""}`;
+    html += `<div class="lzv"><b>${esc(v.naam)}</b>${v.vlakken ? ` <span class="hint">(vlak ${v.vlakken.join(", ")})</span>` : v.pts ? ` <span class="hint">(${[...new Set(v.pts.map(q => q.it.name))].map(esc).join(", ")})</span>` : ""}${v.dev != null ? `<br><span class="hint">Grootste afwijking van het ontwerp: ${nl(v.dev / 10, 1)} cm</span>` : ""}${v.scheef ? ` <span style="color:var(--warn)">(lijnen niet evenwijdig: gemiddeld vlak)</span>` : ""}`;
     if (D.u) {
       const X = v.gx * D.u.x + v.gy * D.u.y, Y = v.gx * -D.u.y + v.gy * D.u.x;
       if (Math.abs(X) > 0.1 || Math.abs(Y) > 0.1) teSteil = true;
@@ -3777,29 +3878,34 @@ function renderAfp() {
     const sets = st.items.filter(it => it.type === "set").sort((a, b) => (AFVOER.includes(b.soort) ? 1 : 0) - (AFVOER.includes(a.soort) ? 1 : 0));
     $("afpMid").innerHTML = `<option value="">het X/Y-nulpunt${st.origin ? "" : " (nog niet gezet)"}</option>` + sets.map(it => `<option value="${it.id}"${it.id === A.mid ? " selected" : ""}>${st.items.indexOf(it) + 1} · ${esc(it.name)}</option>`).join("");
   }
-  document.querySelectorAll("#planZet [data-zet]").forEach(b => b.setAttribute("aria-pressed", tool === "set" && planSoort === b.dataset.zet));
+  document.querySelectorAll("#planZet [data-zet]").forEach(b => b.setAttribute("aria-pressed", (tool === "set" && planSoort === b.dataset.zet) || (tool === "poly" && planLijn && "l:" + planLijn === b.dataset.zet)));
   $("afpRond").hidden = mode !== "rond"; $("afpVlak").hidden = mode !== "vlak"; $("afpLijnen").hidden = mode !== "lijnen"; $("afpPlan").hidden = mode !== "plan"; $("afpH0L").hidden = mode === "lijnen" || mode === "plan";
   if (mode === "plan") {
     const areas = st.items.filter(it => it.type === "area" && it.pts.length > 2);
     $("afpGrens").innerHTML = `<option value="">geen (alles tussen de punten)</option>` + areas.map(it => `<option value="${it.id}"${it.id === A.grens ? " selected" : ""}>${st.items.indexOf(it) + 1} · ${esc(it.name)}</option>`).join("");
     $("afpPijl").checked = A.pijl !== false;
     $("afpRaster").value = String(A.raster || 0);
+    $("afpMerge").value = String(planMerge());
     const metAhn = ahnReady();
     $("afpNapL").hidden = !metAhn;
     if (document.activeElement !== $("afpNap0")) $("afpNap0").value = A.nap0 != null ? nl(A.nap0, 2) : "";
-    const T = planTin(), vast = st.items.filter(it => it.type === "set" && it.h != null).length, out = $("afpPlanRes");
+    const T = planTin(), vast = T ? T.P.length : 0, out = $("afpPlanRes");
     if (!st.mmPerPx) out.innerHTML = "IJk eerst de tekening.";
-    else if (vast < 3) out.innerHTML = `Geef minstens 3 Uitzetmaat-punten een ontwerphoogte (in Metingen). Nu: ${vast}.`;
+    else if (vast < 3) out.innerHTML = `Zet minstens 3 punten met een hoogte (of een 0-lijn en een kolk). Nu: ${vast}.`;
     else if (!T.tris.length) out.innerHTML = "De punten met hoogte liggen op één lijn: zet er een naast.";
     else {
       const tr = T.tris.filter(t => t.in), ss = tr.map(t => t.s), vl = tr.filter(t => t.s < 0.002).length;
       const nb = new Map(); T.tris.forEach(t => [[t.a, t.b], [t.b, t.c], [t.c, t.a]].forEach(([u, w]) => { if (!nb.has(u)) nb.set(u, new Set()); if (!nb.has(w)) nb.set(w, new Set()); nb.get(u).add(w); nb.get(w).add(u); }));
       const laag = T.P.filter(q => nb.get(q) && [...nb.get(q)].every(w => w.h > q.h));
-      let t = `${T.P.length} punten met hoogte · ${tr.length} driehoeken in ${T.groups.length} ${T.groups.length === 1 ? "vlak" : "vlakken"} · afschot ${ss.length ? (Math.min(...ss) === Math.max(...ss) ? pctTxt(ss[0]) + "%" : `${pctTxt(Math.min(...ss))}% tot ${pctTxt(Math.max(...ss))}%`) : "–"}`;
+      const nL = new Set(T.P.filter(q => q.lijn).map(q => q.it)).size, nP = T.P.filter(q => !q.lijn).length;
+      let t = `${nP} ${nP === 1 ? "punt" : "punten"}${nL ? ` en ${nL} ${nL === 1 ? "hoogtelijn" : "hoogtelijnen"}` : ""} met hoogte · ${tr.length} driehoeken in ${T.groups.length} ${T.groups.length === 1 ? "vlak" : "vlakken"} · afschot ${ss.length ? (Math.min(...ss) === Math.max(...ss) ? pctTxt(ss[0]) + "%" : `${pctTxt(Math.min(...ss))}% tot ${pctTxt(Math.max(...ss))}%`) : "–"}`;
+      const LG = planLaser();
+      if (planMerge() > 0 && LG) t += `<br>Voor de laser: <b>${LG.length} ${LG.length === 1 ? "laservlak" : "laservlakken"}</b> in plaats van ${T.groups.length} (max ${nl(planMerge() / 10, 1)} cm afwijking; grootste: ${nl(Math.max(...LG.map(g => g.dev)) / 10, 1)} cm)${A.merge == null ? " · automatisch, omdat er hoogtelijnen in zitten" : ""}.`;
+      else if (T.groups.length > 3) t += `<br><span class="hint">Veel vlakken = vaak de laser opnieuw instellen. Kies hieronder bij Laservlakken "samenvoegen" om er minder te krijgen.</span>`;
       if (vl) t += `<br><span style="color:var(--warn)">${vl} ${vl === 1 ? "driehoek is" : "driehoeken zijn"} flauwer dan 0,2% (oranje pijl): daar blijft water staan.</span>`;
-      const nm = q => `${esc(q.it.name)} (${fmtPeil(q.h)})`;
-      const goed = laag.filter(q => AFVOER.includes(q.it.soort)), plas = laag.filter(q => !AFVOER.includes(q.it.soort));
-      const hoger = T.P.filter(q => AFVOER.includes(q.it.soort) && nb.get(q) && [...nb.get(q)].some(w => w.h < q.h));
+      const nm = q => `${esc(q.it.name)} (${fmtPeil(q.h)})`, uniek = arr => arr.filter((q, i) => arr.findIndex(o => o.it === q.it) === i);
+      const goed = uniek(laag.filter(q => AFVOER.includes(q.it.soort))), plas = uniek(laag.filter(q => !AFVOER.includes(q.it.soort)));
+      const hoger = uniek(T.P.filter(q => !q.lijn && AFVOER.includes(q.it.soort) && nb.get(q) && [...nb.get(q)].some(w => w.h < q.h)));
       if (goed.length) t += `<br><span style="color:var(--ok)">Water loopt naar: <b>${goed.map(nm).join(", ")}</b> ✓</span>`;
       if (plas.length) t += `<br><span style="color:var(--warn)">Plas: <b>${plas.map(nm).join(", ")}</b> ${plas.length === 1 ? "ligt" : "liggen"} het laagst maar ${plas.length === 1 ? "is" : "zijn"} geen kolk, put of goot.</span>`;
       if (hoger.length) t += `<br><span style="color:var(--warn)">${hoger.map(nm).join(", ")}: er ligt een punt naast dat lager is, dus niet al het water komt hier.</span>`;
@@ -3852,6 +3958,7 @@ function renderAfp() {
   }
   $("afpInfo").innerHTML = info;
   $("afpList").innerHTML = afpOn() ? sets.map(it => {
+    if (it.soort === "richt") return "";
     const p = it.pts[0], vast = mode === "plan" && it.h != null, h = vast ? it.h : afpH(p); if (h == null) return "";
     const X = st.origin ? (p.x - st.origin.x) * st.mmPerPx : 0, Y = st.origin ? (st.origin.y - p.y) * st.mmPerPx : 0;
     return `<li><div class="pph"><b>${st.items.indexOf(it) + 1} · ${esc(it.name)}</b><span class="ppv">${fmtPeil(h)}</span>${vast ? `<span class="ppm">ontwerp</span>` : mode === "plan" ? `<span class="ppm">uit plan</span>` : ""}</div>${st.origin ? `<span class="ppm">X ${sgn(X)}${fmtMM(Math.abs(X))} · Y ${sgn(Y)}${fmtMM(Math.abs(Y))} · ${nl(Math.hypot(X, Y) / 1000, 2)} m van het nulpunt</span>` : ""}</li>`;
@@ -3859,7 +3966,7 @@ function renderAfp() {
   const sum = $("sum-afschot");
   const lijnen = st.items.filter(it => it.af && afLine(it) && afLine(it).s != null).length;
   const LR = mode === "lijnen" ? afpLijnenCalc() : null;
-  sum.textContent = [mode === "rond" && A.s ? "vanaf nulpunt" : mode === "vlak" ? "schuin vlak" : LR && LR.s != null ? `2 lijnen ${pctTxt(LR.s)}%` : mode === "plan" ? `plan · ${(planTin() || { groups: [] }).groups.length} vlakken` : "", lijnen ? `${lijnen} ${lijnen === 1 ? "lijn" : "lijnen"}` : ""].filter(Boolean).join(" · ");
+  sum.textContent = [mode === "rond" && A.s ? "vanaf nulpunt" : mode === "vlak" ? "schuin vlak" : LR && LR.s != null ? `2 lijnen ${pctTxt(LR.s)}%` : mode === "plan" ? (() => { const LG = planTin() ? planLaser() : null; return LG ? `plan · ${LG.length} ${planMerge() > 0 ? "laservlakken" : "vlakken"}` : "plan"; })() : "", lijnen ? `${lijnen} ${lijnen === 1 ? "lijn" : "lijnen"}` : ""].filter(Boolean).join(" · ");
 }
 function afpSet(f) { st.afp = Object.assign({ mode: "uit" }, st.afp || {}); f(st.afp); save(); renderAfp(); renderList(); scheduleOverlay(); planChanged(); }
 function planChanged() { if (ahnReady() && ahnModeOf() === "peil") { clearTimeout(planChanged.tm); planChanged.tm = setTimeout(() => { ahnOverlay(); renderAhn(); }, 300); } }
@@ -3873,12 +3980,15 @@ $("afpDx").addEventListener("change", e => afpSet(A => { A.dx = +e.target.value;
 $("afpMid").addEventListener("change", e => afpSet(A => { A.mid = e.target.value ? +e.target.value : null; }));
 $("planZet").addEventListener("click", e => {
   const b = e.target.closest("[data-zet]"); if (!b) return;
-  setTool("set"); planSoort = b.dataset.zet; renderAll();
+  if (b.dataset.zet.startsWith("l:")) { setTool("poly"); planLijn = b.dataset.zet.slice(2); }
+  else { setTool("set"); planSoort = b.dataset.zet; }
+  renderAll();
   if (window.matchMedia("(max-width: 900px)").matches) $("view").scrollIntoView({ behavior: "smooth", block: "center" });
 });
 $("afpGrens").addEventListener("change", e => afpSet(A => { A.grens = e.target.value ? +e.target.value : null; }));
 $("afpPijl").addEventListener("change", e => afpSet(A => { A.pijl = e.target.checked; }));
 $("afpRaster").addEventListener("change", e => afpSet(A => { A.raster = +e.target.value; }));
+$("afpMerge").addEventListener("change", e => afpSet(A => { A.merge = +e.target.value; }));
 $("afpNap0").addEventListener("input", e => afpSet(A => { const t = e.target.value.trim().replace("−", "-").replace(",", "."); A.nap0 = t === "" || isNaN(+t) ? null : +t; planChanged(); }));
 $("lzStand").addEventListener("change", e => afpSet(A => { A.lzS = e.target.value ? +e.target.value : null; }));
 $("lzRicht").addEventListener("change", e => afpSet(A => { const v = e.target.value; A.lzR = !v ? null : v.startsWith("l:") ? v : +v; }));
