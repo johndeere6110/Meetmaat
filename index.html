@@ -3347,7 +3347,7 @@ $("luchtGo").addEventListener("click", async () => {
   finally { b.disabled = !luchtPlek; }
 });
 
-/* ---------- Afschot: langs een lijn, vanaf het nulpunt, schuin vlak ---------- */
+/* ---------- Afschot langs een lijn (Afstand/Lengte): begin + afschot of begin + eind, met X/Y-afschot ---------- */
 // Afschot invoer → helling als fractie (m per m). "0,5" en "0,5%" = 0,5%; "1:200"; "5 mm/m"; "0,5 cm/m"; "5‰"
 function parseAfschot(t) {
   t = String(t || "").trim().toLowerCase().replace(/\s/g, "").replace("−", "-").replace(/,/g, ".");
