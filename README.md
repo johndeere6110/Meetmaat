@@ -29,6 +29,7 @@ Bouwtekening openen, ijken en maten aflezen voor uitzetten in het werk. Werkt op
 - **Zijpaneel:** bij een luchtfoto staan IJking en Palen en putten onderaan (doen daar weinig); zonder palen staat Palen en putten altijd onderaan.
 - **Eenheid:** mm, cm of m. **Haaks:** alleen horizontaal of verticaal meten.
 - **Delen (groep):** stuur een tekening met alle metingen naar een collega of naar iedereen, in Meetmaat zelf. Bij de ander staat hij onder *Voor jou*; één tik en hij is open. Werkt via een eigen Google-script en een map in je Google Drive: eenmalig instellen volgens [`groep/HANDLEIDING.md`](groep/HANDLEIDING.md), daarna de groepslink doorsturen.
+- **Als foto delen** (onder Delen): maakt een JPG van de hele tekening met alle metingen, hoogtepunten en het afschot erop, met naam en datum bovenaan, voor iemand zonder Meetmaat (WhatsApp, mail). Op de pc wordt hij opgeslagen.
 - **Als bestand delen** (onder Delen): stuurt de tekening met alle metingen, ijking, peilpunten en grondwerk als één `.meetmaat`-bestand (vanaf de telefoon via het deelmenu als `.txt`, omdat Chrome alleen bekende bestandssoorten deelt) (via WhatsApp, mail, of opslaan op de pc). Op de andere telefoon: Meetmaat → Tekening openen → dat bestand (of Delen naar Meetmaat). Wordt de tekening daar op een andere resolutie ingelezen, dan rekent de app de punten om.
 - **Delen naar Meetmaat** (Android, na installeren): een PDF uit WhatsApp, mail of Bestanden direct openen.
 
