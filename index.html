@@ -2269,14 +2269,14 @@ function renderTotals() {
   el.innerHTML = `<div class="tth">Totalen per groep</div>` + G.map(g => `<div class="tt"><span class="ttn">${esc(g.name)}</span><span class="ttc">${g.n} meting${g.n === 1 ? "" : "en"}</span><span class="ttv">${[g.na ? fmtArea(g.a) : "", g.nl ? fmtLen(g.l) : ""].filter(Boolean).join(" · ")}</span></div>`).join("");
 }
 // Volgorde zijpaneel: Delen altijd onderaan (boven IJking); IJking onderaan zodra de tekening op schaal staat
-// (anders bovenaan: daar begin je mee); Palen en putten onderaan als er geen palen zijn.
+// (anders bovenaan: daar begin je mee); Palen en putten altijd helemaal onderaan.
 const SIDE = document.querySelector("aside.side"), SIDE_ORDER = [...SIDE.children];
 function sideOrder() {
   const sec = n => SIDE_ORDER.find(e => e.dataset && e.dataset.sec === n);
   const send = sec("send"), cal = sec("cal"), pal = sec("pal");
-  const calOnder = !!(img.w && st.mmPerPx), palOnder = !!(img.w && !piles.length);
+  const calOnder = !!(img.w && st.mmPerPx);
   const voet = SIDE_ORDER.filter(e => e.tagName === "P");      // algemene tip blijft altijd onderaan
-  const onder = [send, calOnder ? cal : null, palOnder ? pal : null].filter(Boolean);
+  const onder = [send, calOnder ? cal : null, pal].filter(Boolean);
   const want = [...SIDE_ORDER.filter(e => !onder.includes(e) && !voet.includes(e)), ...onder, ...voet];
   if (want.some((e, i) => SIDE.children[i] !== e)) want.forEach(e => SIDE.appendChild(e));
 }
