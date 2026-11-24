@@ -97,10 +97,13 @@ body.metpijl main { padding-bottom: 90px; }
     <h2>Je bent uitgenodigd voor een groep</h2>
     <p style="margin:0">Installeer Meetmaat hieronder en open hem. De app vraagt dan alleen nog je naam, en je zit in de groep: dan kun je tekeningen met metingen naar elkaar sturen.</p>
     <div class="tip" id="groepIos" hidden><strong>iPhone:</strong> vraagt de app na het installeren niet om je naam? Kopieer dan de code hieronder. Open Meetmaat, tik op <b>⚙ Instellingen</b>, plak de code bij <b>Groepscode</b>, vul je naam in en tik op <b>Opslaan</b>.</div>
-    <div class="note" style="margin-top:12px">Groepscode</div>
-    <span class="code" id="groepCode"></span>
-    <button type="button" class="btn" id="bKopieer">Kopieer code</button>
-    <div class="msg" id="kopieerMsg" role="status"></div>
+    <!-- Alleen op de iPhone: daar ziet de app op het beginscherm de uitnodiging soms niet. Android neemt hem vanzelf mee. -->
+    <div id="groepCodeBlok" hidden>
+      <div class="note" style="margin-top:12px">Groepscode</div>
+      <span class="code" id="groepCode"></span>
+      <button type="button" class="btn" id="bKopieer">Kopieer code</button>
+      <div class="msg" id="kopieerMsg" role="status"></div>
+    </div>
   </section>
 
   <!-- Al geïnstalleerd -->
@@ -259,7 +262,7 @@ body.metpijl main { padding-bottom: 90px; }
       localStorage.setItem("meetmaat:groepUitnodiging", JSON.stringify({ code, url: web, ts: Date.now() }));
     } catch (e) {}
     show("vGroep"); $("groepCode").textContent = code;
-    if (ios) show("groepIos");
+    if (ios) { show("groepIos"); show("groepCodeBlok"); }
     // Open Meetmaat neemt de groep ook via de link mee (voor als de opslag niet gedeeld is)
     document.querySelectorAll(".openApp").forEach(a => { a.href = "./" + query; });
     $("deelUitleg").textContent = "Stuur deze uitnodiging door via WhatsApp of mail. De ander installeert Meetmaat en zit daarna meteen in de groep.";
