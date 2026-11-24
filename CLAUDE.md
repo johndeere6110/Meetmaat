@@ -20,4 +20,7 @@ Web-app (PWA) om bouwtekeningen (PDF/foto) te openen, te ijken en maten af te le
 - Testen: in de repo `python3 -m http.server 8765`, dan Playwright op http://localhost:8765, op 1300 px én 412 px (of `devices["Pixel 7"]`).
   Voor PDOK: `proxy: { server: process.env.HTTPS_PROXY, bypass: "localhost,127.0.0.1" }`. Na elke wijziging elk `<script>` door `new Function()` halen als syntaxcheck.
   Controleer dat het zijpaneel niet breder wordt dan zijn kader.
+- Groep: `meetmaat:groep` = {url, code, naam} (url leeg = vaste GRP_URL_VAST). Uitnodiging: `installeren.html?groep=<code>` (+ `&web=<link>` alleen bij een eigen script) zet de code in `meetmaat:groep` en een seintje `meetmaat:groepUitnodiging` {code, url, ts}; de app pakt dat op bij starten, `visibilitychange` en `storage` (ouder dan een week: negeren). Groepslink `./?groep=<code>`. Oude `#groep=<base64>` blijft werken. De groepscode staat nooit in de code of de repo.
+  De groep is een brievenbus (sturen/ophalen/weghalen per tekening), geen samenvoegen: een nieuw apparaat kan de groep dus niet leegmaken.
+- manifest `id` is "/Meetmaat/": nooit meer veranderen, anders zien telefoons hem als een andere app.
 - Open ideeën: lijst met eerdere tekeningen in het menu; "Leeg vel op schaal" mag weg als het niet gebruikt wordt.

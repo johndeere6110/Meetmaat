@@ -389,13 +389,15 @@ button.afbtn { margin-top: 6px; padding: 6px 10px; font-size: 13px; }
             </div>
             <div class="btns"><button type="button" id="grpSave">Opslaan</button><button type="button" class="ghost" id="grpLink">Groepslink doorsturen</button></div>
             <p class="hint" id="grpSetupMsg" style="margin:0"></p>
+            <p class="hint" id="grpLinkUitleg" style="margin:0" hidden>Groepslink: voor wie Meetmaat al heeft. Nog geen app? Stuur dan hieronder bij <b>App</b> de installatielink met groep.</p>
           </div>
     </section>
     <section>
       <h3 class="dh">App</h3>
       <div class="sand">
         <p class="hint" style="margin:0">Versie: <b id="appVersion">…</b>. Na een update: app helemaal sluiten en opnieuw openen (op de pc Ctrl+F5).</p>
-        <div class="btns"><button type="button" class="ghost" id="sendLink">App doorsturen</button><a class="btn ghostlink" href="installeren.html">Hulp bij installeren</a></div>
+        <div class="btns"><button type="button" class="ghost" id="sendLink">Stuur installatielink</button><button type="button" class="ghost" id="sendLinkLos" hidden>Installatielink zonder groep</button><a class="btn ghostlink" href="installeren.html">Hulp bij installeren</a></div>
+        <p class="hint" id="sendLinkMsg" style="margin:0">De ander krijgt een pagina met de stappen voor zijn eigen telefoon.</p>
       </div>
     </section>
     <section class="keyhelp">
@@ -2948,7 +2950,10 @@ function renderGrp() {
   // velden in Instellingen bijhouden (niet terwijl je erin typt)
   if (![$("grpCode"), $("grpNaam"), $("grpUrl")].includes(document.activeElement)) { $("grpUrl").value = grp.url && grp.url !== GRP_URL_VAST ? grp.url : ""; $("grpCode").value = grp.code || ""; $("grpNaam").value = grp.naam || ""; }
   if (grpBadCode && !$("grpSetupMsg").dataset.keep) $("grpSetupMsg").innerHTML = `<span style="color:var(--warn)">De groepscode klopt niet (meer). Vul de nieuwe code in en tik op <b>Opslaan</b>.</span>`;
-  $("grpLink").hidden = !ok;
+  $("grpLink").hidden = !ok; $("grpLinkUitleg").hidden = !ok;
+  const inst = ok && !grpBadCode;
+  $("sendLink").textContent = inst ? "Installatielink met groep" : "Stuur installatielink";
+  $("sendLinkLos").hidden = !inst;
   // in Delen
   $("grpNotSet").hidden = !notSet; $("grpMain").hidden = notSet;
   $("grpNotSetMsg").innerHTML = grpBadCode ? `<span style="color:var(--warn)">De groepscode klopt niet (meer).</span> Vul bij <b>Instellingen</b> de nieuwe code in.`
@@ -2988,8 +2993,11 @@ $("fname").addEventListener("click", () => {
   setTimeout(() => { $("drawTitle").focus(); $("drawTitle").select(); }, 350);
 });
 $("grpSave").addEventListener("click", async () => {
-  const url = $("grpUrl").value.trim() || GRP_URL_VAST, code = $("grpCode").value.trim(), naam = $("grpNaam").value.trim();
-  if (!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(url)) { $("grpSetupMsg").textContent = "Plak de web-app-link van het Google-script (begint met https://script.google.com/…)."; return; }
+  let url = $("grpUrl").value.trim() || GRP_URL_VAST, code = $("grpCode").value.trim(), naam = $("grpNaam").value.trim();
+  // hele uitnodigingslink geplakt in plaats van alleen de code: code (en evt. web-app-link) eruit halen
+  const lm = /[?&]groep=([^&#\s]+)/.exec(code);
+  if (lm) { try { const q = new URLSearchParams(code.slice(code.indexOf("?"))); code = (q.get("groep") || "").trim(); if (q.get("web")) url = q.get("web"); } catch (e) { code = decodeURIComponent(lm[1]); } $("grpCode").value = code; }
+  if (!grpUrlOk(url)) { $("grpSetupMsg").textContent = "Plak de web-app-link van het Google-script (begint met https://script.google.com/…)."; return; }
   if (!code || !naam) { $("grpSetupMsg").textContent = "Vul de groepscode en je naam in."; return; }
   grp = { url, code, naam }; grpSaveCfg(); grpBadCode = false; $("grpSetupMsg").textContent = "Controleren…";
   await grpRefresh();
@@ -3042,35 +3050,90 @@ $("grpMain").addEventListener("click", async e => {
     grpList = grpList.filter(y => y !== x); renderGrp();
   });
 });
-// Groepslink: web-app-link en code in één link, zodat collega's alleen hun naam nog invullen
-const grpLinkData = () => btoa(unescape(encodeURIComponent(JSON.stringify({ u: grp.url, c: grp.code })))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-$("grpLink").addEventListener("click", async () => {
-  const url = new URL("./", location.href).href + "#groep=" + grpLinkData();
-  try { if (navigator.share) { await navigator.share({ title: "Meetmaat groep", text: "Doe mee met de Meetmaat-groep: open deze link (en installeer Meetmaat als je hem nog niet hebt).", url }); return; } }
-  catch (e) { if (e && e.name === "AbortError") return; }
-  try { await navigator.clipboard.writeText(url); toast("Groepslink gekopieerd"); } catch (e) { toast("Stuur deze link: " + url); }
-});
-(function grpFromHash() {
-  const m = /[#&]groep=([A-Za-z0-9_-]+)/.exec(location.hash); if (!m) return;
+// Groepslink en installatielink: ?groep=<code> (zoals bij de Perceelkaart). Alleen bij een eigen web-app-link gaat
+// die mee als &web=. De code zelf staat nooit in de app: hij komt uit wat je invult of uit de link.
+// Oude links (#groep=<base64 van {u,c}>) blijven werken.
+const GRP_INV = "meetmaat:groepUitnodiging";   // seintje {code, url, ts} van installeren.html?groep=
+const grpQuery = () => "groep=" + encodeURIComponent(grp.code) + (grp.url && grp.url !== GRP_URL_VAST ? "&web=" + encodeURIComponent(grp.url) : "");
+const grpUrlOk = u => /^https:\/\/script\.google(usercontent)?\.com\/.+/.test(u) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(u);
+// Code (en evt. web-app-link) overnemen; je naam blijft staan
+function grpNeemCode(code, url) {
+  code = String(code || "").trim().slice(0, 100); url = String(url || "").trim();
+  if (!code) return false;
+  if (url && !grpUrlOk(url)) url = "";
+  if (code !== grp.code) grpBadCode = false;
+  grp = { url: url || GRP_URL_VAST, code, naam: grp.naam || "" }; grpSaveCfg();
+  return true;
+}
+// Seintje van de installatiepagina oppakken (bij starten, terugkomen in de app en als de opslag verandert)
+function grpNeemSeintje() {
+  let u = null; try { u = JSON.parse(localStorage.getItem(GRP_INV) || "null"); } catch (e) {}
+  if (!u) return false;
+  try { localStorage.removeItem(GRP_INV); } catch (e) {}
+  if (!(Date.now() - (+u.ts || 0) < 7 * 864e5)) return false;   // ouder dan een week: negeren
+  return grpNeemCode(u.code, u.url);
+}
+// Na een uitnodiging: Instellingen open, cursor in het naamveld (of meteen controleren als je naam er al staat)
+function grpToonUitnodiging() {
+  renderGrp();
+  if (!grp.naam) {
+    openSettings("grpNaam");
+    $("grpSetupMsg").textContent = "Je bent uitgenodigd voor de groep. Vul je naam in en tik op Opslaan.";
+    setTimeout(() => { try { $("grpNaam").scrollIntoView({ block: "center" }); } catch (e) {} }, 120);
+  } else {
+    openSettings();
+    $("grpSetupMsg").textContent = `Uitnodiging ontvangen. Je zit in de groep als ${grp.naam}. Klopt je naam niet? Pas hem aan en tik op Opslaan.`;
+    grpRefresh().then(() => { if (grpErr) $("grpSetupMsg").innerHTML = `<span style="color:var(--warn)">${esc(grpErr)}</span>`; });
+  }
+}
+// Delen: deelmenu (WhatsApp, mail), anders klembord, anders de link laten zien. Annuleren = niks doen.
+async function deelLink(url, title, text, msgEl) {
+  const zeg = t => { if (msgEl) msgEl.textContent = t; else toast(t); };
   try {
-    const o = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, "+").replace(/_/g, "/")))));
-    if (o && o.u && o.c) {
-      grp = { url: o.u, code: o.c, naam: grp.naam || "" }; grpSaveCfg();
-      setTimeout(() => {
-        renderGrp();
-        if (!grp.naam) { openSettings("grpNaam"); $("grpSetupMsg").textContent = "Groepslink ontvangen. Vul je naam in en tik op Opslaan."; }
-        else { grpRefresh(); toast("Groepslink ontvangen"); }
-      }, 300);
+    if (navigator.share) { await navigator.share({ title, text, url }); zeg("Gedeeld."); return; }
+  } catch (e) { if (e && e.name === "AbortError") return; }
+  try { await navigator.clipboard.writeText(url); zeg("Link gekopieerd, plak hem in WhatsApp of een mail: " + url); }
+  catch (e) { zeg("Stuur deze link: " + url); }
+}
+$("grpLink").addEventListener("click", () => {
+  if (!grpOk()) return;
+  deelLink(new URL("./", location.href).href + "?" + grpQuery(), "Meetmaat groep",
+    "Doe mee met onze Meetmaat-groep: open deze link en vul je naam in. (Nog geen Meetmaat? Vraag dan de installatielink.)", $("grpSetupMsg"));
+});
+$("grpNaam").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("grpSave").click(); } });
+let grpUitgenodigd = false;
+(function grpFromLink() {
+  // ?groep=<code>(&web=<link>): groepslink, opent de app zelf
+  try {
+    const q = new URLSearchParams(location.search), c = q.get("groep");
+    if (c != null) {
+      if (grpNeemCode(c, q.get("web"))) grpUitgenodigd = true;
+      q.delete("groep"); q.delete("web");
+      history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q : "") + location.hash);
     }
   } catch (e) {}
-  history.replaceState(null, "", location.pathname + location.search);
+  // oude groepslink: #groep=<base64 van {u,c}>
+  const m = /[#&]groep=([A-Za-z0-9_-]+)/.exec(location.hash);
+  if (m) {
+    try {
+      const o = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, "+").replace(/_/g, "/")))));
+      if (o && o.c && grpNeemCode(o.c, o.u)) grpUitgenodigd = true;
+    } catch (e) {}
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+  if (grpNeemSeintje()) grpUitgenodigd = true;
 })();
 renderGrp();
-if (grpOk()) setTimeout(() => grpRefresh(true), 2500);
-// Via de installatielink in een groep gezet, maar nog geen naam: vraag die bij het eerste openen
-else if (grp.code && grp.url && !grp.naam && !/[#&]groep=/.test(location.hash)) setTimeout(() => {
+if (grpUitgenodigd) setTimeout(grpToonUitnodiging, 300);
+else if (grpOk()) setTimeout(() => grpRefresh(true), 2500);
+// Wel een code, nog geen naam (bijv. eerder uitgenodigd): vraag die bij het openen
+else if (grp.code && grp.url && !grp.naam) setTimeout(() => {
   openSettings("grpNaam"); $("grpSetupMsg").textContent = "Je bent uitgenodigd voor de groep. Vul je naam in en tik op Opslaan.";
 }, 1200);
+// App stond al open (achtergrond) of de installatiepagina staat in een ander tabblad open
+const grpLaterUitnodiging = () => { if (grpNeemSeintje()) grpToonUitnodiging(); };
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") grpLaterUitnodiging(); });
+window.addEventListener("storage", e => { if (e.key === GRP_INV && e.newValue) grpLaterUitnodiging(); });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && grpOk()) grpRefresh(true); });
 
 /* ---------- Luchtfoto van PDOK (RD-coördinaten, vaste schaal: geen ijking nodig) ---------- */
@@ -4276,17 +4339,13 @@ $("install").addEventListener("click", async () => {
   try { await installEvt.userChoice; } catch (e) {}
   installEvt = null; $("install").hidden = true;
 });
-// Installatielink delen (deelmenu: WhatsApp, mail enz.), anders kopiëren
-// App doorsturen: installatielink; zit je in een groep, dan gaat de groep mee (de ander vult alleen zijn naam nog in)
-async function sendInstallLink() {
-  const inGroup = grpOk() && !grpBadCode;
-  const url = new URL("installeren.html", location.href).href + (inGroup ? "#groep=" + grpLinkData() : "");
-  const text = inGroup ? "Installeer Meetmaat en doe meteen mee met onze groep:" : "Meetmaat installeren op je telefoon:";
-  try {
-    if (navigator.share) { await navigator.share({ title: "Meetmaat", text, url }); return; }
-  } catch (e) { if (e && e.name === "AbortError") return; }
-  try { await navigator.clipboard.writeText(url); toast("Link gekopieerd, plak hem in WhatsApp of een mail"); }
-  catch (e) { toast("Stuur deze link: " + url); }
+// Installatielink: zit je in de groep, dan kun je hem met de groep erbij sturen (?groep=): de ander installeert
+// en vult daarna alleen zijn naam in. "Zonder groep" is de gewone link, voor iemand die niet in de groep hoort.
+const grpInstOk = () => grpOk() && !grpBadCode;
+function sendInstallLink(metGroep) {
+  const groep = metGroep && grpInstOk();
+  const url = new URL("installeren.html", location.href).href + (groep ? "?" + grpQuery() : "");
+  deelLink(url, groep ? "Meetmaat groep" : "Meetmaat", groep ? "Installeer Meetmaat en doe meteen mee met onze groep:" : "Meetmaat installeren op je telefoon:", $("sendLinkMsg"));
 }
 $("shareBtn").addEventListener("click", () => {
   const d = document.querySelector('.sec[data-sec="send"]'); if (!d) return;
@@ -4294,7 +4353,8 @@ $("shareBtn").addEventListener("click", () => {
   if (!img.w || img.sample) toast("Open eerst je eigen tekening, dan kun je hem delen.");
   else setTimeout(() => { const t = grpOk() ? $("grpTo") : $("drawTitle"); t.focus(); }, 400);
 });
-$("sendLink").addEventListener("click", sendInstallLink);
+$("sendLink").addEventListener("click", () => sendInstallLink(true));
+$("sendLinkLos").addEventListener("click", () => sendInstallLink(false));
 if ("launchQueue" in window) {
   launchQueue.setConsumer(async params => {
     if (params.files && params.files.length) { try { openFile(await params.files[0].getFile()); } catch (e) {} }

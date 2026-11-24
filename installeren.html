@@ -10,6 +10,15 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Meetmaat">
+<meta name="description" content="Bouwtekening openen, ijken en maten aflezen voor uitzetten in het werk. Werkt op je telefoon.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Meetmaat">
+<meta property="og:title" content="Meetmaat installeren">
+<meta property="og:description" content="Bouwtekening openen, ijken en maten aflezen voor uitzetten in het werk. Werkt op je telefoon.">
+<meta property="og:image" content="https://johndeere6110.github.io/Meetmaat/icons/icon-512.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:image:alt" content="Meetmaat">
 <style>
 /* Lettertypen zitten in de app zelf (SIL OFL, zie fonts/) */
 @font-face { font-family: "Barlow Condensed"; font-weight: 700; font-display: swap; src: url(fonts/barlow-condensed-latin-700-normal.woff2) format("woff2"); }
@@ -69,6 +78,9 @@ body.metpijl main { padding-bottom: 90px; }
   .arrow { animation: hop 1.2s ease-in-out infinite; }
   @keyframes hop { 0%, 100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 8px); } }
 }
+.code { display: block; margin-top: 12px; padding: 12px 14px; border: 2px dashed var(--line); border-radius: 6px; text-align: center; font: 600 24px/1.2 ui-monospace, Menlo, "IBM Plex Mono", monospace; letter-spacing: .04em; word-break: break-all; user-select: all; -webkit-user-select: all; }
+.msg { font-size: 15px; margin-top: 10px; font-weight: 600; }
+.msg:empty { display: none; }
 [hidden] { display: none !important; }
 </style>
 </head>
@@ -80,39 +92,51 @@ body.metpijl main { padding-bottom: 90px; }
   </div>
   <div class="tape" aria-hidden="true"></div>
 
+  <!-- Uitnodiging voor een groep (installeren.html?groep=…): staat boven de installeerstappen -->
+  <section class="card main" id="vGroep" hidden>
+    <h2>Je bent uitgenodigd voor een groep</h2>
+    <p style="margin:0">Installeer Meetmaat hieronder en open hem. De app vraagt dan alleen nog je naam, en je zit in de groep: dan kun je tekeningen met metingen naar elkaar sturen.</p>
+    <div class="tip" id="groepIos" hidden><strong>iPhone:</strong> vraagt de app na het installeren niet om je naam? Kopieer dan de code hieronder. Open Meetmaat, tik op <b>⚙ Instellingen</b>, plak de code bij <b>Groepscode</b>, vul je naam in en tik op <b>Opslaan</b>.</div>
+    <div class="note" style="margin-top:12px">Groepscode</div>
+    <span class="code" id="groepCode"></span>
+    <button type="button" class="btn" id="bKopieer">Kopieer code</button>
+    <div class="msg" id="kopieerMsg" role="status"></div>
+  </section>
+
   <!-- Al geïnstalleerd -->
   <section class="card main" id="vAl" hidden>
     <div class="ok">✓</div>
     <h2 style="margin-top:8px">Je hebt de app al</h2>
-    <a class="btn primary" href="./">Open Meetmaat</a>
+    <a class="btn primary openApp" href="./">Open Meetmaat</a>
   </section>
 
   <!-- Android met installeerknop -->
   <section class="card main" id="vKnop" hidden>
     <h2>Installeren met één tik</h2>
     <button type="button" class="btn primary" id="bInstall">Installeer Meetmaat</button>
-    <div class="note" id="installNote">Daarna staat het icoon bij je apps.</div>
+    <div class="note" id="installNote" role="status">Daarna staat het icoon bij je apps.</div>
   </section>
 
   <!-- Zojuist geïnstalleerd -->
   <section class="card main" id="vKlaar" hidden>
     <div class="ok">✓</div>
     <h2 style="margin-top:8px">Geïnstalleerd</h2>
-    <p style="margin:0">Je vindt Meetmaat nu bij je apps. Open hem voortaan via het icoon.</p>
+    <p style="margin:0">Je vindt hem nu bij je apps. Open Meetmaat voortaan via het icoon.</p>
+    <a class="btn primary openApp" href="./">Open Meetmaat</a>
   </section>
 
   <!-- Android stappen -->
   <section class="card main" id="vAndroid" hidden>
     <h2>Installeren op Android</h2>
+    <div class="tip" id="tipAndroid" hidden style="margin:0 0 14px"><strong>Eerst:</strong> open deze link in <strong>Chrome</strong>. Houd de link in WhatsApp ingedrukt en kies <b>Openen in Chrome</b> (of tik rechtsboven op ⋮ → Openen in Chrome). Daarna de stappen hieronder.</div>
     <ol class="steps">
       <li><div>Tik rechtsboven op de drie puntjes <span class="ico dots" aria-label="menu"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></span></div></li>
-      <li><div>Kies <strong>App installeren</strong> of <strong>Toevoegen aan startscherm</strong></div></li>
+      <li><div>Kies <strong>App installeren</strong> of <strong>Toevoegen aan startscherm</strong> <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 7v8M9 12l3 3 3-3"/></svg></span></div></li>
       <li><div>Tik op <strong>Installeren</strong>. Het icoon staat daarna bij je apps.</div></li>
     </ol>
-    <div class="tip" id="tipAndroid" hidden><strong>Zie je dat niet?</strong> Open deze link in <strong>Chrome</strong>: houd de link ingedrukt en kies "Openen in Chrome", of kopieer hem naar Chrome.</div>
   </section>
 
-  <!-- iPhone stappen -->
+  <!-- iPhone in Safari -->
   <section class="card main" id="vIos" hidden>
     <h2>Installeren op iPhone</h2>
     <ol class="steps">
@@ -120,47 +144,56 @@ body.metpijl main { padding-bottom: 90px; }
       <li><div>Scroll omlaag en kies <strong>Zet op beginscherm</strong> <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg></span></div></li>
       <li><div>Tik rechtsboven op <strong>Voeg toe</strong>. Het icoon staat daarna op je beginscherm.</div></li>
     </ol>
-    <div class="tip"><strong>Staat "Zet op beginscherm" er niet bij?</strong> Dan is de link geopend in WhatsApp of een andere app. Tik eerst op het <strong>Safari-kompasje</strong> of op "Open in Safari", en doe het daar opnieuw.</div>
-    <div class="tip" id="tipIosBrowser" hidden>Je gebruikt niet Safari. Het werkt het betrouwbaarst in <strong>Safari</strong>: kopieer de link en plak hem daar.</div>
+    <div class="tip"><strong>Staat "Zet op beginscherm" er niet bij?</strong> Dan is de link in WhatsApp geopend: eerst <b>Open in Safari</b> (het kompasje), en doe het daar opnieuw.</div>
+  </section>
+
+  <!-- iPhone in Chrome (iOS 16.4+) of een andere browser -->
+  <section class="card main" id="vIosChrome" hidden>
+    <h2 id="iosChromeTitel">Installeren op iPhone (Chrome)</h2>
+    <ol class="steps">
+      <li><div>Tik rechtsboven in de adresbalk op het deel-knopje <span class="ico" aria-label="deel-knop"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11v9h12v-9"/></svg></span></div></li>
+      <li><div>Kies <strong>Zet op beginscherm</strong> <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg></span></div></li>
+      <li><div>Tik rechtsboven op <strong>Voeg toe</strong>. Het icoon staat daarna op je beginscherm.</div></li>
+    </ol>
+    <div class="tip"><strong>Staat "Zet op beginscherm" er niet bij?</strong> Scroll in het deelmenu omlaag of tik op <b>Meer</b>. Lukt het niet, open de link dan in <b>Safari</b>.</div>
   </section>
 
   <!-- Computer -->
   <section class="card main" id="vPc" hidden>
     <h2>Open dit op je telefoon</h2>
-    <p style="margin:0">Scan de code met de camera van je telefoon. Dan krijg je daar de stappen.</p>
+    <p style="margin:0">Scan de code met de camera van je telefoon. Dan krijg je daar de stappen voor die telefoon.</p>
     <div id="qr" aria-label="QR-code naar deze pagina"></div>
     <div class="link" id="linkTxt"></div>
-    <a class="btn" href="./">Of gebruik Meetmaat hier op de computer</a>
-  </section>
-
-  <section class="card main" id="vGroep" hidden>
-    <h2>Je bent uitgenodigd voor een groep</h2>
-    <p style="margin:0">Installeer Meetmaat hieronder. Open daarna de app: hij vraagt alleen nog je naam, dan zit je in de groep en kun je tekeningen met metingen naar elkaar sturen.</p>
-    <div class="tip" id="groepIos" hidden><strong>iPhone:</strong> vraagt de app niet om je naam? Ga in Meetmaat naar <b>Instellingen</b> en vul groepscode <b id="groepCode"></b> en je naam in.</div>
+    <div id="pcKnop" hidden>
+      <button type="button" class="btn primary" id="bInstallPc">Installeer op deze computer</button>
+      <div class="note" id="installNotePc" role="status"></div>
+    </div>
+    <a class="btn openApp" href="./">Of gebruik Meetmaat hier op de computer</a>
   </section>
 
   <section class="card" id="deel">
     <h2>Doorsturen naar iemand anders</h2>
-    <p style="margin:0">Stuur de link via WhatsApp of mail. De ander krijgt dan deze pagina met de stappen voor zijn telefoon.</p>
+    <p style="margin:0" id="deelUitleg">Stuur de link via WhatsApp of mail. De ander krijgt dan deze pagina met de stappen voor zijn telefoon.</p>
     <button type="button" class="btn" id="bDeel">Stuur de link door</button>
-    <div class="note" id="deelNote" hidden></div>
+    <div class="msg" id="deelNote" role="status"></div>
   </section>
 
   <section class="card">
     <h2>Goed om te weten</h2>
     <ul class="know">
-      <li>Open een PDF van de tekening. Meetmaat ijkt hem meestal zelf op de maatlijnen en herkent de palen.</li>
-      <li>Een PDF uit WhatsApp of de mail kun je ook <strong>delen naar Meetmaat</strong> (alleen Android, na installeren).</li>
-      <li>De laatste tekening, de ijking en je metingen blijven op je eigen telefoon.</li>
-      <li>Werkt ook zonder internet, als je de app één keer met internet hebt geopend.</li>
+      <li><strong>Open de app altijd via het icoon.</strong> Dan blijven je tekening, ijking en metingen bewaard.</li>
+      <li>Werkt zonder internet: tekening openen, ijken, meten en uitzetten. Open hem wel één keer met internet.</li>
+      <li>Internet nodig voor: luchtfoto en hoogtes (AHN) ophalen, en tekeningen naar de groep sturen of ophalen.</li>
+      <li>Een PDF uit WhatsApp of de mail kun je ook <strong>delen naar Meetmaat</strong> (Android, na installeren).</li>
+      <li>Alles blijft op je eigen telefoon. Geen account nodig.</li>
     </ul>
   </section>
 
   <section class="card" id="ander">
-    <h2>Ook van mij: Zaaihulp en Perceelkaart</h2>
-    <p style="margin:0">Aparte apps met een eigen icoon. Installeer ze op dezelfde manier.</p>
-    <a class="btn" href="../zaaihulp/installeren.html">Zaaihulp installeren</a>
+    <h2>Ook installeren: Perceelkaart en Zaaihulp</h2>
+    <p style="margin:0">Aparte apps met een eigen icoon. Installeren gaat op dezelfde manier.</p>
     <a class="btn" href="../perceelkaart/installeren.html">Perceelkaart installeren</a>
+    <a class="btn" href="../zaaihulp/installeren.html">Zaaihulp installeren</a>
   </section>
 
   <details id="alles">
@@ -168,12 +201,17 @@ body.metpijl main { padding-bottom: 90px; }
     <h2>Android (Chrome)</h2>
     <ol class="steps">
       <li><div>Open de link in Chrome en tik rechtsboven op de drie puntjes ⋮</div></li>
-      <li><div>Kies <strong>App installeren</strong> of <strong>Toevoegen aan startscherm</strong></div></li>
+      <li><div>Kies <strong>App installeren</strong> of <strong>Toevoegen aan startscherm</strong>, dan <strong>Installeren</strong></div></li>
     </ol>
     <h2>iPhone (Safari)</h2>
     <ol class="steps">
       <li><div>Open de link in Safari en tik onderin op het deel-knopje</div></li>
       <li><div>Kies <strong>Zet op beginscherm</strong> en tik op <strong>Voeg toe</strong></div></li>
+    </ol>
+    <h2>iPhone (Chrome)</h2>
+    <ol class="steps">
+      <li><div>Tik rechtsboven in de adresbalk op het deel-knopje</div></li>
+      <li><div>Kies <strong>Zet op beginscherm</strong> (of eerst <b>Meer</b>) en tik op <strong>Voeg toe</strong></div></li>
     </ol>
   </details>
 </main>
@@ -187,72 +225,116 @@ body.metpijl main { padding-bottom: 90px; }
   // iPad met iPadOS doet zich voor als Mac, maar heeft wel touch
   const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
   const android = /Android/.test(ua);
-  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  let standalone = false;
+  try { standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; } catch (e) {}
   const iosSafari = ios && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
   // In-app browsers op Android (WhatsApp, Facebook enz. gebruiken een WebView: "; wv)")
   const androidInApp = android && (/; wv\)/.test(ua) || /FBAN|FBAV|Instagram/.test(ua));
   const show = id => { $(id).hidden = false; };
+  const hide = id => { $(id).hidden = true; };
 
-  // Uitnodiging voor een groep (installeren.html#groep=…): alvast bewaren, de app vraagt daarna alleen de naam
-  const gm = /[#&]groep=([A-Za-z0-9_-]+)/.exec(location.hash);
-  if (gm) {
-    try {
+  // ---- Uitnodiging voor een groep: installeren.html?groep=<code>(&web=<link>), of de oude vorm #groep=<base64 {u,c}>
+  // Code alvast in de opslag van Meetmaat (meetmaat:groep, je naam blijft staan) en een seintje {code, url, ts}
+  // klaarzetten dat de app bij het openen oppakt: dan vraagt hij alleen nog je naam.
+  let code = "", web = "";
+  try {
+    const q = new URLSearchParams(location.search);
+    code = (q.get("groep") || "").trim().slice(0, 100); web = (q.get("web") || "").trim();
+  } catch (e) {}
+  if (!code) {
+    const gm = /[#&]groep=([A-Za-z0-9_-]+)/.exec(location.hash);
+    if (gm) try {
       const o = JSON.parse(decodeURIComponent(escape(atob(gm[1].replace(/-/g, "+").replace(/_/g, "/")))));
-      if (o && o.u && o.c) {
-        let prev = {}; try { prev = JSON.parse(localStorage.getItem("meetmaat:groep") || "{}") || {}; } catch (e) {}
-        localStorage.setItem("meetmaat:groep", JSON.stringify({ url: o.u, code: o.c, naam: prev.code === o.c ? (prev.naam || "") : (prev.naam || "") }));
-        show("vGroep"); $("groepCode").textContent = o.c;
-        if (ios) show("groepIos");
-      }
+      if (o && o.c) { code = String(o.c).trim().slice(0, 100); web = String(o.u || ""); }
     } catch (e) {}
   }
-  // Doorsturen: deelmenu (WhatsApp, mail), anders kopiëren; een groepsuitnodiging gaat mee
-  const deelUrl = new URL("installeren.html", location.href).href + (gm ? "#groep=" + gm[1] : "");
-  $("bDeel").addEventListener("click", async () => {
-    const note = $("deelNote");
-    const zeg = t => { note.textContent = t; note.hidden = false; };
+  if (web && !/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(web) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(web)) web = "";
+  const query = code ? "?groep=" + encodeURIComponent(code) + (web ? "&web=" + encodeURIComponent(web) : "") : "";
+  if (code) {
     try {
-      if (navigator.share) { await navigator.share({ title: "Meetmaat", text: "Meetmaat installeren op je telefoon:", url: deelUrl }); return; }
+      let prev = {}; try { prev = JSON.parse(localStorage.getItem("meetmaat:groep") || "{}") || {}; } catch (e) {}
+      const g = { code, naam: prev.naam || "" };
+      if (web) g.url = web;            // zonder eigen link vult de app de vaste groep in
+      localStorage.setItem("meetmaat:groep", JSON.stringify(g));
+      localStorage.setItem("meetmaat:groepUitnodiging", JSON.stringify({ code, url: web, ts: Date.now() }));
+    } catch (e) {}
+    show("vGroep"); $("groepCode").textContent = code;
+    if (ios) show("groepIos");
+    // Open Meetmaat neemt de groep ook via de link mee (voor als de opslag niet gedeeld is)
+    document.querySelectorAll(".openApp").forEach(a => { a.href = "./" + query; });
+    $("deelUitleg").textContent = "Stuur deze uitnodiging door via WhatsApp of mail. De ander installeert Meetmaat en zit daarna meteen in de groep.";
+  }
+
+  // Kopieer code (klembord, met een textarea als terugval voor oude telefoons)
+  $("bKopieer").addEventListener("click", async () => {
+    const msg = $("kopieerMsg");
+    let ok = false;
+    try { if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(code); ok = true; } } catch (e) {}
+    if (!ok) try {
+      const t = document.createElement("textarea");
+      t.value = code; t.setAttribute("readonly", ""); t.style.cssText = "position:fixed;top:0;left:0;opacity:0;font-size:16px";
+      document.body.appendChild(t); t.select(); t.setSelectionRange(0, code.length);
+      ok = document.execCommand("copy"); t.remove();
+    } catch (e) {}
+    msg.textContent = ok ? "Gekopieerd. Plak hem in Meetmaat bij Instellingen → Groepscode." : "Kopiëren lukte niet. Houd de code ingedrukt om hem te kopiëren.";
+  });
+
+  // ---- Doorsturen: deelmenu (WhatsApp, mail), anders kopiëren, anders de link laten zien
+  const pagina = new URL("installeren.html", location.href).href;
+  const deelUrl = pagina + query;
+  $("bDeel").addEventListener("click", async () => {
+    const zeg = t => { $("deelNote").textContent = t; };
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: code ? "Meetmaat groep" : "Meetmaat", text: code ? "Installeer Meetmaat en doe meteen mee met onze groep:" : "Meetmaat installeren op je telefoon:", url: deelUrl });
+        zeg("Gedeeld."); return;
+      }
     } catch (e) { if (e && e.name === "AbortError") return; }
     try { await navigator.clipboard.writeText(deelUrl); zeg("Link gekopieerd. Plak hem in WhatsApp of een mail."); }
     catch (e) { zeg("Stuur deze link: " + deelUrl); }
   });
 
-  if (standalone) { show("vAl"); return; }
-
+  // ---- Welk blok past bij dit apparaat
+  if (standalone) { show("vAl"); hide("deel"); return; }
   if (ios) {
-    show("vIos");
-    if (!iosSafari) show("tipIosBrowser");
-    if (iosSafari && /iPhone|iPod/.test(ua)) { show("pijl"); document.body.classList.add("metpijl"); }
+    if (iosSafari) {
+      show("vIos");
+      // springende pijl naar het deel-knopje: alleen op de iPhone (op de iPad zit het knopje bovenin)
+      if (/iPhone|iPod/.test(ua)) { show("pijl"); document.body.classList.add("metpijl"); }
+    } else {
+      show("vIosChrome");
+      if (!/CriOS/.test(ua)) $("iosChromeTitel").textContent = "Installeren op iPhone";
+    }
   } else if (android) {
     show("vAndroid");
     if (androidInApp) show("tipAndroid");
   } else {
     show("vPc");
-    const url = location.href.split("#")[0];
-    $("linkTxt").textContent = url;
-    try { if (!window.QRCode) throw 0; new QRCode($("qr"), { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); }
-    catch (e) { $("qr").hidden = true; }
+    $("linkTxt").textContent = deelUrl;
+    try { if (!window.QRCode) throw 0; new QRCode($("qr"), { text: deelUrl, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }); }
+    catch (e) { hide("qr"); }
   }
 
-  // Installeerknop (Chrome, Edge, Samsung Internet)
+  // ---- Installeerknop (Chrome, Edge, Samsung Internet): op Android in plaats van de stappen, op de computer onder de QR-code
   let uitstel = null;
   window.addEventListener("beforeinstallprompt", e => {
-    if (!android) return; // op de computer blijft de QR-code staan
+    if (ios) return;
     e.preventDefault(); uitstel = e;
-    $("vAndroid").hidden = true; $("vPc").hidden = true; show("vKnop");
+    if (android) { hide("vAndroid"); show("vKnop"); } else show("pcKnop");
   });
-  $("bInstall").addEventListener("click", async () => {
+  const installeer = async (knop, note) => {
     if (!uitstel) return;
-    uitstel.prompt();
+    const ev = uitstel; uitstel = null;
+    try { ev.prompt(); } catch (e) {}
     try {
-      const keuze = await uitstel.userChoice;
-      if (keuze && keuze.outcome === "dismissed") $("installNote").textContent = "Geannuleerd. Tik nog eens als je hem toch wilt.";
+      const keuze = await ev.userChoice;
+      if (keuze && keuze.outcome === "dismissed") { knop.hidden = true; $(note).textContent = "Geannuleerd. Herlaad de pagina als je hem toch wilt."; }
     } catch (e) {}
-    uitstel = null;
-  });
+  };
+  $("bInstall").addEventListener("click", () => installeer($("bInstall"), "installNote"));
+  $("bInstallPc").addEventListener("click", () => installeer($("bInstallPc"), "installNotePc"));
   window.addEventListener("appinstalled", () => {
-    ["vKnop", "vAndroid", "vPc"].forEach(id => $(id).hidden = true); show("vKlaar");
+    ["vKnop", "vAndroid", "vPc", "pijl"].forEach(hide); document.body.classList.remove("metpijl"); show("vKlaar");
   });
 })();
 </script>

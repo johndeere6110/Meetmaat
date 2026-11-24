@@ -3,7 +3,7 @@
 //
 // Let op: alle apps op johndeere6110.github.io (Zaaihulp, Perceelkaart, Meetmaat) delen één
 // cache-opslag. Ruim daarom alleen caches op die met "meetmaat-" beginnen.
-const VERSION = "meetmaat-v100";
+const VERSION = "meetmaat-v101";
 const PREFIX = "meetmaat-";
 const CORE = [
   "./",
@@ -78,18 +78,18 @@ self.addEventListener("fetch", e => {
 
   if (req.method !== "GET") return;
 
-  // Pagina's: eerst netwerk (nieuwste versie), offline uit cache
-  if (req.mode === "navigate") {
-    const file = url.pathname.endsWith("installeren.html") ? "installeren.html" : "index.html";
-    e.respondWith(
-      fetch(req).then(r => {
-        if (r.ok) { const copy = r.clone(); caches.open(VERSION).then(c => c.put(file, copy)); }
-        return r;
-      }).catch(() => caches.match(file))
-    );
-    return;
-  }
-
-  // Overige bestanden: uit cache, anders netwerk
-  e.respondWith(caches.match(req).then(hit => hit || fetch(req)));
+  // Alles van de app zelf: eerst netwerk (altijd de nieuwste versie, "no-cache" = even navragen bij de server),
+  // anders uit de cache. Pagina's bewaren we onder hun bestandsnaam, zodat ?groep= of ?shared=1 offline ook werkt.
+  const nav = req.mode === "navigate";
+  const file = !nav ? null : url.pathname.endsWith("installeren.html") ? "installeren.html"
+    : (url.pathname.endsWith("/") || url.pathname.endsWith("/index.html")) ? "index.html" : null;
+  e.respondWith(
+    fetch(req.url, { cache: "no-cache", redirect: nav ? "manual" : "follow" }).then(r => {
+      if (r.ok && r.type === "basic" && !req.headers.has("range")) {
+        const copy = r.clone();
+        caches.open(VERSION).then(c => c.put(file || req, copy)).catch(() => {});
+      }
+      return r;
+    }).catch(() => caches.match(file || req, { ignoreSearch: true }).then(m => m || (nav ? caches.match("index.html") : Response.error())))
+  );
 });
